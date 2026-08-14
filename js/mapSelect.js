@@ -1,7 +1,15 @@
 // マップ選択：ゲーム本編に入る前のステージ選択シーン
 // Chap1では1階層（コモン→ハイレベル→ボス）のみ実装。5階層周回はChap6以降で拡張予定。
 const MapSelectScene = {
+  pendingReward: null, // スキップ報酬をショップへ渡す前に表示するポップアップ用
+
   render(container){
+    this.container = container;
+    this.renderAll();
+  },
+
+  renderAll(){
+    this.container.innerHTML = '';
     const el = document.createElement('div');
     el.className = 'map-screen';
 
@@ -43,11 +51,15 @@ const MapSelectScene = {
       if(skipBtn){
         skipBtn.addEventListener('click', () => {
           if(locked || isCleared) return;
-          const reward = GameData.SKIP_REWARD_BASE[stage.key] || 1;
-          GameState.gold += reward;
-          GameState.lastReward = { type:'skip', stageName: stage.name, gold: reward, breakdown: { base: reward, bonus: 0, total: reward } };
+          const base = GameData.SKIP_REWARD_BASE[stage.key] || 1;
+          const flat = GameData.REWARD_FLAT_BONUS;
+          const total = base + flat;
+          GameState.gold += total;
+          const breakdown = { base, bonus:0, flat, total };
+          GameState.lastReward = { type:'skip', stageName: stage.name, gold: total, breakdown };
           if(!GameState.clearedStages.includes(stage.key)) GameState.clearedStages.push(stage.key);
-          App.showShop();
+          this.pendingReward = { stageName: stage.name, breakdown, gold: total };
+          this.renderAll();
         });
       }
     });
@@ -68,6 +80,31 @@ const MapSelectScene = {
       });
     }
 
-    container.appendChild(el);
-  }
+    this.container.appendChild(el);
+
+    if(this.pendingReward) this.container.appendChild(this.renderRewardPopup());
+  },
+
+  // ショップに入る前に獲得ゴールドを見せるポップアップ
+  renderRewardPopup(){
+    const r = this.pendingReward;
+    const overlay = document.createElement('div');
+    overlay.className = 'pack-modal-overlay';
+    const box = document.createElement('div');
+    box.className = 'gold-reveal-popup';
+    box.innerHTML = `
+      <div class="gr-label">${r.stageName}をスキップ</div>
+      <div class="gr-total">+${r.gold}G</div>
+      <div class="gr-breakdown">基礎G+${r.breakdown.base} ＋ 基本G+${r.breakdown.flat}</div>
+      <button id="btn-goto-shop" style="margin-top:16px;">ショップへ</button>
+    `;
+    overlay.appendChild(box);
+    setTimeout(() => {
+      box.querySelector('#btn-goto-shop').addEventListener('click', () => {
+        this.pendingReward = null;
+        App.showShop();
+      });
+    });
+    return overlay;
+  },
 };

@@ -15,17 +15,13 @@
   --gold:#fbbf24;
 }
 
-*{box-sizing:border-box;}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation;}
 
 html,body{
-  margin:0;
-  padding:0;
-  width:100%;
-  height:100%;
+  margin:0; padding:0; width:100%; height:100%;
   background:radial-gradient(circle at 50% 0%, #1a1f30 0%, #0c0d14 70%);
-  color:var(--text);
-  font-family:'Noto Sans JP', sans-serif;
-  overflow-x:hidden;
+  color:var(--text); font-family:'Noto Sans JP', sans-serif;
+  overflow-x:hidden; overscroll-behavior:none;
 }
 
 #app{
@@ -34,7 +30,48 @@ html,body{
   flex-direction:column;
   align-items:center;
   justify-content:flex-start;
-  padding:24px 16px 60px;
+  padding:16px 12px 40px;
+}
+
+/* スマホ横向き専用レイアウト */
+@media (max-height: 500px) and (orientation: landscape){
+  #app{ padding:8px 10px 20px; }
+  h1,h2{ font-size:1.1rem; margin-bottom:6px; }
+  button{ padding:8px 14px; font-size:13px; border-radius:8px; }
+  .status-bar{ padding:8px 12px; }
+  .stat .value{ font-size:14px; }
+  .board{ grid-template-columns:repeat(4,56px); grid-template-rows:repeat(4,56px); gap:4px; padding:6px; }
+  .cell{ font-size:22px; }
+  .cell-score{ font-size:9px; }
+  .card{ width:52px; height:74px; }
+  .card .card-symbol{ font-size:20px; }
+  .card .card-number{ font-size:11px; }
+  .card .card-tag{ font-size:8px; }
+  .hand-row{ gap:5px; }
+  .log-panel{ max-height:70px; font-size:11px; }
+  .relic-card{ padding:5px 8px; }
+  .relic-name{ font-size:10px; }
+  .effects-panel{ width:160px; font-size:11px; max-height:260px; }
+  .mult-legend{ font-size:10px; }
+  .mult-legend td{ padding:1px 5px; }
+  .progress-outer{ height:6px; }
+  .turn-indicator{ font-size:11px; padding:4px 10px; }
+  .game-screen{ gap:10px; }
+  .board-area{ gap:10px; }
+  .add-score-bar{ font-size:11px; padding:4px 8px; }
+  .cell-bubble{ font-size:10px; padding:3px 6px; top:-24px; }
+  .score-badge{ font-size:10px; padding:2px 5px; top:-22px; }
+  .info-panel{ padding:8px 12px; font-size:12px; }
+}
+
+@media (max-width: 480px){
+  #app{ padding:10px 8px 30px; }
+  .board{ grid-template-columns:repeat(4,60px); grid-template-rows:repeat(4,60px); gap:4px; padding:7px; }
+  .cell{ font-size:24px; }
+  .card{ width:56px; height:80px; }
+  .card .card-symbol{ font-size:22px; }
+  .effects-panel{ width:180px; font-size:11px; }
+  .shop-slot{ width:150px; }
 }
 
 h1,h2,h3{ margin:0 0 12px; font-weight:900; letter-spacing:.04em; }
@@ -127,6 +164,9 @@ button:disabled{ opacity:.35; cursor:not-allowed; }
 .card .card-symbol{ font-size:26px; font-weight:900; }
 .card .card-number{ font-size:12px; color:var(--text-dim); font-family:'Space Mono', monospace; }
 .card .card-tag{ font-size:9px; color:var(--accent-2); }
+.card .card-tag-jamming{ color:var(--square); }
+.card .card-tag-enhance{ color:var(--gold); }
+.card .card-tag-trait{ color:var(--circle); }
 
 .controls-row{ display:flex; gap:10px; }
 
@@ -145,7 +185,66 @@ button:disabled{ opacity:.35; cursor:not-allowed; }
 }
 .result-title{ font-size:34px; font-weight:900; }
 .result-title.win{ color:var(--square); }
+.cell.expand-highlight{ box-shadow:inset 0 0 0 3px var(--accent); background:#1a2a40; }
+.cell.paint-highlight{ box-shadow:inset 0 0 0 3px var(--accent-2); background:#2a1a2a; }
+.cell.blocked{ background:#1a1822; color:#444; cursor:not-allowed; font-size:20px; }
+.boss-tag{ background:#3d1515; border:1px solid var(--cross); border-radius:8px; padding:6px 14px; font-size:13px; color:var(--cross); font-weight:700; width:fit-content; }
 .result-title.lose{ color:var(--cross); }
+
+/* ---------- レリック表示 ---------- */
+.relic-display-row{
+  display:flex; gap:8px; flex-wrap:wrap; align-items:center; width:100%; padding:6px 0;
+}
+.relic-card{
+  background:var(--panel); border:2px solid #3a2c6a; border-radius:10px;
+  padding:8px 12px; min-width:80px; text-align:center; cursor:pointer;
+  transition:transform .15s, border-color .15s;
+}
+.relic-card:hover{ transform:translateY(-3px); border-color:#6a4ad4; }
+.relic-card.active{ border-color:var(--gold); background:#1e1830; }
+.relic-card.bounce{ animation: relicBounce 0.5s ease-in-out; }
+@keyframes relicBounce{
+  0%,100%{ transform:translateY(0); }
+  40%{ transform:translateY(-10px); }
+  70%{ transform:translateY(-4px); }
+}
+.relic-name{ font-size:11px; font-weight:700; color:#c4b5fd; }
+.relic-enhance-tag{ font-size:9px; color:var(--gold); margin-top:2px; }
+.relic-capacity{ font-size:11px; color:var(--text-dim); margin-left:auto; }
+.relic-empty{ font-size:12px; color:var(--text-dim); }
+
+.relic-info-panel{ border:1px solid #6a4ad4; }
+.relic-info-panel .info-desc{ margin-top:4px; }
+.relic-enhance-desc{ color:var(--gold) !important; }
+.sell-relic-btn{ margin-top:10px; background:#3d1a1a; color:var(--cross); font-size:13px; padding:8px 14px; border-radius:8px; }
+.sell-relic-btn:hover{ background:#5a2020; }
+
+/* ---------- ショップ：レリックカード形式 ---------- */
+.relic-shop-card{
+  background:linear-gradient(135deg,#1e1530,#2a1e50); border-radius:8px;
+  padding:10px; text-align:center; margin-bottom:6px; border:1px solid #4a3680;
+}
+.relic-shop-slot{ min-height:120px; }
+
+/* ---------- 加算点数欄 ---------- */
+.add-score-bar{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap; width:100%;
+  margin-top:8px; padding:6px 10px; background:#111624; border-radius:8px; font-size:12px;
+}
+.as-label{ color:var(--text-dim); }
+.as-cards{ font-weight:700; font-size:15px; font-family:'Space Mono',monospace; color:var(--text); }
+.as-relic{ color:var(--gold); font-weight:700; }
+.as-eq{ color:var(--accent); margin-left:auto; }
+
+.gold-reveal-popup{
+  background:var(--panel); border:1px solid #3a3050; border-radius:16px; padding:20px 28px; text-align:center;
+}
+.gold-reveal-popup .gr-label{ font-size:12px; color:var(--text-dim); letter-spacing:.1em; }
+.gold-reveal-popup .gr-total{
+  font-size:36px; font-weight:900; color:var(--gold); font-family:'Space Mono', monospace;
+  text-shadow:0 0 14px var(--gold);
+}
+.gold-reveal-popup .gr-breakdown{ font-size:12px; color:var(--text-dim); margin-top:4px; }
 
 /* ---------- Chap2: 盤面まわり ---------- */
 .board-area{ display:flex; gap:16px; align-items:center; justify-content:center; flex-wrap:wrap; }
@@ -283,12 +382,27 @@ button:disabled{ opacity:.35; cursor:not-allowed; }
 }
 .pack-card-item:hover{ transform:translateY(-6px); border-color:var(--gold); }
 .pack-card-item.picked{ border-color:var(--gold); box-shadow:0 0 0 2px rgba(251,191,36,.5); transform:translateY(-6px); }
+.pack-card-item{ position:relative; }
+.sell-badge{
+  position:absolute; top:-20px; left:50%; transform:translateX(-50%);
+  background:var(--gold); color:#1a1a1a; font-size:9px; font-weight:700; padding:2px 6px; border-radius:6px; white-space:nowrap;
+}
+.grid-disabled{ opacity:.4; pointer-events:none; }
 
-.effect-choice-list{ display:flex; flex-direction:column; gap:10px; max-width:420px; }
+.effect-choice-list{ display:flex; flex-direction:column; gap:10px; max-width:520px; margin:0 auto; }
 .effect-choice-item{
   background:var(--panel-2); border:1px solid #2b3150; border-radius:10px; padding:12px 14px; text-align:left;
   cursor:pointer; transition:border-color .12s ease, transform .12s ease;
 }
 .effect-choice-item:hover{ border-color:var(--gold); transform:translateX(2px); }
+.effect-choice-item.chosen{ border-color:var(--gold); background:#2c2410; }
 
 .pack-modal-actions{ display:flex; gap:10px; justify-content:center; margin-top:16px; flex-wrap:wrap; }
+.pack-modal-wide{ max-width:760px; }
+
+.card-pick-wrap{ display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer; width:150px; }
+.card-pick-wrap .card:hover{ transform:translateY(-6px); border-color:var(--gold); }
+.card-pick-desc{ font-size:11px; color:var(--text-dim); text-align:center; line-height:1.5; }
+
+.card-reveal-popup{ background:var(--panel); border:1px solid var(--gold); border-radius:16px; padding:24px 30px; text-align:center; }
+.card.reveal-glow{ box-shadow:0 0 18px rgba(251,191,36,.6); border-color:var(--gold); }
