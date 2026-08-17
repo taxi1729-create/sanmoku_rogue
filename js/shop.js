@@ -37,24 +37,34 @@ const ShopScene = {
   calcCashGain(card){ return 1 + (card.enhance ? 2 : 0) + (card.jamming ? 1 : 0) + ((card.trait&&card.trait!=='塗りつぶし(レリック)') ? 3 : 0); },
 
   cardTagsHtml(card){
-    let h = '';
-    if(card.jamming) h += `<div class="card-dot dot-jamming" title="${card.jamming}"></div>`;
-    if(card.enhance) h += `<div class="card-dot dot-enhance" title="${card.enhance}"></div>`;
-    if(card.trait) h += `<div class="card-dot dot-trait" title="${card.trait}"></div>`;
-    return h ? `<div class="card-dots-row">${h}</div>` : '';
+    let h='';
+    if(card.jamming) h+=`<div class="card-dot dot-jamming" title="${card.jamming}"></div>`;
+    if(card.enhance) h+=`<div class="card-dot dot-enhance" title="${card.enhance}"></div>`;
+    if(card.trait)   h+=`<div class="card-dot dot-trait"   title="${card.trait}"></div>`;
+    return h?`<div class="card-dots-row">${h}</div>`:'';
   },
   cardSymbolHtml(card){
-    const main = `<span class="sym-${card.symbol}">${GameData.SYMBOL_LABEL[card.symbol]}</span>`;
-    const multiSym = GameData.MULTI_SYMBOL_LABEL[card.enhance];
-    return multiSym
-      ? `<div class="card-symbol-wrap">${main}<span class="card-multi-sub">${multiSym}</span></div>`
-      : `<div class="card-symbol-wrap">${main}</div>`;
+    const label=GameData.SYMBOL_LABEL[card.symbol];
+    const emoji=card.jamming?(GameData.JAMMING_EMOJI[card.jamming]||''):'';
+    const emojiHtml=emoji?`<div class="card-jamming-emoji">${emoji}</div>`:'';
+    const multiSym=GameData.MULTI_SYMBOL_LABEL[card.enhance];
+    if(card.enhance==='横拡張'){
+      return `<div class="card-symbol-expand horiz"><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span></div>${emojiHtml}`;
+    }
+    if(card.enhance==='縦拡張'){
+      return `<div class="card-symbol-expand vert"><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span></div>${emojiHtml}`;
+    }
+    if(card.enhance==='拡大'){
+      return `<div class="card-symbol-expand grid2"><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span></div>${emojiHtml}`;
+    }
+    const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
+    return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span>${sub}</div>${emojiHtml}`;
   },
   cardScoreHtml(card){
-    const multiMap = { 'マルマルチ':'Circle', 'サンカクマルチ':'Triangle', 'シカクマルチ':'Square' };
-    const ms = multiMap[card.enhance];
-    if((ms && card.symbol === ms || card.enhance === 'ブルジョワ') && card.baseScore > card.number)
-      return `<span class="card-number">${card.number}<span class="card-score-bonus">+${card.baseScore - card.number}</span></span>`;
+    const multiMap={'マルマルチ':'Circle','サンカクマルチ':'Triangle','シカクマルチ':'Square'};
+    const ms=multiMap[card.enhance];
+    if((ms&&card.symbol===ms||card.enhance==='ブルジョワ')&&card.baseScore>card.number)
+      return `<span class="card-number">${card.number}<span class="card-score-bonus">+${card.baseScore-card.number}</span></span>`;
     return `<span class="card-number">${card.baseScore}</span>`;
   },
 

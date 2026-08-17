@@ -249,3 +249,28 @@ button:disabled{opacity:.35;cursor:not-allowed;}
   border:6px solid transparent; border-top-color:var(--panel-2);
 }
 .cell.drag-over{ background:#2a3a5c!important; box-shadow:inset 0 0 0 3px var(--accent)!important; }
+
+/* --- 拡張/拡大カードUI #3 --- */
+.card-symbol-expand{ display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:1px; }
+.card-symbol-expand.horiz{ flex-direction:row; gap:2px; }
+.card-symbol-expand.vert{ flex-direction:column; gap:0; }
+.card-symbol-expand.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:0; width:100%; justify-items:center; }
+.esym{ font-size:15px; line-height:1; }
+
+/* --- ジャミング絵文字 #5 --- */
+.card-jamming-emoji{ font-size:13px; line-height:1; margin-top:2px; }
+
+/* --- ホバー吹き出し色 #4 --- */
+.desc-jamming{ color:var(--square); }
+.desc-enhance{ color:var(--gold); }
+.desc-trait{ color:var(--circle); }
+.card-hover-tip span{ display:block; }
+
+/* --- タッチドラッグ #6 --- */
+.touch-drag-ghost{
+  position:fixed; z-index:9999; pointer-events:none; opacity:0.85;
+  transform:scale(1.1); box-shadow:0 8px 24px rgba(0,0,0,.6);
+  border-color:var(--gold)!important;
+}
+.dragging-origin{ opacity:0.4; }
+.cell.touch-hover{ box-shadow:inset 0 0 0 3px var(--gold)!important; background:#2a3a5c!important; }

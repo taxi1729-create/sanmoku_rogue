@@ -727,38 +727,44 @@ const GameMainScene = {
     let h='';
     if(card.jamming) h+=`<div class="card-dot dot-jamming" title="${card.jamming}"></div>`;
     if(card.enhance) h+=`<div class="card-dot dot-enhance" title="${card.enhance}"></div>`;
-    if(card.trait) h+=`<div class="card-dot dot-trait" title="${card.trait}"></div>`;
+    if(card.trait)   h+=`<div class="card-dot dot-trait"   title="${card.trait}"></div>`;
     return h?`<div class="card-dots-row">${h}</div>`:'';
   },
 
-  // #16 マルチカード：記号の右に小さく対応記号表示
   cardSymbolHtml(card){
-    const main=`<span class="sym-${card.symbol}">${GameData.SYMBOL_LABEL[card.symbol]}</span>`;
+    const label=GameData.SYMBOL_LABEL[card.symbol];
+    const emoji=card.jamming?(GameData.JAMMING_EMOJI[card.jamming]||''):'';
+    const emojiHtml=emoji?`<div class="card-jamming-emoji">${emoji}</div>`:'';
     const multiSym=GameData.MULTI_SYMBOL_LABEL[card.enhance];
-    if(multiSym){
-      return `<div class="card-symbol-wrap">${main}<span class="card-multi-sub">${multiSym}</span></div>`;
+    if(card.enhance==='横拡張'){
+      return `<div class="card-symbol-expand horiz"><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span></div>${emojiHtml}`;
     }
-    return `<div class="card-symbol-wrap">${main}</div>`;
+    if(card.enhance==='縦拡張'){
+      return `<div class="card-symbol-expand vert"><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span></div>${emojiHtml}`;
+    }
+    if(card.enhance==='拡大'){
+      return `<div class="card-symbol-expand grid2"><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span></div>${emojiHtml}`;
+    }
+    const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
+    return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span>${sub}</div>${emojiHtml}`;
   },
 
-  // #13 基礎点表示（マルチ/ブルジョワの場合は元の数値+補正値を表示）
   cardScoreHtml(card){
     const multiMap={'マルマルチ':'Circle','サンカクマルチ':'Triangle','シカクマルチ':'Square'};
     const ms=multiMap[card.enhance];
-    if(ms&&card.symbol===ms&&card.baseScore>card.number){
+    if((ms&&card.symbol===ms||card.enhance==='ブルジョワ')&&card.baseScore>card.number)
       return `<span class="card-number">${card.number}<span class="card-score-bonus">+${card.baseScore-card.number}</span></span>`;
-    }
-    if(card.enhance==='ブルジョワ'&&card.baseScore>card.number){
-      return `<span class="card-number">${card.number}<span class="card-score-bonus">+${card.baseScore-card.number}</span></span>`;
-    }
     return `<span class="card-number">${card.baseScore}</span>`;
   },
 
   cardInfoDescHtml(card){
     const l=[];
-    if(card.jamming) l.push(`<div class="info-desc">【${card.jamming}】${GameData.JAMMING_DESC[card.jamming]||''}</div>`);
-    if(card.enhance) l.push(`<div class="info-desc">【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}</div>`);
-    if(card.trait) l.push(`<div class="info-desc">【${card.trait}】${GameData.TRAIT_DESC[card.trait]||''}</div>`);
+    if(card.jamming){
+      const emoji=GameData.JAMMING_EMOJI[card.jamming]||'';
+      l.push(`<div class="info-desc desc-jamming">${emoji} 【${card.jamming}】${GameData.JAMMING_DESC[card.jamming]||''}</div>`);
+    }
+    if(card.enhance) l.push(`<div class="info-desc desc-enhance">【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}</div>`);
+    if(card.trait)   l.push(`<div class="info-desc desc-trait">【${card.trait}】${GameData.TRAIT_DESC[card.trait]||''}</div>`);
     return l.length>0?l.join(''):'<div class="info-desc">効果なし</div>';
   },
 
@@ -802,6 +808,7 @@ const GameMainScene = {
       const isPaint=card&&(card.trait==='塗りつぶし'||card.trait==='塗りつぶし(レリック)');
       const canPlace=this.currentSide==='player'&&!this.resultState&&!this.rerollMode&&(cd===null||isPaint)&&this.selectedCardId&&!isBlocked;
       cellEl.className='cell '+(isBlocked?'blocked':(cd===null?(canPlace?'empty':'disabled'):''));
+      cellEl.dataset.ci=i;
       if(isBlocked){cellEl.textContent='✕';cellEl.style.color='#333';}
       else if(cd){
         const sym=document.createElement('div'); sym.className='card-symbol-wrap sym-'+cd.symbol;
@@ -870,8 +877,9 @@ const GameMainScene = {
         c.innerHTML=`${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card)}`;
       }
 
-      // #5 ドラッグ&ドロップ
+      // ドラッグ&ドロップ（マウス：即時、タッチ：0.38秒長押し後）
       if(this.currentSide==='player'&&!this.resultState&&!this.rerollMode){
+        // --- マウスドラッグ ---
         c.draggable=true;
         c.addEventListener('dragstart',(e)=>{
           this.selectedCardId=card.id;
@@ -880,26 +888,82 @@ const GameMainScene = {
           e.dataTransfer.effectAllowed='move';
           this.renderAll();
         });
-        c.addEventListener('dragend',()=>{
-          // ドロップされなかった場合は選択解除しない（盤面側で処理）
+
+        // --- タッチ長押しドラッグ ---
+        let touchTimer=null, touchDragging=false, ghost=null;
+        const LONG_PRESS_MS=380;
+
+        const startGhost=(touchX,touchY)=>{
+          touchDragging=true;
+          this.selectedCardId=card.id;
+          this.expandPending=null; this.paintPending=null;
+          // ゴースト要素を作成
+          ghost=c.cloneNode(true);
+          ghost.className=c.className+' touch-drag-ghost';
+          ghost.style.left=(touchX-33)+'px';
+          ghost.style.top=(touchY-46)+'px';
+          document.body.appendChild(ghost);
+          c.classList.add('dragging-origin');
+          this.renderAll();
+        };
+
+        c.addEventListener('touchstart',(e)=>{
+          if(e.touches.length!==1) return;
+          const t=e.touches[0];
+          touchTimer=setTimeout(()=>startGhost(t.clientX,t.clientY), LONG_PRESS_MS);
+        },{passive:true});
+
+        c.addEventListener('touchmove',(e)=>{
+          if(!touchDragging){ clearTimeout(touchTimer); touchTimer=null; return; }
+          e.preventDefault();
+          const t=e.touches[0];
+          if(ghost){ ghost.style.left=(t.clientX-33)+'px'; ghost.style.top=(t.clientY-46)+'px'; }
+          // ドロップ先セルのハイライト
+          const el=document.elementFromPoint(t.clientX,t.clientY);
+          document.querySelectorAll('.cell.touch-hover').forEach(x=>x.classList.remove('touch-hover'));
+          const cell=el?.closest('.cell'); if(cell) cell.classList.add('touch-hover');
+        },{passive:false});
+
+        c.addEventListener('touchend',(e)=>{
+          clearTimeout(touchTimer); touchTimer=null;
+          document.querySelectorAll('.cell.touch-hover').forEach(x=>x.classList.remove('touch-hover'));
+          if(ghost){ ghost.remove(); ghost=null; }
+          c.classList.remove('dragging-origin');
+          if(!touchDragging){ touchDragging=false; return; }
+          touchDragging=false;
+          // ドロップ先セルを特定
+          const t=e.changedTouches[0];
+          const el=document.elementFromPoint(t.clientX,t.clientY);
+          const cellEl=el?.closest('.cell[data-ci]');
+          if(cellEl){
+            const ci=parseInt(cellEl.dataset.ci,10);
+            if(!isNaN(ci)) this.onCellClick(ci);
+          }
+        });
+
+        c.addEventListener('touchcancel',()=>{
+          clearTimeout(touchTimer); touchTimer=null;
+          if(ghost){ ghost.remove(); ghost=null; }
+          c.classList.remove('dragging-origin');
+          touchDragging=false;
+          document.querySelectorAll('.cell.touch-hover').forEach(x=>x.classList.remove('touch-hover'));
         });
       }
 
-      // #1 ホバーで吹き出し
+      // ホバーで吹き出し（マウスのみ）
       c.addEventListener('mouseenter',()=>{
-        const tip=wrapper.querySelector('.card-hover-tip');
-        if(tip) return;
+        const tip=wrapper.querySelector('.card-hover-tip'); if(tip) return;
         const lines=[];
         if(!this.bossBlackedOut||isSel){
-          if(card.jamming) lines.push(`【${card.jamming}】${GameData.JAMMING_DESC[card.jamming]||''}`);
-          if(card.enhance) lines.push(`【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}`);
-          if(card.trait) lines.push(`【${card.trait}】${GameData.TRAIT_DESC[card.trait]||''}`);
+          if(card.jamming){ const emoji=GameData.JAMMING_EMOJI[card.jamming]||''; lines.push(`<span class="desc-jamming">${emoji} 【${card.jamming}】${GameData.JAMMING_DESC[card.jamming]||''}</span>`); }
+          if(card.enhance) lines.push(`<span class="desc-enhance">【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}</span>`);
+          if(card.trait)   lines.push(`<span class="desc-trait">【${card.trait}】${GameData.TRAIT_DESC[card.trait]||''}</span>`);
         }else{
-          if(card.enhance) lines.push(`【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}`);
+          if(card.enhance) lines.push(`<span class="desc-enhance">【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}</span>`);
         }
         if(lines.length===0) return;
         const tip2=document.createElement('div'); tip2.className='card-hover-tip';
-        tip2.textContent=lines.join(' / ');
+        tip2.innerHTML=lines.join('<br>');
         wrapper.appendChild(tip2);
       });
       c.addEventListener('mouseleave',()=>{
