@@ -274,3 +274,27 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 }
 .dragging-origin{ opacity:0.4; }
 .cell.touch-hover{ box-shadow:inset 0 0 0 3px var(--gold)!important; background:#2a3a5c!important; }
+
+/* --- #4 強化効果ビジュアル --- */
+.sym-large{ font-size:38px!important; line-height:1; }
+.enhance-badge{ font-size:13px; margin-left:1px; line-height:1; }
+.gold-text{ color:var(--gold); }
+.card-draw-label{ display:block; font-size:8px; color:var(--accent); font-family:'Space Mono',monospace; line-height:1; margin-top:1px; text-align:right; padding-right:4px; }
+
+/* --- #2 カード更新説明 --- */
+.card-reveal-desc{ font-size:10px; line-height:1.5; max-width:160px; text-align:left; background:var(--panel-2); border-radius:8px; padding:6px 8px; }
+
+/* --- #3 ピックアップアップグレードプレビュー --- */
+.pickup-preview-item{ font-size:10px; color:var(--text-dim); line-height:1.4; }
+
+/* --- #5 アップグレードモーダルのビンゴ倍率パネル --- */
+.modal-mult-panel{ margin-bottom:10px; }
+.mult-legend-modal{ display:inline-block; background:rgba(0,0,0,.3); border-radius:8px; padding:6px 12px; font-size:11px; }
+.mult-legend-modal table{ border-collapse:collapse; }
+.mult-legend-modal th{ color:var(--text-dim); font-weight:400; padding:0 5px 2px; text-align:center; font-size:10px; }
+.mult-legend-modal td{ padding:1px 5px; text-align:center; font-family:'Space Mono',monospace; font-size:11px; }
+.mult-legend-modal td:first-child{ font-size:14px; font-weight:900; }
+
+/* --- #1 基礎点左のインラインドット --- */
+.score-dots{ display:inline-flex; gap:2px; align-items:center; margin-right:3px; vertical-align:middle; }
+.score-dot{ width:6px; height:6px; border-radius:50%; display:inline-block; }

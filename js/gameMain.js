@@ -723,38 +723,88 @@ const GameMainScene = {
   },
 
   // #5 カードタグ：ドット表示に変更
+  // --- 共通カード表示ヘルパー（手札/盤面/ショップ共通） ---
+
+  // #1 左上ドット（ジャミング緑・強化黄・性質変化青）
   cardTagsHtml(card){
     let h='';
-    if(card.jamming) h+=`<div class="card-dot dot-jamming" title="${card.jamming}"></div>`;
-    if(card.enhance) h+=`<div class="card-dot dot-enhance" title="${card.enhance}"></div>`;
-    if(card.trait)   h+=`<div class="card-dot dot-trait"   title="${card.trait}"></div>`;
+    if(card.jamming) h+=`<div class="card-dot dot-jamming"></div>`;
+    if(card.enhance) h+=`<div class="card-dot dot-enhance"></div>`;
+    if(card.trait)   h+=`<div class="card-dot dot-trait"></div>`;
     return h?`<div class="card-dots-row">${h}</div>`:'';
   },
 
+  // #4 各強化効果の視覚表現を記号に反映
   cardSymbolHtml(card){
     const label=GameData.SYMBOL_LABEL[card.symbol];
     const emoji=card.jamming?(GameData.JAMMING_EMOJI[card.jamming]||''):'';
     const emojiHtml=emoji?`<div class="card-jamming-emoji">${emoji}</div>`:'';
     const multiSym=GameData.MULTI_SYMBOL_LABEL[card.enhance];
-    if(card.enhance==='横拡張'){
+
+    // 拡張・拡大
+    if(card.enhance==='横拡張')
       return `<div class="card-symbol-expand horiz"><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span></div>${emojiHtml}`;
-    }
-    if(card.enhance==='縦拡張'){
+    if(card.enhance==='縦拡張')
       return `<div class="card-symbol-expand vert"><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span></div>${emojiHtml}`;
-    }
-    if(card.enhance==='拡大'){
+    if(card.enhance==='拡大')
       return `<div class="card-symbol-expand grid2"><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span></div>${emojiHtml}`;
+
+    // 巨大化：記号1.5倍
+    if(card.enhance==='巨大化'){
+      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol} sym-large">${label}</span>${sub}</div>${emojiHtml}`;
     }
+    // ハブ：記号右に➕
+    if(card.enhance==='ハブ'){
+      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">➕</span>${sub}</div>${emojiHtml}`;
+    }
+    // 連鎖：記号右に🤝
+    if(card.enhance==='連鎖'){
+      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">🤝</span>${sub}</div>${emojiHtml}`;
+    }
+    // 肥大化：記号横に "+倍率*2" (黄色)
+    if(card.enhance==='肥大化'){
+      const mult=GameData.BINGO_MULTIPLIER_BASE[card.symbol]||0;
+      const val=mult*2;
+      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge gold-text">+${val}</span>${sub}</div>${emojiHtml}`;
+    }
+    // マルチ系
     const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
     return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span>${sub}</div>${emojiHtml}`;
   },
 
-  cardScoreHtml(card){
+  // #4 右上数字にブルジョワ・ドロー情報を付加
+  // #1 ドット（黄緑青）をカード基礎点の左に inline 表示
+  // #2 ブルジョワは現在Gを受け取って動的表示
+  // #6 数値強化も +15 を明示
+  cardScoreHtml(card, currentGold=0){
     const multiMap={'マルマルチ':'Circle','サンカクマルチ':'Triangle','シカクマルチ':'Square'};
     const ms=multiMap[card.enhance];
-    if((ms&&card.symbol===ms||card.enhance==='ブルジョワ')&&card.baseScore>card.number)
-      return `<span class="card-number">${card.number}<span class="card-score-bonus">+${card.baseScore-card.number}</span></span>`;
-    return `<span class="card-number">${card.baseScore}</span>`;
+
+    // 左側インラインドット
+    let dotHtml='';
+    if(card.enhance) dotHtml+=`<span class="score-dot dot-enhance"></span>`;
+    if(card.jamming) dotHtml+=`<span class="score-dot dot-jamming"></span>`;
+    if(card.trait)   dotHtml+=`<span class="score-dot dot-trait"></span>`;
+    const dotsSpan=dotHtml?`<span class="score-dots">${dotHtml}</span>`:'';
+
+    let bonusHtml='';
+    if(ms&&card.symbol===ms&&card.baseScore>card.number){
+      bonusHtml=`<span class="card-score-bonus">+${card.baseScore-card.number}</span>`;
+    } else if(card.enhance==='数値強化'){
+      bonusHtml=`<span class="card-score-bonus">+15</span>`;
+    } else if(card.enhance==='ブルジョワ'){
+      // #2 動的：現在G×4
+      const bonus=currentGold*4;
+      bonusHtml=`<span class="card-score-bonus gold-text">+${bonus}(×4G)</span>`;
+    }
+
+    let scoreHtml=`<span class="card-number">${dotsSpan}${card.baseScore}${bonusHtml}</span>`;
+    if(card.enhance==='ドロー') scoreHtml+=`<span class="card-draw-label">draw1</span>`;
+    return scoreHtml;
   },
 
   cardInfoDescHtml(card){
@@ -874,7 +924,7 @@ const GameMainScene = {
       if(this.bossBlackedOut&&!isSel){
         c.innerHTML=`<div class="card-dots-row">${card.enhance?`<div class="card-dot dot-enhance" title="${card.enhance}"></div>`:''}</div><div class="card-symbol-wrap" style="color:#fff;font-size:22px;">？</div><span class="card-number">-</span>`;
       }else{
-        c.innerHTML=`${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card)}`;
+        c.innerHTML=`${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card, GameState.gold)}`;
       }
 
       // ドラッグ&ドロップ（マウス：即時、タッチ：0.38秒長押し後）
