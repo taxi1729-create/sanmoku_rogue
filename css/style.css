@@ -298,3 +298,27 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 /* --- #1 基礎点左のインラインドット --- */
 .score-dots{ display:inline-flex; gap:2px; align-items:center; margin-right:3px; vertical-align:middle; }
 .score-dot{ width:6px; height:6px; border-radius:50%; display:inline-block; }
+
+/* --- #1 点数演出フェーズ別アニメ --- */
+.scoring-pop{ animation:cellPop .4s ease-out; }
+@keyframes cellPop{
+  0%{transform:scale(1);}50%{transform:scale(1.25);box-shadow:inset 0 0 0 3px var(--gold),0 0 12px var(--gold);}100%{transform:scale(1);}
+}
+.mult-legend.scoring-phase2{ animation:multGlow .5s ease-in-out; }
+@keyframes multGlow{
+  0%,100%{background:rgba(0,0,0,.3);}50%{background:rgba(251,191,36,.3);box-shadow:0 0 12px var(--gold);}
+}
+.as-live{ font-size:18px; font-weight:900; font-family:'Space Mono',monospace; color:var(--gold); margin-left:auto; }
+
+/* --- #4 ボス効果タグに説明を追加 --- */
+.boss-tag{ display:flex; flex-direction:column; gap:2px; }
+.boss-tag-name{ color:var(--cross); font-weight:700; font-size:12px; }
+.boss-tag-desc{ color:#cc7070; font-size:10px; }
+
+/* --- #5 ショップをスクロール可能・固定高さに --- */
+.shop-screen{
+  width:100%; max-width:960px; display:flex; flex-direction:column; gap:14px;
+  max-height:calc(100vh - 80px); overflow-y:auto; padding-right:4px;
+}
+.shop-row{ flex-wrap:wrap; }
+

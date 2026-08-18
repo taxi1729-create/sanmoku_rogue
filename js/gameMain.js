@@ -408,17 +408,48 @@ const GameMainScene = {
   },
 
   async playScoreSequence(bingos){ for(const b of bingos) await this.showScoreStep(b); },
+
   async showScoreStep(b){
     const before=GameState.currentScore, after=Math.max(0,before+b.score);
-    this.scoringAnim={cells:b.cells,symbol:b.symbol,liveScore:before,reached:false,totalBase:b.totalBase,relicBonus:b.relicBonus,mult:b.mult,isQuad:b.isQuad};
-    this.renderAll(); await this.sleep(300);
-    const steps=20,dur=900;
-    for(let s=1;s<=steps;s++){
-      this.scoringAnim.liveScore=Math.round(before+(after-before)*s/steps);
-      this.renderAll(); await this.sleep(dur/steps);
+    // step 1: 補正基礎点+カード基礎点（ビンゴセルをポップ）
+    this.scoringAnim={phase:1,cells:b.cells,symbol:b.symbol,liveScore:before,totalBase:b.totalBase,mult:b.mult,isQuad:b.isQuad,finalMultiplier:b.finalMultiplier,finalAdd:b.finalAdd,reached:false};
+    this.renderAll(); await this.sleep(500);
+    // step 2: ビンゴ倍率+補正倍率（倍率を光らせる）
+    this.scoringAnim.phase=2;
+    this.renderAll(); await this.sleep(500);
+    // step 3: 1×2を乗算してカウントアップ
+    this.scoringAnim.phase=3;
+    const step3Target=Math.round(b.totalBase*b.mult);
+    this.renderAll();
+    const steps3=10;
+    for(let s=1;s<=steps3;s++){
+      this.scoringAnim.liveScore=Math.round(before+(step3Target-before)*s/steps3);
+      this.renderAll(); await this.sleep(500/steps3);
     }
+    await this.sleep(150);
+    // step 4: 4列補正×1.5（isQuadの場合のみ）
+    if(b.isQuad){
+      this.scoringAnim.phase=4;
+      const step4Target=Math.max(0,Math.round(b.totalBase*b.mult*1.5));
+      this.renderAll();
+      const steps4=10;
+      for(let s=1;s<=steps4;s++){
+        this.scoringAnim.liveScore=Math.round(before+(step4Target-before)*s/steps4);
+        this.renderAll(); await this.sleep(500/steps4);
+      }
+      await this.sleep(150);
+    }
+    // step 5: 最終乗算補正（該当レリック/カードをポップ）
+    this.scoringAnim.phase=5;
+    this.renderAll(); await this.sleep(500);
+    // step 6: 最終加算補正
+    if(b.finalAdd){
+      this.scoringAnim.phase=6;
+      this.renderAll(); await this.sleep(500);
+    }
+    // 確定
     GameState.currentScore=after;
-    this.scoringAnim.liveScore=after; this.scoringAnim.reached=GameState.currentScore>=GameState.targetScore;
+    this.scoringAnim.liveScore=after; this.scoringAnim.reached=GameState.currentScore>=GameState.targetScore; this.scoringAnim.phase=7;
     this.addLog(`${GameData.SYMBOL_LABEL[b.symbol]}${b.isQuad?'4列':'3列'}ビンゴ！ +${GlobalFunctions.formatScore(b.score)}（計${GlobalFunctions.formatScore(GameState.currentScore)}）`);
     this.renderAll(); await this.sleep(900);
     this.scoringAnim=null; this.renderAll();
@@ -636,12 +667,13 @@ const GameMainScene = {
     this.renderAll(); if(this.currentSide==='npc') this.scheduleAIMove();
   },
 
-  onRelicClick(relicId){ this.activeRelicId=(this.activeRelicId===relicId)?null:relicId; this.boardInfoCell=null; this.selectedCardId=null; this.renderAll(); },
+  onRelicClick(idx){ this.activeRelicId=(this.activeRelicId===idx)?null:idx; this.boardInfoCell=null; this.selectedCardId=null; this.renderAll(); },
 
-  sellRelic(relicId){
-    const idx=GameState.relics.findIndex(r=>r.id===relicId); if(idx<0) return;
+  // #2 売却はインデックスベースで特定（同一idのレリックが複数あっても正しく売却）
+  sellRelic(relicIndex){
+    const idx=parseInt(relicIndex,10);
+    if(isNaN(idx)||idx<0||idx>=GameState.relics.length) return;
     const relic=GameState.relics[idx];
-    // #20 レリック売却時に効果を除去
     this.removeRelicEffect(relic);
     const ren=relic.relicEnhance;
     let price=1;
@@ -680,10 +712,16 @@ const GameMainScene = {
     const turnEl=document.createElement('div'); turnEl.className='turn-indicator '+this.currentSide;
     turnEl.textContent=this.currentSide==='player'?`あなたの番（ターン ${this.turnInRound} / ${turnMax}）`:`NPCの番（ターン ${this.turnInRound} / ${turnMax}）`;
     wrap.appendChild(turnEl);
-    if(this.bossEffect){const bt=document.createElement('div');bt.className='boss-tag';bt.textContent=`ボス効果：${this.bossEffect.name}`;wrap.appendChild(bt);}
+    if(this.bossEffect){
+      const bt=document.createElement('div'); bt.className='boss-tag';
+      bt.innerHTML=`<span class="boss-tag-name">ボス効果：${this.bossEffect.name}</span><span class="boss-tag-desc">${this.bossEffect.desc}</span>`;
+      wrap.appendChild(bt);
+    }
     const ba=document.createElement('div'); ba.className='board-area';
     const leftCol=document.createElement('div'); leftCol.className='board-left-col';
-    leftCol.appendChild(this.renderMultLegend());
+    const multLegend=this.renderMultLegend();
+    if(this.scoringAnim?.phase===2) multLegend.classList.add('scoring-phase2');
+    leftCol.appendChild(multLegend);
     leftCol.appendChild(this.renderEffectsPanel()); // #6 常時表示
     ba.appendChild(leftCol); ba.appendChild(this.renderBoard());
     wrap.appendChild(ba);
@@ -706,9 +744,9 @@ const GameMainScene = {
     let addScoreHtml='';
     if(this.scoringAnim){
       const a=this.scoringAnim;
-      const cardSum=a.totalBase-(a.relicBonus||0)-GameData.CORRECTION_BASE_SCORE;
-      const relicPart=a.relicBonus>0?` + ${a.relicBonus}（レリック補正）`:'';
-      addScoreHtml=`<div class="add-score-bar"><span class="as-label">基礎点：</span><span class="as-cards">${cardSum}${relicPart}</span><span class="as-eq">→ 合計 ${a.totalBase} × ${Math.round(a.mult*10)/10}倍</span></div>`;
+      const phase=a.phase||1;
+      const phaseLabels={1:`ステップ1: カード基礎点 ${a.totalBase}`,2:`ステップ2: ビンゴ倍率 ×${Math.round(a.mult*10)/10}`,3:`ステップ3: ${a.totalBase} × ${Math.round(a.mult*10)/10} → 計算中`,4:`ステップ4: 4列補正 ×1.5`,5:`ステップ5: 最終乗算補正 ×${Math.round(a.finalMultiplier*10)/10}`,6:`ステップ6: 最終加算補正 +${a.finalAdd}`,7:'確定'};
+      addScoreHtml=`<div class="add-score-bar"><span class="as-label">${phaseLabels[phase]||''}</span><span class="as-eq as-live">${GlobalFunctions.formatScore(a.liveScore)}</span></div>`;
     }
     const stats=[['ステージ',this.stage.name],['ラウンド',`${GameState.round}/${GameState.effectiveMaxRounds()}`],['目標',GlobalFunctions.formatScore(GameState.targetScore)],['現在点数',GlobalFunctions.formatScore(live),sparkle],['G',GameState.gold],['山札',GameState.drawPile.length],['捨',GameState.discardPile.length]];
     const row=document.createElement('div'); row.style.cssText='display:flex;flex-wrap:wrap;gap:12px;width:100%;';
@@ -871,7 +909,11 @@ const GameMainScene = {
         const st=document.createElement('div');st.className='cell-score';st.textContent=cd.baseScore;cellEl.appendChild(st);
         const dcs=this.effectDotClasses(cd.card);
         if(dcs.length>0){const dots=document.createElement('div');dots.className='cell-dots';dcs.forEach(dc=>{const dot=document.createElement('div');dot.className='cell-dot '+dc;dots.appendChild(dot);});cellEl.appendChild(dots);}
-        if(sc.includes(i)){cellEl.classList.add('scoring-cell');const badge=document.createElement('div');badge.className='score-badge';badge.textContent='+'+cd.baseScore;cellEl.appendChild(badge);}
+        if(sc.includes(i)){
+          cellEl.classList.add('scoring-cell');
+          if(this.scoringAnim?.phase===1) cellEl.classList.add('scoring-pop');
+          const badge=document.createElement('div');badge.className='score-badge';badge.textContent='+'+cd.baseScore;cellEl.appendChild(badge);
+        }
         if(this.bossBlackedOut&&cd.owner==='player') sym.style.color='transparent';
       }else if(hints[i]!==undefined){
         cellEl.classList.add('hint-blink');
@@ -922,82 +964,79 @@ const GameMainScene = {
       c.className='card'+(isSel?' selected':'')+(isRe?' reroll-selected':'');
 
       if(this.bossBlackedOut&&!isSel){
-        c.innerHTML=`<div class="card-dots-row">${card.enhance?`<div class="card-dot dot-enhance" title="${card.enhance}"></div>`:''}</div><div class="card-symbol-wrap" style="color:#fff;font-size:22px;">？</div><span class="card-number">-</span>`;
+        // #3 数字と全ドット（緑黄青）は表示、記号のみ非表示
+        c.innerHTML=`${this.cardTagsHtml(card)}<div class="card-symbol-wrap"><span style="opacity:0;font-size:22px;">${GameData.SYMBOL_LABEL[card.symbol]}</span></div>${this.cardScoreHtml(card, GameState.gold)}`;
       }else{
         c.innerHTML=`${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card, GameState.gold)}`;
       }
 
-      // ドラッグ&ドロップ（マウス：即時、タッチ：0.38秒長押し後）
+      // ドラッグ（マウス：0.18秒長押し、タッチ：0.38秒長押し）
       if(this.currentSide==='player'&&!this.resultState&&!this.rerollMode){
-        // --- マウスドラッグ ---
-        c.draggable=true;
-        c.addEventListener('dragstart',(e)=>{
+        let dragTimer=null, isDragging=false, dragGhost=null;
+
+        const startDrag=(x,y)=>{
+          isDragging=true;
           this.selectedCardId=card.id;
           this.expandPending=null; this.paintPending=null;
-          e.dataTransfer.setData('cardId',card.id);
-          e.dataTransfer.effectAllowed='move';
-          this.renderAll();
-        });
-
-        // --- タッチ長押しドラッグ ---
-        let touchTimer=null, touchDragging=false, ghost=null;
-        const LONG_PRESS_MS=380;
-
-        const startGhost=(touchX,touchY)=>{
-          touchDragging=true;
-          this.selectedCardId=card.id;
-          this.expandPending=null; this.paintPending=null;
-          // ゴースト要素を作成
-          ghost=c.cloneNode(true);
-          ghost.className=c.className+' touch-drag-ghost';
-          ghost.style.left=(touchX-33)+'px';
-          ghost.style.top=(touchY-46)+'px';
-          document.body.appendChild(ghost);
+          dragGhost=c.cloneNode(true);
+          dragGhost.className=c.className+' touch-drag-ghost';
+          dragGhost.id='drag-ghost-'+card.id;
+          dragGhost.style.left=(x-33)+'px'; dragGhost.style.top=(y-46)+'px';
+          document.body.appendChild(dragGhost);
           c.classList.add('dragging-origin');
           this.renderAll();
         };
+        const clearDrag=()=>{
+          if(dragGhost){ dragGhost.remove(); dragGhost=null; }
+          c.classList.remove('dragging-origin');
+          document.querySelectorAll('.cell.touch-hover').forEach(x=>x.classList.remove('touch-hover'));
+          isDragging=false;
+        };
+        const moveDrag=(x,y)=>{
+          if(!isDragging) return;
+          if(dragGhost){ dragGhost.style.left=(x-33)+'px'; dragGhost.style.top=(y-46)+'px'; }
+          document.querySelectorAll('.cell.touch-hover').forEach(x=>x.classList.remove('touch-hover'));
+          const el=document.elementFromPoint(x,y);
+          const cell=el?.closest('.cell[data-ci]'); if(cell) cell.classList.add('touch-hover');
+        };
+        const dropDrag=(x,y)=>{
+          const el=document.elementFromPoint(x,y);
+          const cellEl=el?.closest('.cell[data-ci]');
+          clearDrag();
+          if(cellEl){ const ci=parseInt(cellEl.dataset.ci,10); if(!isNaN(ci)) this.onCellClick(ci); }
+        };
 
+        // --- マウス長押し (0.18秒) ---
+        c.addEventListener('mousedown',(e)=>{
+          if(e.button!==0) return;
+          dragTimer=setTimeout(()=>startDrag(e.clientX,e.clientY), 180);
+        });
+        window.addEventListener('mousemove',(e)=>{ clearTimeout(dragTimer); dragTimer=null; moveDrag(e.clientX,e.clientY); });
+        window.addEventListener('mouseup',(e)=>{
+          clearTimeout(dragTimer); dragTimer=null;
+          if(!isDragging) return;
+          dropDrag(e.clientX,e.clientY);
+        });
+
+        // --- タッチ長押し (0.38秒) ---
         c.addEventListener('touchstart',(e)=>{
           if(e.touches.length!==1) return;
           const t=e.touches[0];
-          touchTimer=setTimeout(()=>startGhost(t.clientX,t.clientY), LONG_PRESS_MS);
+          dragTimer=setTimeout(()=>startDrag(t.clientX,t.clientY), 380);
         },{passive:true});
-
         c.addEventListener('touchmove',(e)=>{
-          if(!touchDragging){ clearTimeout(touchTimer); touchTimer=null; return; }
-          e.preventDefault();
           const t=e.touches[0];
-          if(ghost){ ghost.style.left=(t.clientX-33)+'px'; ghost.style.top=(t.clientY-46)+'px'; }
-          // ドロップ先セルのハイライト
-          const el=document.elementFromPoint(t.clientX,t.clientY);
-          document.querySelectorAll('.cell.touch-hover').forEach(x=>x.classList.remove('touch-hover'));
-          const cell=el?.closest('.cell'); if(cell) cell.classList.add('touch-hover');
+          if(!isDragging){ clearTimeout(dragTimer); dragTimer=null; return; }
+          e.preventDefault();
+          moveDrag(t.clientX,t.clientY);
         },{passive:false});
-
         c.addEventListener('touchend',(e)=>{
-          clearTimeout(touchTimer); touchTimer=null;
-          document.querySelectorAll('.cell.touch-hover').forEach(x=>x.classList.remove('touch-hover'));
-          if(ghost){ ghost.remove(); ghost=null; }
-          c.classList.remove('dragging-origin');
-          if(!touchDragging){ touchDragging=false; return; }
-          touchDragging=false;
-          // ドロップ先セルを特定
+          clearTimeout(dragTimer); dragTimer=null;
+          if(!isDragging) return;
           const t=e.changedTouches[0];
-          const el=document.elementFromPoint(t.clientX,t.clientY);
-          const cellEl=el?.closest('.cell[data-ci]');
-          if(cellEl){
-            const ci=parseInt(cellEl.dataset.ci,10);
-            if(!isNaN(ci)) this.onCellClick(ci);
-          }
+          dropDrag(t.clientX,t.clientY);
         });
-
-        c.addEventListener('touchcancel',()=>{
-          clearTimeout(touchTimer); touchTimer=null;
-          if(ghost){ ghost.remove(); ghost=null; }
-          c.classList.remove('dragging-origin');
-          touchDragging=false;
-          document.querySelectorAll('.cell.touch-hover').forEach(x=>x.classList.remove('touch-hover'));
-        });
+        c.addEventListener('touchcancel',()=>{ clearTimeout(dragTimer); dragTimer=null; clearDrag(); });
       }
 
       // ホバーで吹き出し（マウスのみ）
@@ -1039,13 +1078,13 @@ const GameMainScene = {
   renderRelicRow(){
     const row=document.createElement('div'); row.className='relic-display-row';
     if(GameState.relics.length===0){const empty=document.createElement('div');empty.className='relic-empty';empty.textContent='レリックなし';row.appendChild(empty);}
-    else GameState.relics.forEach(relic=>{
+    else GameState.relics.forEach((relic,i)=>{
       const rc=document.createElement('div');
-      const isActive=this.activeRelicId===relic.id;
+      const isActive=this.activeRelicId===i;
       const isScoring=this.scoringRelicIds.includes(relic.id);
       rc.className='relic-card'+(isActive?' active':'')+(isScoring?' bounce':'');
       rc.innerHTML=`<div class="relic-name">${relic.name}</div>${relic.relicEnhance?`<div class="relic-enhance-tag">${GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance)?.name||''}</div>`:''}`;
-      rc.addEventListener('click',()=>this.onRelicClick(relic.id));
+      rc.addEventListener('click',()=>this.onRelicClick(i));
       row.appendChild(rc);
     });
     const maxEl=document.createElement('div');maxEl.className='relic-capacity';maxEl.textContent=`${GameState.relics.length}/${GameState.effectiveMaxRelics()}`;
@@ -1054,12 +1093,13 @@ const GameMainScene = {
   },
 
   renderRelicInfoPanel(){
-    const relic=GameState.relics.find(r=>r.id===this.activeRelicId); if(!relic) return null;
+    const idx=this.activeRelicId;
+    const relic=GameState.relics[idx]; if(!relic) return null;
     const panel=document.createElement('div'); panel.className='info-panel relic-info-panel';
     const ren=GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance);
     let sellPrice=1; if(relic.relicEnhance==='ren_discard_sell') sellPrice=Math.floor(GameState.currentDeck.length/2); else if(ren) sellPrice+=2;
     panel.innerHTML=`<div class="info-title">${relic.name}</div><div class="info-desc">${relic.desc}</div>${ren?`<div class="info-desc relic-enhance-desc">【${ren.name}】${ren.desc}</div>`:''}<button class="sell-relic-btn">売却（${sellPrice}G）</button>`;
-    panel.querySelector('.sell-relic-btn').addEventListener('click',()=>this.sellRelic(relic.id));
+    panel.querySelector('.sell-relic-btn').addEventListener('click',()=>this.sellRelic(idx));
     return panel;
   },
 
