@@ -1,58 +1,45 @@
-// グローバルファンクション：ゲーム全体で使う共通処理
 const GlobalFunctions = {
+  shuffle(array){ const a=array.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; },
+  randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; },
+  randChoice(array){ return array[this.randInt(0,array.length-1)]; },
+  loadImage(path){ return new Promise((res,rej)=>{const img=new Image();img.onload=()=>res(img);img.onerror=()=>res(null);img.src=path;}); },
+  playSE(name){},
+  formatScore(n){ return Math.floor(n).toLocaleString('ja-JP'); },
 
-  // 配列をシャッフルする（Fisher-Yates）
-  shuffle(array){
-    const a = array.slice();
-    for(let i = a.length - 1; i > 0; i--){
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
+  // #8 セーブ/ロード (3スロット)
+  SAVE_KEY:'siren_spire_save_v1',
+  getSaves(){
+    try{ return JSON.parse(localStorage.getItem(this.SAVE_KEY)||'[]'); }catch(e){ return []; }
   },
-
-  // min以上max以下のランダム整数
-  randInt(min, max){
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-  },
-
-  // 配列からランダムに1つ選ぶ
-  randChoice(array){
-    return array[this.randInt(0, array.length - 1)];
-  },
-
-  // 画像読み込み（Chap1では未使用・将来拡張用スタブ）
-  loadImage(path){
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = path;
-    });
-  },
-
-  // 音声再生（Chap1では未使用・将来拡張用スタブ）
-  playSE(name){
-    // TODO: Chap6でSE/BGM実装予定
-  },
-
-  // データセーブ（Chap6で本実装予定のスタブ）
-  saveData(){
+  saveSlot(slotIndex, data){
     try{
-      localStorage.setItem('siren_spire_save', JSON.stringify({ saved:false }));
-    }catch(e){ /* no-op */ }
+      const saves=this.getSaves();
+      while(saves.length<=slotIndex) saves.push(null);
+      saves[slotIndex]={...data, savedAt:Date.now()};
+      localStorage.setItem(this.SAVE_KEY, JSON.stringify(saves));
+      return true;
+    }catch(e){ return false; }
+  },
+  loadSlot(slotIndex){
+    try{ const saves=this.getSaves(); return saves[slotIndex]||null; }catch(e){ return null; }
+  },
+  deleteSlot(slotIndex){
+    try{ const saves=this.getSaves(); saves[slotIndex]=null; localStorage.setItem(this.SAVE_KEY,JSON.stringify(saves)); }catch(e){}
   },
 
-  // データロード（Chap6で本実装予定のスタブ）
-  loadData(){
-    try{
-      const raw = localStorage.getItem('siren_spire_save');
-      return raw ? JSON.parse(raw) : null;
-    }catch(e){ return null; }
+  // #9 図鑑データ（ゲーム中に発見したカード効果・レリック）
+  GALLERY_KEY:'siren_spire_gallery',
+  getGallery(){ try{ return JSON.parse(localStorage.getItem(this.GALLERY_KEY)||'{"jamming":[],"enhance":[],"trait":[],"relic":[]}')}catch(e){return{jamming:[],enhance:[],trait:[],relic:[]};} },
+  recordCard(card){
+    const g=this.getGallery();
+    let dirty=false;
+    if(card.jamming&&!g.jamming.includes(card.jamming)){g.jamming.push(card.jamming);dirty=true;}
+    if(card.enhance&&!g.enhance.includes(card.enhance)){g.enhance.push(card.enhance);dirty=true;}
+    if(card.trait&&!g.trait.includes(card.trait)){g.trait.push(card.trait);dirty=true;}
+    if(dirty) localStorage.setItem(this.GALLERY_KEY,JSON.stringify(g));
   },
-
-  // 画面ログ出力用ヘルパー
-  formatScore(n){
-    return Math.floor(n).toLocaleString('ja-JP');
-  }
+  recordRelic(relicId){
+    const g=this.getGallery();
+    if(!g.relic.includes(relicId)){ g.relic.push(relicId); localStorage.setItem(this.GALLERY_KEY,JSON.stringify(g)); }
+  },
 };

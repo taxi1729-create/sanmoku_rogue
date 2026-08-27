@@ -56,7 +56,7 @@ const GameMainScene = {
   },
 
   applyRelicInitEffects(){
-    if(GameState.hasRelic('base_boost')) GameData.CORRECTION_BASE_SCORE+=200;
+    if(GameState.hasRelic('base_boost')) GameData.FINAL_ADD+=2000;
     if(GameState.hasRelic('paint')) this.applyPaintRelic();
     GameState.relics.forEach(r=>{
       if(r.relicEnhance==='ren_cross') GameData.BINGO_MULTIPLIER_BASE['Cross']*=5;
@@ -131,7 +131,11 @@ const GameMainScene = {
     for(const cell of this.board){
       if(!cell?.card) continue;
       const c=cell.card;
-      if(c.trait==='保留') GameState.reserve.push(c);
+      if(c.trait==='保留'){
+        GameState.reserve.push(c);
+        // 保留カードは捨て札には入れない（次ラウンド手札へ戻る）
+        continue;
+      }
       if(this.bossEffect?.id==='discard_used') GameState.discardedPile.push(c);
       else GameState.discardPile.push(c);
     }
@@ -158,10 +162,18 @@ const GameMainScene = {
     this.resultState=result;
     if(result==='win'){
       if(this.stage&&!GameState.clearedStages.includes(this.stage.key)) GameState.clearedStages.push(this.stage.key);
+      // #12 最高クリア記録更新
+      const stageOrder=['common','high','boss'];
+      const stageIdx=stageOrder.indexOf(this.stage.key);
+      const floorScore=GameState.currentFloor*3+stageIdx;
+      const prevScore=(GameState.maxClearedFloor||0)*3+(stageOrder.indexOf(GameState.maxClearedStage||''));
+      if(floorScore>prevScore){ GameState.maxClearedFloor=GameState.currentFloor; GameState.maxClearedStage=this.stage.name; }
       const rd=this.calcClearReward();
       GameState.gold+=rd.total;
       GameState.lastReward={type:'clear',stageName:this.stage.name,gold:rd.total,breakdown:rd};
       this.addLog(`クリア報酬：G+${rd.total}`);
+      // #8 クリア時セーブ
+      App.saveGame();
     }
     this.renderAll();
   },
@@ -330,7 +342,7 @@ const GameMainScene = {
         if(r.sym==='Triangle'&&GameState.hasRelic('triangle_boost')){relicBonus+=60;scoringRelics.add('triangle_boost');}
         if(r.sym==='Square'&&GameState.hasRelic('square_boost')){relicBonus+=60;scoringRelics.add('square_boost');}
         if(GameState.hasRelic('relic_boost')){const n=GameState.relicCount();relicBonus+=5+8*n;scoringRelics.add('relic_boost');}
-        if(GameState.hasRelic('base_boost')){relicBonus+=200;scoringRelics.add('base_boost');}
+        // base_boost is now FINAL_ADD; handled via FINAL_ADD
         if(GameState.hasRelic('empty_boost')){const ec=this.board.filter(c=>!c).length;relicBonus+=6*ec+5;scoringRelics.add('empty_boost');}
         GameState.relics.forEach(rel=>{
           const ren=rel.relicEnhance; if(!ren) return;
@@ -411,42 +423,42 @@ const GameMainScene = {
 
   async showScoreStep(b){
     const before=GameState.currentScore, after=Math.max(0,before+b.score);
-    // step 1: 補正基礎点+カード基礎点（ビンゴセルをポップ）
-    this.scoringAnim={phase:1,cells:b.cells,symbol:b.symbol,liveScore:before,totalBase:b.totalBase,mult:b.mult,isQuad:b.isQuad,finalMultiplier:b.finalMultiplier,finalAdd:b.finalAdd,reached:false};
-    this.renderAll(); await this.sleep(500);
-    // step 2: ビンゴ倍率+補正倍率（倍率を光らせる）
-    this.scoringAnim.phase=2;
-    this.renderAll(); await this.sleep(500);
-    // step 3: 1×2を乗算してカウントアップ
+
+    // #1 各セルを1枚ずつ0.4秒ポップ（同セルが複数ビンゴに属する場合、その分繰り返す）
+    for(const cellIdx of b.cells){
+      this.scoringAnim={phase:0,cells:[cellIdx],symbol:b.symbol,liveScore:before,totalBase:b.totalBase,mult:b.mult,isQuad:b.isQuad,finalMultiplier:b.finalMultiplier,finalAdd:b.finalAdd,reached:false,popCell:cellIdx};
+      this.renderAll(); await this.sleep(400);
+    }
+    this.scoringAnim.cells=b.cells;
+
+    // step 1: 補正基礎点+カード基礎点
+    this.scoringAnim.phase=1; this.renderAll(); await this.sleep(500);
+    // step 2: ビンゴ倍率
+    this.scoringAnim.phase=2; this.renderAll(); await this.sleep(500);
+    // step 3: 乗算カウントアップ
     this.scoringAnim.phase=3;
     const step3Target=Math.round(b.totalBase*b.mult);
     this.renderAll();
-    const steps3=10;
-    for(let s=1;s<=steps3;s++){
-      this.scoringAnim.liveScore=Math.round(before+(step3Target-before)*s/steps3);
-      this.renderAll(); await this.sleep(500/steps3);
+    for(let s=1;s<=10;s++){
+      this.scoringAnim.liveScore=Math.round(before+(step3Target-before)*s/10);
+      this.renderAll(); await this.sleep(50);
     }
     await this.sleep(150);
-    // step 4: 4列補正×1.5（isQuadの場合のみ）
+    // step 4: 4列×1.5
     if(b.isQuad){
       this.scoringAnim.phase=4;
       const step4Target=Math.max(0,Math.round(b.totalBase*b.mult*1.5));
       this.renderAll();
-      const steps4=10;
-      for(let s=1;s<=steps4;s++){
-        this.scoringAnim.liveScore=Math.round(before+(step4Target-before)*s/steps4);
-        this.renderAll(); await this.sleep(500/steps4);
+      for(let s=1;s<=10;s++){
+        this.scoringAnim.liveScore=Math.round(before+(step4Target-before)*s/10);
+        this.renderAll(); await this.sleep(50);
       }
       await this.sleep(150);
     }
-    // step 5: 最終乗算補正（該当レリック/カードをポップ）
-    this.scoringAnim.phase=5;
-    this.renderAll(); await this.sleep(500);
+    // step 5: 最終乗算補正
+    this.scoringAnim.phase=5; this.renderAll(); await this.sleep(500);
     // step 6: 最終加算補正
-    if(b.finalAdd){
-      this.scoringAnim.phase=6;
-      this.renderAll(); await this.sleep(500);
-    }
+    if(b.finalAdd){ this.scoringAnim.phase=6; this.renderAll(); await this.sleep(500); }
     // 確定
     GameState.currentScore=after;
     this.scoringAnim.liveScore=after; this.scoringAnim.reached=GameState.currentScore>=GameState.targetScore; this.scoringAnim.phase=7;
@@ -499,10 +511,27 @@ const GameMainScene = {
       const e2=adj.filter(i=>this.board[i]===null&&!this.blockedCells.has(i));
       if(e2.length>0) empty=e2;
     }
-    const weighted=empty.map(ci=>{let w=0;for(const win of this.windows){if(!win.cells.includes(ci)) continue;const cells=win.cells.map(i=>this.board[i]);if(cells.some(c=>c&&c.symbol!=='Cross')) continue;const n=cells.filter(c=>c&&c.symbol==='Cross').length;w+=(n+1)*(n+1);}return{ci,w};});
+    const weighted=empty.map(ci=>{
+      let w=0;
+      for(const win of this.windows){
+        if(!win.cells.includes(ci)) continue;
+        const cells=win.cells.map(i=>this.board[i]);
+        if(cells.some(c=>c&&c.symbol!=='Cross')) continue;
+        const n=cells.filter(c=>c&&c.symbol==='Cross').length;
+        w+=(n+1)*(n+1);
+      }
+      return{ci,w};
+    });
     if(weighted.length===0) return null;
-    const isConf=this.effects.confuseNextNpc; if(isConf) this.effects.confuseNextNpc=false;
-    const tgt=isConf?weighted.reduce((a,b)=>b.w<a.w?b:a):weighted.reduce((a,b)=>b.w>a.w?b:a);
+    const isConf=this.effects.confuseNextNpc;
+    if(isConf){
+      this.effects.confuseNextNpc=false;
+      // #7 混乱高度化：プレイヤーにとって最も有利な（NPCにとって最も邪魔しにくい）マスを選ぶ
+      // プレイヤーのビンゴ可能性が高いマスに置かせる（ビンゴの可能性重みが最小のマス）
+      const tgt=weighted.reduce((a,b)=>b.w<a.w?b:a);
+      return GlobalFunctions.randChoice(weighted.filter(w=>w.w===tgt.w)).ci;
+    }
+    const tgt=weighted.reduce((a,b)=>b.w>a.w?b:a);
     return GlobalFunctions.randChoice(weighted.filter(w=>w.w===tgt.w)).ci;
   },
 
@@ -619,9 +648,9 @@ const GameMainScene = {
   getExpandTargets(startCi,mode,isPaint=false){
     const sr=Math.floor(startCi/GameData.BOARD_SIZE),sc=startCi%GameData.BOARD_SIZE;
     let offsets=[];
-    if(mode==='right') offsets=[[0,0],[0,1]];
-    if(mode==='up')    offsets=[[0,0],[-1,0]];
-    if(mode==='rect')  offsets=[[0,0],[0,1],[-1,0],[-1,1]];
+    if(mode==='right') offsets=[[0,0],[0,1]];           // 右隣
+    if(mode==='up')    offsets=[[0,0],[-1,0]];           // 上隣
+    if(mode==='rect')  offsets=[[0,0],[0,1],[1,0],[1,1]]; // #10 右・下・右下（2×2）
     const targets=[];
     for(const [dr,dc] of offsets){
       const nr=sr+dr,nc=sc+dc;
@@ -694,7 +723,7 @@ const GameMainScene = {
       case 'hand_boost': GameState.handSizeBonus=Math.max(0,GameState.handSizeBonus-3); break;
       case 'paint': this.removePaintRelic(); GameState.turnsBonus+=2; break;
       case 'jamming_boost': GameState.rerollCount+=3; break;
-      case 'base_boost': GameData.CORRECTION_BASE_SCORE=Math.max(0,GameData.CORRECTION_BASE_SCORE-200); break;
+      case 'base_boost': GameData.FINAL_ADD=Math.max(0,GameData.FINAL_ADD-2000); break;
       default: break;
     }
     if(relic.relicEnhance==='ren_cross') GameData.BINGO_MULTIPLIER_BASE['Cross']=Math.max(-30,GameData.BINGO_MULTIPLIER_BASE['Cross']/5);
@@ -911,7 +940,8 @@ const GameMainScene = {
         if(dcs.length>0){const dots=document.createElement('div');dots.className='cell-dots';dcs.forEach(dc=>{const dot=document.createElement('div');dot.className='cell-dot '+dc;dots.appendChild(dot);});cellEl.appendChild(dots);}
         if(sc.includes(i)){
           cellEl.classList.add('scoring-cell');
-          if(this.scoringAnim?.phase===1) cellEl.classList.add('scoring-pop');
+          const isPopping=(this.scoringAnim?.phase===1)||(this.scoringAnim?.phase===0&&this.scoringAnim?.popCell===i);
+          if(isPopping) cellEl.classList.add('scoring-pop');
           const badge=document.createElement('div');badge.className='score-badge';badge.textContent='+'+cd.baseScore;cellEl.appendChild(badge);
         }
         if(this.bossBlackedOut&&cd.owner==='player') sym.style.color='transparent';
@@ -956,15 +986,31 @@ const GameMainScene = {
   renderHand(){
     const area=document.createElement('div'); area.className='hand-area';
     const row=document.createElement('div'); row.className='hand-row';
+
+    // #11 保留札を左側に分離表示
+    if(GameState.reserve.length>0){
+      const reserveGroup=document.createElement('div'); reserveGroup.className='reserve-group';
+      reserveGroup.innerHTML='<div class="reserve-label">保留</div>';
+      const reserveRow=document.createElement('div'); reserveRow.className='reserve-row';
+      GameState.reserve.forEach(card=>{
+        const wrapper=document.createElement('div'); wrapper.className='card-wrapper';
+        const c=document.createElement('div'); c.className='card reserve-card';
+        c.innerHTML=`${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card,GameState.gold)}`;
+        this.attachHoverTip(c,card);
+        wrapper.appendChild(c); reserveRow.appendChild(wrapper);
+      });
+      reserveGroup.appendChild(reserveRow);
+      row.appendChild(reserveGroup);
+      const divider=document.createElement('div'); divider.className='hand-divider'; row.appendChild(divider);
+    }
+
     for(const card of GameState.hand){
       const wrapper=document.createElement('div'); wrapper.className='card-wrapper';
       const c=document.createElement('div');
       const isSel=!this.rerollMode&&this.selectedCardId===card.id;
       const isRe=this.rerollMode&&this.rerollSelected.has(card.id);
-      c.className='card'+(isSel?' selected':'')+(isRe?' reroll-selected':'');
-
+      c.className='card'+(isSel?' selected':'')+(isRe?' reroll-selected':'')+(card.trait?` trait-${card.trait.replace(/[()]/g,'')}`:'');
       if(this.bossBlackedOut&&!isSel){
-        // #3 数字と全ドット（緑黄青）は表示、記号のみ非表示
         c.innerHTML=`${this.cardTagsHtml(card)}<div class="card-symbol-wrap"><span style="opacity:0;font-size:22px;">${GameData.SYMBOL_LABEL[card.symbol]}</span></div>${this.cardScoreHtml(card, GameState.gold)}`;
       }else{
         c.innerHTML=`${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card, GameState.gold)}`;
@@ -1039,31 +1085,26 @@ const GameMainScene = {
         c.addEventListener('touchcancel',()=>{ clearTimeout(dragTimer); dragTimer=null; clearDrag(); });
       }
 
-      // ホバーで吹き出し（マウスのみ）
-      c.addEventListener('mouseenter',()=>{
-        const tip=wrapper.querySelector('.card-hover-tip'); if(tip) return;
-        const lines=[];
-        if(!this.bossBlackedOut||isSel){
-          if(card.jamming){ const emoji=GameData.JAMMING_EMOJI[card.jamming]||''; lines.push(`<span class="desc-jamming">${emoji} 【${card.jamming}】${GameData.JAMMING_DESC[card.jamming]||''}</span>`); }
-          if(card.enhance) lines.push(`<span class="desc-enhance">【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}</span>`);
-          if(card.trait)   lines.push(`<span class="desc-trait">【${card.trait}】${GameData.TRAIT_DESC[card.trait]||''}</span>`);
-        }else{
-          if(card.enhance) lines.push(`<span class="desc-enhance">【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}</span>`);
-        }
-        if(lines.length===0) return;
-        const tip2=document.createElement('div'); tip2.className='card-hover-tip';
-        tip2.innerHTML=lines.join('<br>');
-        wrapper.appendChild(tip2);
-      });
-      c.addEventListener('mouseleave',()=>{
-        const tip=wrapper.querySelector('.card-hover-tip'); if(tip) tip.remove();
-      });
-
+      this.attachHoverTip(c,card);
       c.addEventListener('click',()=>this.onCardClick(card.id));
       wrapper.appendChild(c);
       row.appendChild(wrapper);
     }
     area.appendChild(row); return area;
+  },
+
+  attachHoverTip(el,card){
+    el.addEventListener('mouseenter',()=>{
+      const lines=[];
+      if(card.jamming){const emoji=GameData.JAMMING_EMOJI[card.jamming]||'';lines.push(`<span class="desc-jamming">${emoji} 【${card.jamming}】${GameData.JAMMING_DESC[card.jamming]||''}</span>`);}
+      if(card.enhance) lines.push(`<span class="desc-enhance">【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}</span>`);
+      if(card.trait)   lines.push(`<span class="desc-trait">【${card.trait}】${GameData.TRAIT_DESC[card.trait]||''}</span>`);
+      if(!lines.length) return;
+      let tip=el.querySelector('.card-hover-tip');
+      if(!tip){tip=document.createElement('div');tip.className='card-hover-tip';el.appendChild(tip);}
+      tip.innerHTML=lines.join('<br>');
+    });
+    el.addEventListener('mouseleave',()=>{const t=el.querySelector('.card-hover-tip');if(t)t.remove();});
   },
 
   // #4 手札カードの説明も吹き出し
@@ -1111,7 +1152,43 @@ const GameMainScene = {
     }else{
       const rBtn=document.createElement('button');rBtn.textContent=`リロール（残り${GameState.rerollCount}）`;rBtn.disabled=GameState.rerollCount<=0||this.currentSide!=='player'||this.bossEffect?.id==='reroll_limit';rBtn.addEventListener('click',()=>this.enterRerollMode());controls.appendChild(rBtn);
     }
+    // #10 デッキ/捨て札/廃棄札確認ボタン
+    const deckBtn=document.createElement('button'); deckBtn.textContent=`デッキ(${GameState.currentDeck.length})`; deckBtn.addEventListener('click',()=>this.showDeckModal('deck')); controls.appendChild(deckBtn);
+    const discBtn=document.createElement('button'); discBtn.textContent=`捨て札(${GameState.discardPile.length})`; discBtn.addEventListener('click',()=>this.showDeckModal('discard')); controls.appendChild(discBtn);
+    if(GameState.discardedPile.length>0){
+      const exlBtn=document.createElement('button'); exlBtn.textContent=`廃棄(${GameState.discardedPile.length})`; exlBtn.addEventListener('click',()=>this.showDeckModal('discarded')); controls.appendChild(exlBtn);
+    }
     return controls;
+  },
+
+  showDeckModal(type){
+    const existing=document.getElementById('deck-modal-overlay'); if(existing) existing.remove();
+    const overlay=document.createElement('div'); overlay.id='deck-modal-overlay'; overlay.className='pack-modal-overlay';
+    overlay.addEventListener('click',(e)=>{ if(e.target===overlay) overlay.remove(); });
+    const modal=document.createElement('div'); modal.className='pack-modal';
+    const titles={'deck':'デッキ','discard':'捨て札','discarded':'廃棄札'};
+    const piles={'deck':GameState.currentDeck,'discard':GameState.discardPile,'discarded':GameState.discardedPile};
+    const cards=piles[type]||[];
+    modal.innerHTML=`<h3>${titles[type]}（${cards.length}枚）</h3>`;
+    const grid=document.createElement('div'); grid.className='pack-card-grid'; grid.style.maxHeight='60vh'; grid.style.overflowY='auto';
+    cards.forEach(card=>{
+      const item=document.createElement('div'); item.className='card';
+      item.innerHTML=`${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card,GameState.gold)}`;
+      item.addEventListener('mouseenter',()=>{
+        const lines=[];
+        if(card.jamming){const emoji=GameData.JAMMING_EMOJI[card.jamming]||'';lines.push(`<span class="desc-jamming">${emoji} 【${card.jamming}】${GameData.JAMMING_DESC[card.jamming]||''}</span>`);}
+        if(card.enhance) lines.push(`<span class="desc-enhance">【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}</span>`);
+        if(card.trait)   lines.push(`<span class="desc-trait">【${card.trait}】${GameData.TRAIT_DESC[card.trait]||''}</span>`);
+        if(!lines.length) return;
+        let tip=item.querySelector('.card-hover-tip'); if(!tip){tip=document.createElement('div');tip.className='card-hover-tip';item.appendChild(tip);}
+        tip.innerHTML=lines.join('<br>');
+      });
+      item.addEventListener('mouseleave',()=>{const t=item.querySelector('.card-hover-tip');if(t)t.remove();});
+      grid.appendChild(item);
+    });
+    modal.appendChild(grid);
+    const closeBtn=document.createElement('button'); closeBtn.textContent='閉じる'; closeBtn.style.marginTop='14px'; closeBtn.addEventListener('click',()=>overlay.remove()); modal.appendChild(closeBtn);
+    overlay.appendChild(modal); this.container.appendChild(overlay);
   },
 
   renderLog(){ const p=document.createElement('div');p.className='log-panel';p.innerHTML=this.logs.map(l=>`<div>${l}</div>`).join('');p.scrollTop=p.scrollHeight;return p; },
