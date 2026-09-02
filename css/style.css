@@ -473,3 +473,12 @@ button:disabled{opacity:.35;cursor:not-allowed;}
   100%{transform:translateX(-50%) scale(1.2) rotate(5deg);}
 }
 
+
+/* #10 ショップのレリックに「レリック🔴」バッジを付与 */
+.relic-shop-badge{font-size:10px;color:#ff5566;font-weight:700;margin-bottom:2px;letter-spacing:.02em;}
+/* #7 ステージ上のスキップ報酬表示 */
+.skip-bonus-tag{font-size:11px;margin:6px 0;color:var(--gold,#f0c419);}
+/* #4 クリア済みステージの表示（再挑戦なし） */
+.stage-done-tag{padding:6px 10px;background:#333a4a;border-radius:6px;font-size:12px;text-align:center;color:#9aa0b0;}
+.pack-modal-wide{max-width:640px;}
+.card-pick-wrap.picked .card, .card-pick-wrap.picked .relic-card{outline:2px solid var(--accent,#4fd1ff);}

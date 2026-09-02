@@ -42,4 +42,20 @@ const GlobalFunctions = {
     const g=this.getGallery();
     if(!g.relic.includes(relicId)){ g.relic.push(relicId); localStorage.setItem(this.GALLERY_KEY,JSON.stringify(g)); }
   },
+
+  // #6 自己最高到達時のデッキ・レリック記録（タイトル画面で確認用）
+  BEST_RUN_KEY:'siren_spire_best_run',
+  getBestRun(){
+    try{ return JSON.parse(localStorage.getItem(this.BEST_RUN_KEY)||'null'); }catch(e){ return null; }
+  },
+  saveBestRunIfBetter(floorScore, data){
+    try{
+      const cur=this.getBestRun();
+      if(!cur||floorScore>=(cur.floorScore||0)){
+        localStorage.setItem(this.BEST_RUN_KEY, JSON.stringify({...data, floorScore}));
+        return true;
+      }
+      return false;
+    }catch(e){ return false; }
+  },
 };

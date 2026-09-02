@@ -186,7 +186,26 @@ const GameData = {
     { id:'card_focus', name:'カードフォーカスパック', weight:20 },
     { id:'bingo_focus', name:'ビンゴフォーカスパック', weight:20 },
     { id:'dream_card', name:'ドリームカードパック',   weight:2 },
+    // #9 新商品：強化カードパック20%・ジャミングカードパック30%・レリックパック15%を追加（合計165%、上限175%以内）
+    { id:'enhance_pack', name:'強化カードパック',     weight:20 },
+    { id:'jamming_pack', name:'ジャミングカードパック', weight:30 },
+    { id:'relic_pack', name:'レリックパック',         weight:15 },
   ],
+
+  // #7 スキップ報酬の追加ボーナス抽選（レリック35%・通常アプ40%・特別アプ10%・ドリームカード5%、残り10%はボーナスなし）
+  SKIP_BONUS_TYPES: [
+    { id:'relic', name:'ランダムレリック', weight:35 },
+    { id:'normal_upgrade', name:'通常アップグレード', weight:40 },
+    { id:'special_upgrade', name:'特別アップグレード', weight:10 },
+    { id:'dream_card', name:'ドリームカードパック', weight:5 },
+  ],
+  pickSkipBonusType(){
+    const pool=this.SKIP_BONUS_TYPES;
+    const r=Math.random()*100; // 残り10%はボーナスなし
+    let acc=0;
+    for(const t of pool){ acc+=t.weight; if(r<acc) return t.id; }
+    return null;
+  },
 
   pickWeightedType(){
     const pool = this.SHOP_RANDOM_TYPES;
@@ -208,7 +227,9 @@ const GameData = {
   },
 
   SHOP_PRICES: { relic:5, cardPack:2, normalUpgrade:3, specialUpgrade:10, reroll:1,
-                 cardFocus:6, bingoFocus:4, dreamCard:20, pickupUpgrade:3, pickupRelic:8 },
+                 cardFocus:6, bingoFocus:4, dreamCard:20, pickupUpgrade:3, pickupRelic:8,
+                 // #9 新商品価格（各4G）
+                 enhancePack:4, jammingPack:4, relicPack:4 },
 
   NORMAL_SELECT_POOL: [
     { id:'circle_mult', name:'🟡マルビンゴ強化',    desc:'○のビンゴ倍率を+4する',              targetMin:0, targetMax:0 },

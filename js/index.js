@@ -100,5 +100,34 @@ const App = {
     this.container.appendChild(el);
     el.querySelector('#btn-back').addEventListener('click',()=>this.showTitle());
   },
+  // #6 自身の最高到達時のデッキ・レリックを確認
+  showBestRun(){
+    this.container.innerHTML='';
+    const el=document.createElement('div'); el.className='title-screen'; el.style.marginTop='4vh';
+    const b=GlobalFunctions.getBestRun();
+    let html='<h2>最高到達時のデッキ・レリック</h2>';
+    if(!b){
+      html+='<div class="gallery-desc">まだ記録がありません</div>';
+    }else{
+      const d=new Date(b.savedAt); const ds=d.toLocaleString('ja-JP');
+      html+=`<div class="title-record">第${b.floor}階層 ${b.stageName} 到達時（${ds}）</div>`;
+      html+=`<div class="gallery-section"><h3>レリック（${(b.relics||[]).length}件）</h3><div class="gallery-list">`;
+      (b.relics||[]).forEach(r=>{
+        const ren=r.relicEnhance?GameData.RELIC_ENHANCE_POOL.find(x=>x.id===r.relicEnhance):null;
+        html+=`<div class="gallery-item"><b>${r.name}</b>${ren?`<span class="relic-enhance-tag"> ${ren.name}</span>`:''}<div class="gallery-desc">${r.desc}${ren?`<br>【${ren.name}】${ren.desc}`:''}</div></div>`;
+      });
+      html+='</div></div>';
+      html+=`<div class="gallery-section"><h3>デッキ（${(b.deck||[]).length}枚）</h3><div class="gallery-list">`;
+      (b.deck||[]).forEach(c=>{
+        const tags=[c.jamming,c.enhance,c.trait].filter(Boolean).join(' / ');
+        html+=`<div class="gallery-item"><b>${GameData.SYMBOL_LABEL[c.symbol]||c.symbol} ${c.baseScore}</b>${tags?`<div class="gallery-desc">${tags}</div>`:''}</div>`;
+      });
+      html+='</div></div>';
+    }
+    html+='<button id="btn-back">タイトルへ</button>';
+    el.innerHTML=html;
+    this.container.appendChild(el);
+    el.querySelector('#btn-back').addEventListener('click',()=>this.showTitle());
+  },
 };
 window.addEventListener('DOMContentLoaded',()=>App.init());

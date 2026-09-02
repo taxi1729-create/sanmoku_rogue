@@ -13,6 +13,7 @@ const TitleScene = {
         <button id="btn-new">はじめから</button>
         <button id="btn-continue" id="btn-continue">続きから</button>
         <button id="btn-gallery">図鑑（発見した効果）</button>
+        <button id="btn-best-run">最高到達デッキ・レリックを見る</button>
       </div>
     `;
     container.appendChild(el);
@@ -24,6 +25,9 @@ const TitleScene = {
     });
     el.querySelector('#btn-gallery').addEventListener('click',()=>{
       App.showGallery();
+    });
+    el.querySelector('#btn-best-run').addEventListener('click',()=>{
+      App.showBestRun();
     });
   },
 };

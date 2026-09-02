@@ -66,6 +66,7 @@ const ShopScene = {
     if(relic.relicEnhance==='ren_triple') GameState.relicSlotBonus+=2;
     slot.used=true;
     this.applyRelicGrantEffect(relic);
+    GlobalFunctions.recordRelic(relic.id);
     const renName=relic.relicEnhance?(GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance)?.name||''):'';
     this.message=`レリック「${relic.name}${renName?'・'+renName:''}」を購入した`;
     this.renderAll();
@@ -170,6 +171,7 @@ const ShopScene = {
     GameState.relics.push(relic);
     if(isFixed) this.offers.fixedRelics[i] = null; else this.offers.relics[i] = null;
     this.applyRelicGrantEffect(relic);
+    GlobalFunctions.recordRelic(relic.id);
     this.message = `レリック「${relic.name}」を購入した`;
     this.renderAll();
   },
@@ -201,7 +203,16 @@ const ShopScene = {
 
   pickCardPackCard(card){
     GameState.currentDeck.push(card);
+    GlobalFunctions.recordCard(card);
     this.message = `${GameData.SYMBOL_LABEL[card.symbol]}（基礎点${card.baseScore}）を獲得した`;
+    this.pickingCardPack = null; this.renderAll();
+  },
+  // #8 カードフォーカス等の複数枚ピックアップ確定
+  confirmCardPackMulti(){
+    const p = this.pickingCardPack; if(!p || !p.selected || p.selected.size < (p.pickCount||1)) return;
+    const picked = Array.from(p.selected).map(i => p.candidates[i]).filter(Boolean);
+    picked.forEach(c => { GameState.currentDeck.push(c); GlobalFunctions.recordCard(c); });
+    this.message = `${picked.length}枚のカードを獲得した`;
     this.pickingCardPack = null; this.renderAll();
   },
   skipCardPack(){ this.message = 'カードパックをスキップした'; this.pickingCardPack = null; this.renderAll(); },
@@ -312,22 +323,67 @@ const ShopScene = {
       case 'card_focus': this.buyFocusPack(slot,'card'); break;
       case 'bingo_focus': this.buyFocusPack(slot,'bingo'); break;
       case 'dream_card': this.buyDreamCard(slot); break;
+      // #9 新商品
+      case 'enhance_pack': this.buyEnhancePack(slot); break;
+      case 'jamming_pack': this.buyJammingPack(slot); break;
+      case 'relic_pack': this.buyRelicPack(slot); break;
       default: break;
     }
   },
 
   slotPrice(type){
-    const map = { pickup_relic:GameData.SHOP_PRICES.pickupRelic, card_pack:GameData.SHOP_PRICES.cardPack, pickup_upgrade:GameData.SHOP_PRICES.pickupUpgrade, normal_upgrade:GameData.SHOP_PRICES.normalUpgrade, special_upgrade:GameData.SHOP_PRICES.specialUpgrade, card_focus:GameData.SHOP_PRICES.cardFocus, bingo_focus:GameData.SHOP_PRICES.bingoFocus, dream_card:GameData.SHOP_PRICES.dreamCard };
+    const map = { pickup_relic:GameData.SHOP_PRICES.pickupRelic, card_pack:GameData.SHOP_PRICES.cardPack, pickup_upgrade:GameData.SHOP_PRICES.pickupUpgrade, normal_upgrade:GameData.SHOP_PRICES.normalUpgrade, special_upgrade:GameData.SHOP_PRICES.specialUpgrade, card_focus:GameData.SHOP_PRICES.cardFocus, bingo_focus:GameData.SHOP_PRICES.bingoFocus, dream_card:GameData.SHOP_PRICES.dreamCard,
+      enhance_pack:GameData.SHOP_PRICES.enhancePack, jamming_pack:GameData.SHOP_PRICES.jammingPack, relic_pack:GameData.SHOP_PRICES.relicPack };
     return map[type] || 3;
   },
+
+  // #9 強化カードパック：カード3枚（全て強化付き）のうち1枚をピックアップ。4G
+  buyEnhancePack(slot){
+    const price = GameState.shopPriceOf(this.slotPrice('enhance_pack'));
+    if(GameState.gold < price) return;
+    GameState.gold -= price; slot.used = true;
+    const gen = () => { const c = GameData.generateShopCard(); c.enhance = GlobalFunctions.randChoice(GameData.ENHANCE_NAME_POOL); GameData.applyGrantSideEffects(c); return c; };
+    this.pickingCardPack = { candidates:[gen(),gen(),gen()], pickCount:1 };
+    this.renderAll();
+  },
+  // #9 ジャミングカードパック：カード3枚（全てジャミング付き）のうち1枚をピックアップ。4G
+  buyJammingPack(slot){
+    const price = GameState.shopPriceOf(this.slotPrice('jamming_pack'));
+    if(GameState.gold < price) return;
+    GameState.gold -= price; slot.used = true;
+    const gen = () => { const c = GameData.generateShopCard(); c.jamming = GlobalFunctions.randChoice(Object.keys(GameData.JAMMING_DESC)); return c; };
+    this.pickingCardPack = { candidates:[gen(),gen(),gen()], pickCount:1 };
+    this.renderAll();
+  },
+  // #9 レリックパック：レリック3つのうち1つをピックアップ。所持レリックの売却も可能。4G。強化付与率25%
+  buyRelicPack(slot){
+    const price = GameState.shopPriceOf(this.slotPrice('relic_pack'));
+    if(GameState.gold < price) return;
+    GameState.gold -= price; slot.used = true;
+    const gen = () => { const base = GlobalFunctions.randChoice(GameData.RELIC_POOL); const relicEnhance = Math.random() < 0.25 ? GlobalFunctions.randChoice(GameData.RELIC_ENHANCE_POOL).id : null; return { ...base, relicEnhance }; };
+    this.pickingRelicPack = { candidates:[gen(),gen(),gen()] };
+    this.renderAll();
+  },
+  pickRelicPackCard(idx){
+    const p = this.pickingRelicPack; if(!p) return;
+    const relic = p.candidates[idx]; if(!relic) return;
+    if(GameState.relics.length >= GameState.effectiveMaxRelics()){ this.message='レリック上限です。売却してから選択してください'; this.renderAll(); return; }
+    GameState.relics.push(relic);
+    this.applyRelicGrantEffect(relic);
+    GlobalFunctions.recordRelic(relic.id);
+    this.message = `レリック「${relic.name}」を獲得した`;
+    this.pickingRelicPack = null;
+    this.renderAll();
+  },
+  skipRelicPack(){ this.message='レリックパックをスキップした'; this.pickingRelicPack=null; this.renderAll(); },
 
   buyFocusPack(slot, focus){
     GameState.gold -= GameState.shopPriceOf(this.slotPrice(slot.type));
     slot.used = true;
-    // カードフォーカス：ランダムカード3枚提示、ビンゴフォーカス：ビンゴ倍率強化3択
+    // #8 カードフォーカス：カード4枚のうち2枚をピックアップ、ビンゴフォーカス：ビンゴ倍率強化3択
     if(focus === 'card'){
-      const candidates = [GameData.generateShopCard(), GameData.generateShopCard(), GameData.generateShopCard()];
-      this.pickingCardPack = { candidates, multi: true };
+      const candidates = [GameData.generateShopCard(), GameData.generateShopCard(), GameData.generateShopCard(), GameData.generateShopCard()];
+      this.pickingCardPack = { candidates, pickCount:2, selected:new Set() };
     } else {
       const effects = [
         { id:'circle_mult', name:'マルビンゴ+4', targetMin:0, targetMax:0, desc:'○のビンゴ倍率を+4する' },
@@ -343,9 +399,8 @@ const ShopScene = {
     this.renderAll();
   },
 
-  buyDreamCard(slot){
-    GameState.gold -= GameState.shopPriceOf(GameData.SHOP_PRICES.dreamCard);
-    slot.used = true;
+  // #8 ドリームカードパック：2枚のうち1枚をピックアップ（またはスキップ）
+  genDreamCard(){
     const card = GameData.generateShopCard();
     card.baseScore = GlobalFunctions.randInt(120, 150); // #2 ドリームカード数値
     card.number = card.baseScore;
@@ -353,11 +408,14 @@ const ShopScene = {
     card.jamming = GlobalFunctions.randChoice(Object.keys(GameData.JAMMING_DESC));
     card.trait = GlobalFunctions.randChoice(GameData.TRAIT_NAME_POOL);
     GameData.applyGrantSideEffects(card);
-    GameState.currentDeck.push(card);
-    this.cardRevealPopup = { cards:[card] };
-    this.message = 'ドリームカードを獲得した！';
+    return card;
+  },
+  buyDreamCard(slot){
+    GameState.gold -= GameState.shopPriceOf(GameData.SHOP_PRICES.dreamCard);
+    slot.used = true;
+    const candidates = [this.genDreamCard(), this.genDreamCard()];
+    this.pickingCardPack = { candidates, pickCount:1, isDream:true };
     this.renderAll();
-    this.sleep(2000).then(()=>{ this.cardRevealPopup = null; this.renderAll(); });
   },
 
   rerollOffers(){ const price=GameState.shopPriceOf(GameData.SHOP_PRICES.reroll); if(GameState.gold<price) return; GameState.gold-=price; this.offers=this.generateOffers(); this.message='品揃えを更新した'; this.renderAll(); },
@@ -370,7 +428,7 @@ const ShopScene = {
     const el = document.createElement('div'); el.className = 'shop-screen';
     const r = GameState.lastReward;
     let rewardText = '';
-    if(r){ const b=r.breakdown; rewardText = b ? `${r.stageName}を${r.type==='skip'?'スキップ':'クリア'}：基本6 ＋ 残りラウンド${b.roundBonus} ＋ 残りリロール${b.rerollBonus} ＋ レリック${b.relicBonus} ＋ カード${b.cardBonus} ＝ G+${r.gold}` : `${r.stageName}：G+${r.gold}`; }
+    if(r){ const b=r.breakdown; rewardText = b ? `${r.stageName}を${r.type==='skip'?'スキップ':'クリア'}：基本6 ＋ 残りラウンド${b.roundBonus} ＋ 残りリロール${b.rerollBonus} ＋ レリック${b.relicBonus} ＋ カード${b.cardBonus}${b.doubled?'（2倍済）':''} ＝ G+${r.gold}${r.extra?`／追加報酬：${r.extra}`:''}` : `${r.stageName}：G+${r.gold}${r.extra?`／追加報酬：${r.extra}`:''}`; }
     const header = document.createElement('div'); header.className='shop-header';
     header.innerHTML = `<h2>ショップ</h2>${rewardText?`<div class="shop-reward">${rewardText}</div>`:''}<div class="shop-gold">所持G：${GameState.gold}</div>${this.message?`<div class="shop-message">${this.message}</div>`:''}`;
     el.appendChild(header);
@@ -423,7 +481,48 @@ const ShopScene = {
     this.container.appendChild(el);
     if(this.pickingCardPack) this.container.appendChild(this.renderCardPackModal());
     if(this.pickingPack) this.container.appendChild(this.renderPickModal());
+    if(this.pickingRelicPack) this.container.appendChild(this.renderRelicPackModal());
     if(this.cardRevealPopup) this.container.appendChild(this.renderCardRevealPopup());
+  },
+
+  // #9 レリックパック選択モーダル（所持レリックの売却も可能）
+  renderRelicPackModal(){
+    const p = this.pickingRelicPack;
+    const overlay = document.createElement('div'); overlay.className='pack-modal-overlay';
+    const modal = document.createElement('div'); modal.className='pack-modal pack-modal-wide';
+    modal.innerHTML = '<h3>レリックを1つ選んでください（3つから）</h3>';
+    const grid = document.createElement('div'); grid.className='pack-card-grid';
+    p.candidates.forEach((relic,idx) => {
+      const ren = relic.relicEnhance ? GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance) : null;
+      const wrap = document.createElement('div'); wrap.className='card-pick-wrap';
+      const item = document.createElement('div'); item.className='relic-card pickup';
+      item.innerHTML = `<div class="relic-shop-badge">レリック🔴</div><div class="relic-name">${relic.name}</div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}`;
+      wrap.appendChild(item);
+      const desc = document.createElement('div'); desc.className='card-pick-desc';
+      desc.textContent = relic.desc + (ren?` ／【${ren.name}】${ren.desc}`:'');
+      wrap.appendChild(desc);
+      wrap.addEventListener('click', () => this.pickRelicPackCard(idx));
+      grid.appendChild(wrap);
+    });
+    modal.appendChild(grid);
+
+    const ownedTitle = document.createElement('div'); ownedTitle.className='shop-section-title'; ownedTitle.style.marginTop='14px';
+    ownedTitle.textContent = `所持レリック（${GameState.relics.length}/${GameState.effectiveMaxRelics()}）売却してストックを確保できます`;
+    modal.appendChild(ownedTitle);
+    const ownedRow = document.createElement('div'); ownedRow.className='relic-display-row';
+    if(GameState.relics.length===0){ const empty=document.createElement('div'); empty.className='relic-empty'; empty.textContent='なし'; ownedRow.appendChild(empty); }
+    else GameState.relics.forEach(relic => {
+      const ren = relic.relicEnhance ? GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance) : null;
+      let sellPrice=1; if(relic.relicEnhance==='ren_discard_sell') sellPrice=Math.floor(GameState.currentDeck.length/2); else if(ren) sellPrice+=2;
+      const rc = document.createElement('div'); rc.className='relic-card';
+      rc.innerHTML = `<div class="relic-name">${relic.name}</div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}<button class="sell-relic-btn" style="margin-top:4px;">売却（${sellPrice}G）</button>`;
+      rc.querySelector('.sell-relic-btn').addEventListener('click', () => this.shopSellRelic(relic.id));
+      ownedRow.appendChild(rc);
+    });
+    modal.appendChild(ownedRow);
+
+    const skipBtn = document.createElement('button'); skipBtn.textContent='スキップ'; skipBtn.style.marginTop='18px'; skipBtn.addEventListener('click', () => this.skipRelicPack()); modal.appendChild(skipBtn);
+    overlay.appendChild(modal); return overlay;
   },
 
   renderFixedRelicSection(){
@@ -436,7 +535,7 @@ const ShopScene = {
       const price = this.relicPrice(relic);
       const ren = relic.relicEnhance ? GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance) : null;
       slot.className='shop-slot relic-shop-slot pickup-slot';
-      slot.innerHTML=`<div class="relic-shop-card pickup"><div class="relic-name">${relic.name}</div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}</div><div class="slot-desc">${relic.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||GameState.relics.length>=GameState.effectiveMaxRelics()?'disabled':''}>購入（${price}G）</button>`;
+      slot.innerHTML=`<div class="relic-shop-card pickup"><div class="relic-shop-badge">レリック🔴</div><div class="relic-name">${relic.name}</div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}</div><div class="slot-desc">${relic.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||GameState.relics.length>=GameState.effectiveMaxRelics()?'disabled':''}>購入（${price}G）</button>`;
       slot.querySelector('.buy-btn').addEventListener('click', () => this.buyRelic(i, true));
       row.appendChild(slot);
     });
@@ -505,7 +604,7 @@ const ShopScene = {
         const r=slot._relic;
         const ren=r.relicEnhance?GameData.RELIC_ENHANCE_POOL.find(x=>x.id===r.relicEnhance):null;
         el.className+=' pickup-slot';
-        el.innerHTML=`<div class="slot-title">${r.name}${ren?`<span class="relic-enhance-tag"> ${ren.name}</span>`:''}</div><div class="slot-desc">${r.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||GameState.relics.length>=GameState.effectiveMaxRelics()?'disabled':''}>購入（${price}G）</button>`;
+        el.innerHTML=`<div class="slot-title"><div class="relic-shop-badge">レリック🔴</div>${r.name}${ren?`<span class="relic-enhance-tag"> ${ren.name}</span>`:''}</div><div class="slot-desc">${r.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||GameState.relics.length>=GameState.effectiveMaxRelics()?'disabled':''}>購入（${price}G）</button>`;
         el.querySelector('.buy-btn').addEventListener('click', () => this.buyPickupRelic(slot));
         row.appendChild(el); return;
       }
@@ -540,7 +639,8 @@ const ShopScene = {
   },
 
   slotDesc(type){
-    const descs = { pickup_relic:'ランダムなレリックを購入', card_pack:'カード2枚から1枚選択', pickup_upgrade:'通常セレクトから3つ', normal_upgrade:'通常セレクトから3つ', special_upgrade:'特別セレクトから2つ', card_focus:'カード3枚から選択', bingo_focus:'ビンゴ倍率強化を選択', dream_card:'全効果付き特別カードを獲得' };
+    const descs = { pickup_relic:'ランダムなレリックを購入', card_pack:'カード2枚から1枚選択', pickup_upgrade:'通常セレクトから3つ', normal_upgrade:'通常セレクトから3つ', special_upgrade:'特別セレクトから2つ', card_focus:'カード4枚から2枚ピックアップ', bingo_focus:'ビンゴ倍率強化を選択', dream_card:'カード2枚から1枚ピックアップ（全効果付き）',
+      enhance_pack:'強化付きカード3枚から1枚選択', jamming_pack:'ジャミング付きカード3枚から1枚選択', relic_pack:'レリック3つから1つ選択・売却してストック確保も可能' };
     return descs[type] || '';
   },
 
@@ -558,12 +658,14 @@ const ShopScene = {
 
   renderCardPackModal(){
     const p = this.pickingCardPack;
+    const pickCount = p.pickCount||1;
     const overlay = document.createElement('div'); overlay.className='pack-modal-overlay';
     const modal = document.createElement('div'); modal.className='pack-modal';
-    modal.innerHTML = `<h3>${p.multi?'カードを1枚選んでください（3枚から）':'カードを1枚選んでください'}</h3>`;
+    modal.innerHTML = `<h3>カードを${pickCount}枚選んでください（${p.candidates.length}枚から）</h3>`;
     const grid = document.createElement('div'); grid.className='pack-card-grid';
-    p.candidates.forEach(card => {
-      const wrap = document.createElement('div'); wrap.className='card-pick-wrap';
+    if(!p.selected) p.selected = new Set();
+    p.candidates.forEach((card,idx) => {
+      const wrap = document.createElement('div'); wrap.className='card-pick-wrap'+(pickCount>1&&p.selected.has(idx)?' picked':'');
       const item = document.createElement('div'); item.className='card'+(card.trait?` trait-${card.trait.replace(/[()]/g,'')}`:'');
       item.innerHTML = `${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card, GameState.gold)}`;
       wrap.appendChild(item);
@@ -571,10 +673,23 @@ const ShopScene = {
       const lines = [card.jamming&&(GameData.JAMMING_DESC[card.jamming]||''), card.enhance&&(GameData.ENHANCE_DESC[card.enhance]||''), card.trait&&(GameData.TRAIT_DESC[card.trait]||'')].filter(Boolean);
       desc.textContent = lines.join(' / ') || '効果なし';
       wrap.appendChild(desc);
-      wrap.addEventListener('click', () => this.pickCardPackCard(card));
+      if(pickCount===1){
+        wrap.addEventListener('click', () => this.pickCardPackCard(card));
+      }else{
+        wrap.addEventListener('click', () => {
+          if(p.selected.has(idx)) p.selected.delete(idx);
+          else if(p.selected.size < pickCount) p.selected.add(idx);
+          this.renderAll();
+        });
+      }
       grid.appendChild(wrap);
     });
     modal.appendChild(grid);
+    if(pickCount>1){
+      const confirmBtn = document.createElement('button'); confirmBtn.textContent=`決定（${p.selected.size}/${pickCount}）`; confirmBtn.style.marginTop='12px'; confirmBtn.disabled = p.selected.size < pickCount;
+      confirmBtn.addEventListener('click', () => this.confirmCardPackMulti());
+      modal.appendChild(confirmBtn);
+    }
     const skipBtn = document.createElement('button'); skipBtn.textContent='スキップ'; skipBtn.style.marginTop='18px'; skipBtn.addEventListener('click', () => this.skipCardPack()); modal.appendChild(skipBtn);
     overlay.appendChild(modal); return overlay;
   },
