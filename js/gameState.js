@@ -7,23 +7,29 @@ const GameState = {
   currentFloor:1,          // #12 現在の階層
   maxClearedFloor:0,        // #12 最高クリア階層
   maxClearedStage:'',       // #12 最高クリアステージ名
+  symbolPassiveTier:{ Circle:0, Triangle:0, Square:0, Cross:0 }, // #A 記号パッシブ（0=未取得,1-3=段階）
 
   effectiveHandSize(){ return GameData.HAND_SIZE + this.handSizeBonus; },
   effectiveMaxRounds(){ return GameData.MAX_ROUNDS + this.roundsBonus; },
   effectiveTurnsPerRound(){ return GameData.TURNS_PER_ROUND + this.turnsBonus; },
   effectiveMaxRelics(){ return GameData.MAX_RELICS + this.relicSlotBonus; },
   hasRelic(id){ return this.relics.some(r=>r.id===id); },
+  // #1(B) レリック所持数計算：ネガティブ=0枠、倍化=2枠、3倍化=3枠、通常=1枠
+  slotsForRelic(relic){
+    const ren=relic?.relicEnhance;
+    if(ren==='ren_negative') return 0;
+    if(ren==='ren_triple') return 3;
+    if(ren==='ren_double') return 2;
+    return 1;
+  },
   relicCount(){
     let n=0;
-    for(const r of this.relics){
-      const ren=r.relicEnhance;
-      if(ren==='ren_negative') continue;
-      if(ren==='ren_triple'){n+=3;continue;}
-      if(ren==='ren_double'){n+=2;continue;}
-      n+=1;
-    }
+    for(const r of this.relics) n+=this.slotsForRelic(r);
     return n;
   },
+  // #1(B) 所持スロット数（表示・購入判定はこれを基準にする。relics.length ではなく実際の消費枠数）
+  usedRelicSlots(){ return this.relicCount(); },
+  canAddRelic(relic){ return this.usedRelicSlots() + this.slotsForRelic(relic) <= this.effectiveMaxRelics(); },
   shopPriceOf(basePrice){ return this.relics.some(r=>r.relicEnhance==='ren_black')?Math.ceil(basePrice/2):basePrice; },
 
   initNewGame(){
@@ -35,6 +41,7 @@ const GameState = {
     this.usedSpecialEffectIds=[]; this.discardedPile=[];
     this.specialPackExhausted=false; this.pendingBossEffect=null;
     this.currentFloor=1;
+    this.symbolPassiveTier={ Circle:0, Triangle:0, Square:0, Cross:0 };
     GameData.BINGO_MULTIPLIER_BASE={...GameData.BINGO_MULTIPLIER_BASE_ORIGINAL};
     GameData.CORRECTION_BASE_SCORE=0; GameData.CORRECTION_MULTIPLIER=0;
     GameData.FINAL_MULTIPLIER=1; GameData.FINAL_ADD=0;
@@ -58,6 +65,7 @@ const GameState = {
       turnsBonus:this.turnsBonus, relicSlotBonus:this.relicSlotBonus,
       rerollBonus:this.rerollBonus, usedSpecialEffectIds:this.usedSpecialEffectIds,
       pendingBossEffect:this.pendingBossEffect,
+      symbolPassiveTier:this.symbolPassiveTier,
       multBase:{...GameData.BINGO_MULTIPLIER_BASE},
       corrBase:GameData.CORRECTION_BASE_SCORE,
       savedFloorStage: (this.currentStage?this.currentStage.key:''),
@@ -75,6 +83,7 @@ const GameState = {
     this.rerollBonus=d.rerollBonus||0;
     this.usedSpecialEffectIds=d.usedSpecialEffectIds||[];
     this.pendingBossEffect=d.pendingBossEffect||null;
+    this.symbolPassiveTier=d.symbolPassiveTier||{ Circle:0, Triangle:0, Square:0, Cross:0 };
     if(d.multBase) Object.assign(GameData.BINGO_MULTIPLIER_BASE,d.multBase);
     if(d.corrBase!=null) GameData.CORRECTION_BASE_SCORE=d.corrBase;
   },

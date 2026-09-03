@@ -89,8 +89,46 @@ const GameData = {
     if(matched && card.symbol === matched) card.baseScore += 20;
   },
 
+  // #A 記号パッシブ（ボスクリアごとに1つ選択・3段階）
+  SYMBOL_PASSIVE_NAMES: { Circle:'マルパッシブ', Triangle:'サンカクパッシブ', Square:'シカクパッシブ', Cross:'バツパッシブ' },
+  SYMBOL_PASSIVES: {
+    Circle: {
+      1: { name:'マル・エスカレート', desc:'ステージクリア時、マルのビンゴ倍率を1.1倍(小数点切り上げ)する',
+        live(){ return `現在のマル倍率:${Math.round(GameData.BINGO_MULTIPLIER_BASE.Circle*100)/100} → クリア時 ${Math.ceil(GameData.BINGO_MULTIPLIER_BASE.Circle*1.1)}`; } },
+      2: { name:'マル・トライフォース', desc:'ビンゴ時、盤面にマル・サンカク・シカクを全て含んでいた場合、残りラウンドを1追加する',
+        live(){ return '盤面に3種の記号が揃うたびに、そのステージの残りラウンド+1'; } },
+      3: { name:'マル・ドリームセット', desc:'ゲーム開始時、デッキから合計10枚のカードの基礎点+20とマルマルチ(パッシブ専用枠)を付与する。ステージ終了後に取り除く（カード強化効果とは別枠）',
+        live(){ const n=Math.min(10,GameState.currentDeck.length); return `対象:${n}枚 基礎点+20 / マルマルチ付与（ステージ限定）`; } },
+    },
+    Triangle: {
+      1: { name:'サンカク・エコー', desc:'ジャミング効果を使用した次のターンに、もう一度同じ効果をNPCに付与する',
+        live(){ return 'ジャミングカード使用の1ターン後に同じ効果を再付与'; } },
+      2: { name:'サンカク・レゾナンス', desc:'デッキ内のジャミング効果を持つカード1枚につき、最終補正倍率+0.1する',
+        live(){ const n=GameState.currentDeck.filter(c=>c.jamming).length; return `ジャミング所持カード:${n}枚 → 最終補正倍率+${Math.round(n*0.1*100)/100}`; } },
+      3: { name:'サンカク・レシオ', desc:'デッキ内のサンカクカード比率nを計算し、サンカクカードの基礎点に(1+n)を乗算する',
+        live(){ const total=GameState.currentDeck.length||1; const n=GameState.currentDeck.filter(c=>c.symbol==='Triangle').length/total; return `サンカク比率n=${Math.round(n*100)/100} → サンカク基礎点×${Math.round((1+n)*100)/100}`; } },
+    },
+    Square: {
+      1: { name:'シカク・アンプ', desc:'カード強化効果（肥大化・連鎖）の効果量を2倍にする',
+        live(){ return '肥大化・連鎖の加算値が通常の2倍になる'; } },
+      2: { name:'シカク・ダブル', desc:'シカクカードのカード基礎点が常に2倍になる',
+        live(){ return 'シカクカードの基礎点計算に×2が常時適用'; } },
+      3: { name:'シカク・ドロー', desc:'シカクカードをプレイした時、カードを1枚ドローする（カード強化効果:ドローと重複可）',
+        live(){ return 'シカクカードプレイ時、追加で1枚ドロー'; } },
+    },
+    Cross: {
+      1: { name:'バツ・クインタプル', desc:'バツのビンゴ倍率を5倍にする',
+        live(){ return `現在のバツ倍率:${Math.round(GameData.BINGO_MULTIPLIER_BASE.Cross*100)/100}（習得時点で×5適用済）`; } },
+      2: { name:'バツ・スケール', desc:'バツの基礎点が常にデッキ枚数×3に変化する',
+        live(){ const n=GameState.currentDeck.length; return `デッキ枚数:${n}枚 → バツ基礎点=${n*3}`; } },
+      3: { name:'バツ・ミラー', desc:'一番高いビンゴ倍率を常にバツ倍率に反映する',
+        live(){ const max=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s])); return `現在の最大倍率:${Math.round(max*100)/100} → バツ倍率に反映`; } },
+    },
+  },
+
+
   RELIC_ENHANCE_POOL: [
-    { id:'ren_discard', name:'廃棄強化',     desc:'捨て札は廃棄札へ。最終乗算補正×3' },
+    { id:'ren_discard', name:'廃棄強化',     desc:'捨て札は廃棄札へ。最終乗算補正×1.5' },
     { id:'ren_circle', name:'マルオール',   desc:'ビンゴ時補正基礎点+n（n=デッキのマルカード数）' },
     { id:'ren_square', name:'シカクオール',  desc:'ビンゴ時補正基礎点+n（n=デッキのシカクカード数）' },
     { id:'ren_triangle', name:'サンカクオール',desc:'ビンゴ時補正基礎点+n（n=デッキのサンカクカード数）' },
@@ -178,18 +216,18 @@ const GameData = {
 
   // #27 ショップ商品種別の確率テーブル
   SHOP_RANDOM_TYPES: [
-    { id:'pickup_relic', name:'ピックアップレリック',   weight:10 },
-    { id:'card_pack', name:'？カードパック',         weight:5 },
-    { id:'pickup_upgrade', name:'ピックアップアップグレード', weight:5 },
-    { id:'normal_upgrade', name:'通常アップグレード',     weight:30 },
-    { id:'special_upgrade', name:'特別アップグレード',     weight:8 },
-    { id:'card_focus', name:'カードフォーカスパック', weight:20 },
-    { id:'bingo_focus', name:'ビンゴフォーカスパック', weight:20 },
-    { id:'dream_card', name:'ドリームカードパック',   weight:2 },
+    { id:'pickup_relic', name:'ピックアップレリック',   weight:10, emoji:'🏺' },
+    { id:'card_pack', name:'？カードパック',         weight:5, emoji:'🎴' },
+    { id:'pickup_upgrade', name:'ピックアップアップグレード', weight:5, emoji:'🎯' },
+    { id:'normal_upgrade', name:'通常アップグレード',     weight:60, emoji:'⬆️' }, // #5 出現確率2倍(30→60)
+    { id:'special_upgrade', name:'特別アップグレード',     weight:8, emoji:'✨' },
+    { id:'card_focus', name:'カードフォーカスパック', weight:20, emoji:'🔍' },
+    { id:'bingo_focus', name:'ビンゴフォーカスパック', weight:20, emoji:'🎰' },
+    { id:'dream_card', name:'ドリームカードパック',   weight:2, emoji:'🌙' },
     // #9 新商品：強化カードパック20%・ジャミングカードパック30%・レリックパック15%を追加（合計165%、上限175%以内）
-    { id:'enhance_pack', name:'強化カードパック',     weight:20 },
-    { id:'jamming_pack', name:'ジャミングカードパック', weight:30 },
-    { id:'relic_pack', name:'レリックパック',         weight:15 },
+    { id:'enhance_pack', name:'強化カードパック',     weight:20, emoji:'💪' },
+    { id:'jamming_pack', name:'ジャミングカードパック', weight:30, emoji:'🌀' },
+    { id:'relic_pack', name:'レリックパック',         weight:15, emoji:'🏆' },
   ],
 
   // #7 スキップ報酬の追加ボーナス抽選（レリック35%・通常アプ40%・特別アプ10%・ドリームカード5%、残り10%はボーナスなし）

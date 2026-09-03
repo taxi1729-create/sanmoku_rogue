@@ -17,6 +17,8 @@ const MapSelectScene = {
   },
 
   renderAll(){
+    // #4 タップのたびに画面が一番上に戻る不具合を防ぐ：スクロール位置を保持
+    const scrollY=window.scrollY;
     this.container.innerHTML='';
     const el=document.createElement('div'); el.className='map-screen';
     const header=document.createElement('div'); header.className='map-header';
@@ -98,6 +100,7 @@ const MapSelectScene = {
     }
     this.container.appendChild(el);
     if(this.pendingReward) this.container.appendChild(this.renderRewardPopup());
+    window.scrollTo(0,scrollY);
   },
 
   renderRewardPopup(){
@@ -131,7 +134,7 @@ const MapSelectScene = {
     if(!bonus||!bonus.type) return '';
     if(bonus.type==='relic'){
       const relic=bonus.extra;
-      if(GameState.relics.length<GameState.effectiveMaxRelics()){
+      if(ShopScene.canAcquireRelic(relic)){
         GameState.relics.push(relic);
         ShopScene.applyRelicGrantEffect(relic);
         GlobalFunctions.recordRelic(relic.id);

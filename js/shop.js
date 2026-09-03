@@ -40,14 +40,17 @@ const ShopScene = {
     let price=1;
     if(relic.relicEnhance==='ren_discard_sell') price=Math.floor(GameState.currentDeck.length/2);
     else if(ren) price+=2;
-    // #7 倍化/3倍化のカウント分を差し引く
-    if(relic.relicEnhance==='ren_double') GameState.relicSlotBonus=Math.max(0,GameState.relicSlotBonus-1);
-    if(relic.relicEnhance==='ren_triple') GameState.relicSlotBonus=Math.max(0,GameState.relicSlotBonus-2);
     GameState.relics.splice(idx,1);
     GameState.gold+=price;
     this.activeRelicId=null;
     this.message=`レリック「${relic.name}」を${price}Gで売却した`;
     this.renderAll();
+  },
+
+  // #1(B) ブラックカードは重複所持不可
+  canAcquireRelic(relic){
+    if(relic.relicEnhance==='ren_black' && GameState.relics.some(r=>r.relicEnhance==='ren_black')) return false;
+    return GameState.canAddRelic(relic);
   },
 
   // #4 ピックアップレリック：スロットに独自レリックを持ち購入
@@ -56,14 +59,13 @@ const ShopScene = {
     const relic=slot._relic;
     const price=this.relicPrice(relic);
     if(GameState.gold<price){ this.message='Gが足りません'; this.renderAll(); return; }
-    // #7 倍化/3倍化は追加でレリック枠を消費するので事前確認
-    const extraSlots=relic.relicEnhance==='ren_double'?1:relic.relicEnhance==='ren_triple'?2:0;
-    if(GameState.relics.length+1+extraSlots>GameState.effectiveMaxRelics()){ this.message=`レリックは最大${GameState.effectiveMaxRelics()}個まで`; this.renderAll(); return; }
+    // #1(B) 倍化/3倍化は2枠・3枠消費。上限を超える場合は購入不可。ブラックカードは重複不可
+    if(!this.canAcquireRelic(relic)){
+      this.message = (relic.relicEnhance==='ren_black' && GameState.relics.some(r=>r.relicEnhance==='ren_black')) ? 'ブラックカードは重複所持できません' : `レリックは最大${GameState.effectiveMaxRelics()}枠まで`;
+      this.renderAll(); return;
+    }
     GameState.gold-=price;
     GameState.relics.push(relic);
-    // #7 倍化/3倍化購入時にスロット追加
-    if(relic.relicEnhance==='ren_double') GameState.relicSlotBonus+=1;
-    if(relic.relicEnhance==='ren_triple') GameState.relicSlotBonus+=2;
     slot.used=true;
     this.applyRelicGrantEffect(relic);
     GlobalFunctions.recordRelic(relic.id);
@@ -166,7 +168,10 @@ const ShopScene = {
     if(!relic) return;
     const price = this.relicPrice(relic);
     if(GameState.gold < price){ this.message = 'Gが足りません'; this.renderAll(); return; }
-    if(GameState.relics.length >= GameState.effectiveMaxRelics()){ this.message = `レリックは最大${GameState.effectiveMaxRelics()}個まで`; this.renderAll(); return; }
+    if(!this.canAcquireRelic(relic)){
+      this.message = (relic.relicEnhance==='ren_black' && GameState.relics.some(r=>r.relicEnhance==='ren_black')) ? 'ブラックカードは重複所持できません' : `レリックは最大${GameState.effectiveMaxRelics()}枠まで`;
+      this.renderAll(); return;
+    }
     GameState.gold -= price;
     GameState.relics.push(relic);
     if(isFixed) this.offers.fixedRelics[i] = null; else this.offers.relics[i] = null;
@@ -367,7 +372,10 @@ const ShopScene = {
   pickRelicPackCard(idx){
     const p = this.pickingRelicPack; if(!p) return;
     const relic = p.candidates[idx]; if(!relic) return;
-    if(GameState.relics.length >= GameState.effectiveMaxRelics()){ this.message='レリック上限です。売却してから選択してください'; this.renderAll(); return; }
+    if(!this.canAcquireRelic(relic)){
+      this.message = (relic.relicEnhance==='ren_black' && GameState.relics.some(r=>r.relicEnhance==='ren_black')) ? 'ブラックカードは重複所持できません。売却してから選択してください' : 'レリック上限です。売却してから選択してください';
+      this.renderAll(); return;
+    }
     GameState.relics.push(relic);
     this.applyRelicGrantEffect(relic);
     GlobalFunctions.recordRelic(relic.id);
@@ -424,6 +432,8 @@ const ShopScene = {
 
   // ===== Render =====
   renderAll(){
+    // #4 タップのたびに画面が一番上に戻る不具合を防ぐ：スクロール位置を保持
+    const scrollY = window.scrollY;
     this.container.innerHTML = '';
     const el = document.createElement('div'); el.className = 'shop-screen';
     const r = GameState.lastReward;
@@ -435,7 +445,7 @@ const ShopScene = {
 
     // #4 ショップ内レリック表示（ゲームプレイ中と同様のカード表示＋売却）
     const relicArea = document.createElement('div'); relicArea.className='shop-relic-confirm';
-    relicArea.innerHTML = `<div class="shop-section-title">所持レリック（${GameState.relics.length}/${GameState.effectiveMaxRelics()}）</div>`;
+    relicArea.innerHTML = `<div class="shop-section-title">所持レリック（${GameState.usedRelicSlots()}/${GameState.effectiveMaxRelics()}）</div>`;
     const relicRow = document.createElement('div'); relicRow.className='relic-display-row';
     if(GameState.relics.length===0){
       const empty=document.createElement('div');empty.className='relic-empty';empty.textContent='なし';relicRow.appendChild(empty);
@@ -483,6 +493,7 @@ const ShopScene = {
     if(this.pickingPack) this.container.appendChild(this.renderPickModal());
     if(this.pickingRelicPack) this.container.appendChild(this.renderRelicPackModal());
     if(this.cardRevealPopup) this.container.appendChild(this.renderCardRevealPopup());
+    window.scrollTo(0,scrollY);
   },
 
   // #9 レリックパック選択モーダル（所持レリックの売却も可能）
@@ -507,7 +518,7 @@ const ShopScene = {
     modal.appendChild(grid);
 
     const ownedTitle = document.createElement('div'); ownedTitle.className='shop-section-title'; ownedTitle.style.marginTop='14px';
-    ownedTitle.textContent = `所持レリック（${GameState.relics.length}/${GameState.effectiveMaxRelics()}）売却してストックを確保できます`;
+    ownedTitle.textContent = `所持レリック（${GameState.usedRelicSlots()}/${GameState.effectiveMaxRelics()}）売却してストックを確保できます`;
     modal.appendChild(ownedTitle);
     const ownedRow = document.createElement('div'); ownedRow.className='relic-display-row';
     if(GameState.relics.length===0){ const empty=document.createElement('div'); empty.className='relic-empty'; empty.textContent='なし'; ownedRow.appendChild(empty); }
@@ -552,7 +563,7 @@ const ShopScene = {
     if(cpSlot.used){ cpEl.innerHTML='<div class="slot-title">SOLD OUT</div>'; }
     else{
       const price = GameState.shopPriceOf(GameData.SHOP_PRICES.cardPack);
-      cpEl.innerHTML=`<div class="slot-title">？カードパック</div><div class="slot-desc">2枚から1枚選択</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入（${price}G）</button>`;
+      cpEl.innerHTML=`<div class="slot-title">🎴？カードパック</div><div class="slot-desc">2枚から1枚選択</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入（${price}G）</button>`;
       cpEl.querySelector('.buy-btn').addEventListener('click', () => this.buyCardPack(cpSlot));
     }
     row.appendChild(cpEl);
@@ -567,7 +578,7 @@ const ShopScene = {
     else{
       const price = GameState.shopPriceOf(GameData.SHOP_PRICES.pickupUpgrade);
       const eff = puSlot._single;
-      puEl.innerHTML=`<div class="slot-title">ピックアップ<br>${eff.name}</div><div class="slot-desc">${eff.desc}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入（${price}G）</button>`;
+      puEl.innerHTML=`<div class="slot-title">🎯ピックアップ<br>${eff.name}</div><div class="slot-desc">${eff.desc}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入（${price}G）</button>`;
       puEl.querySelector('.buy-btn').addEventListener('click', () => {
         if(GameState.gold < price) return;
         GameState.gold -= price; puSlot.used = true;
@@ -594,7 +605,7 @@ const ShopScene = {
       const isDream = slot.type === 'dream_card';
       const isSpecial = slot.type === 'special_upgrade';
       const price = GameState.shopPriceOf(this.slotPrice(slot.type));
-      const typeName = (GameData.SHOP_RANDOM_TYPES.find(t=>t.id===slot.type)||{name:slot.type}).name;
+      const typeName = (GameData.SHOP_RANDOM_TYPES.find(t=>t.id===slot.type)||{name:slot.type,emoji:''});
       if(slot.used){ el.className='shop-slot sold'; el.innerHTML='<div class="slot-title">SOLD OUT</div>'; row.appendChild(el); return; }
       el.className='shop-slot'+(isDream?' dream-slot':'')+(isSpecial?' special-slot':'');
 
@@ -617,7 +628,7 @@ const ShopScene = {
         }
         const eff=slot._single;
         el.className+=' pickup-slot';
-        el.innerHTML=`<div class="slot-title">ピックアップ<br>${eff.name}</div><div class="slot-desc">${eff.desc}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入（${price}G）</button>`;
+        el.innerHTML=`<div class="slot-title">🎯ピックアップ<br>${eff.name}</div><div class="slot-desc">${eff.desc}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入（${price}G）</button>`;
         el.querySelector('.buy-btn').addEventListener('click', () => {
           if(GameState.gold<price) return;
           GameState.gold-=price; slot.used=true;
@@ -631,7 +642,7 @@ const ShopScene = {
         row.appendChild(el); return;
       }
 
-      el.innerHTML=`<div class="slot-title">${typeName}</div><div class="slot-desc">${this.slotDesc(slot.type)}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入（${price}G）</button>`;
+      el.innerHTML=`<div class="slot-title">${typeName.emoji||''}${typeName.name}</div><div class="slot-desc">${this.slotDesc(slot.type)}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入（${price}G）</button>`;
       el.querySelector('.buy-btn').addEventListener('click', () => this.handleRandomSlot(slot));
       row.appendChild(el);
     });

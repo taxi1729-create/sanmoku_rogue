@@ -224,9 +224,33 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 }
 @media (max-width:480px){
   .board{grid-template-columns:repeat(4,60px);grid-template-rows:repeat(4,60px);}
-  .board-left-col{width:100%;flex-direction:row;}
-  .effects-panel-side{flex:1;}
+  .board-left-col{width:100%;flex-direction:row;gap:6px;align-items:flex-start;}
+  .mult-legend{width:auto;flex:0 0 42%;max-height:120px;overflow-y:auto;padding:4px 6px;}
+  .mult-legend td,.mult-legend th{font-size:9px;padding:0 3px;}
+  .mult-legend td:first-child{font-size:11px;}
+  .effects-panel-side{flex:1;max-height:120px;overflow-y:auto;}
   .shop-slot{width:145px;}
+}
+
+/* #4 スマホ縦画面：1ページに収まるよう全体を圧縮（ページ全体スクロールを避ける） */
+@media (max-width:480px) and (orientation:portrait){
+  html,body{overflow-y:auto;}
+  #app{padding:4px 6px 10px;}
+  .game-screen{gap:6px;}
+  .status-bar{padding:6px 8px;}
+  .stat{font-size:11px;}
+  .stat .value{font-size:12px;}
+  .board{grid-template-columns:repeat(4,52px);grid-template-rows:repeat(4,52px);gap:3px;padding:5px;}
+  .cell{font-size:18px;}
+  .board-area{gap:6px;}
+  .board-left-col{gap:4px;}
+  .mult-legend{max-height:96px;font-size:9px;}
+  .effects-panel-side{max-height:96px;font-size:9px;}
+  .hand-row{gap:4px;}
+  .card{width:48px;height:68px;}
+  .card-symbol-wrap{font-size:18px;}
+  .log-panel{max-height:48px;font-size:9px;}
+  .relic-display-row{gap:4px;}
 }
 
 /* Symbol colors */
@@ -482,3 +506,24 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .stage-done-tag{padding:6px 10px;background:#333a4a;border-radius:6px;font-size:12px;text-align:center;color:#9aa0b0;}
 .pack-modal-wide{max-width:640px;}
 .card-pick-wrap.picked .card, .card-pick-wrap.picked .relic-card{outline:2px solid var(--accent,#4fd1ff);}
+
+/* #A 記号パッシブ：常時表示バー＆詳細パネル */
+.passive-bar{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0;}
+.passive-icon{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 8px;border-radius:8px;background:rgba(0,0,0,.3);cursor:pointer;opacity:.5;min-width:36px;}
+.passive-icon.active{opacity:1;box-shadow:0 0 6px rgba(251,191,36,.5);}
+.passive-icon .passive-sym{font-size:16px;font-weight:900;}
+.passive-icon .passive-tier{font-size:9px;color:var(--text-dim);}
+.passive-info-panel{border:1px solid #3a3050;}
+.passive-detail-row{padding:4px 0;border-top:1px solid rgba(255,255,255,.06);font-size:11px;line-height:1.5;opacity:.55;}
+.passive-detail-row.got{opacity:1;}
+.passive-detail-row:first-child{border-top:none;}
+
+/* #2 ビンゴ確定時：獲得点数を大きくポップアップ表示 */
+.score-badge-final{top:-34px;font-size:15px;padding:4px 10px;background:var(--gold);color:#1a1a1a;font-weight:900;box-shadow:0 0 10px rgba(251,191,36,.7);z-index:5;}
+
+/* #3 報酬画面：ゲームメイン画面上にオーバーレイ表示＋デバッグログ */
+.result-screen{z-index:70;}
+.result-box{background:var(--panel);border:1px solid #3a3050;border-radius:16px;padding:20px 26px;text-align:center;max-height:88vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;align-items:center;max-width:92vw;}
+.result-debug-log{width:100%;max-width:420px;max-height:180px;overflow-y:auto;background:#0e1018;border-radius:10px;padding:8px 12px;font-size:10px;color:var(--text-dim);font-family:'Space Mono',monospace;line-height:1.5;text-align:left;}
+.result-debug-title{font-weight:900;color:var(--text);margin-bottom:4px;}
+.result-debug-line{word-break:break-all;margin-bottom:2px;}
