@@ -518,12 +518,13 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .passive-detail-row{padding:4px 0;border-top:1px solid rgba(255,255,255,.06);font-size:11px;line-height:1.5;opacity:.55;}
 .passive-detail-row.got{opacity:1;}
 .passive-detail-row:first-child{border-top:none;}
-
 /* #2 ビンゴ確定時：獲得点数を大きくポップアップ表示 */
 .score-badge-final{top:-34px;font-size:15px;padding:4px 10px;background:var(--gold);color:#1a1a1a;font-weight:900;box-shadow:0 0 10px rgba(251,191,36,.7);z-index:5;}
 
 /* #3 報酬画面：ゲームメイン画面上にオーバーレイ表示＋デバッグログ */
 .result-screen{z-index:70;}
+/* #1 パッシブ選択モーダルはリザルト画面より前面に表示する */
+.passive-choice-overlay{z-index:80;}
 .result-box{background:var(--panel);border:1px solid #3a3050;border-radius:16px;padding:20px 26px;text-align:center;max-height:88vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;align-items:center;max-width:92vw;}
 .result-debug-log{width:100%;max-width:420px;max-height:180px;overflow-y:auto;background:#0e1018;border-radius:10px;padding:8px 12px;font-size:10px;color:var(--text-dim);font-family:'Space Mono',monospace;line-height:1.5;text-align:left;}
 .result-debug-title{font-weight:900;color:var(--text);margin-bottom:4px;}
@@ -543,9 +544,13 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .enhance-pulse{animation:enhancePulse 1.4s ease-in-out infinite;}
 @keyframes enhancePulse{0%,100%{filter:brightness(1);}50%{filter:brightness(1.35);}}
 
-/* #5 パッシブ効果：タップで吹き出し表示 */
-.passive-info-panel{position:relative;background:var(--panel);}
-.passive-info-panel::before{content:'';position:absolute;top:-8px;left:24px;border:8px solid transparent;border-bottom-color:var(--panel);}
+/* #3 パッシブ効果：タップで吹き出し表示（レイアウトを押し広げないよう画面に固定フロート表示） */
+.passive-info-panel{
+  position:fixed; top:14vh; left:50%; transform:translateX(-50%);
+  background:var(--panel); z-index:40; width:min(340px,88vw); max-height:64vh; overflow-y:auto;
+  box-shadow:0 8px 28px rgba(0,0,0,.6);
+}
+.passive-info-panel::before{content:'';position:absolute;top:-8px;left:50%;transform:translateX(-50%);border:8px solid transparent;border-bottom-color:var(--panel);}
 
 /* #2 点数計算をより派手に演出 */
 .score-badge-final{animation:scoreFinalPop .5s cubic-bezier(.34,1.56,.64,1);}

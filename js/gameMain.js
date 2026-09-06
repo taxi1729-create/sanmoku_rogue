@@ -371,6 +371,8 @@ const GameMainScene = {
       if(cell.card.enhance==='巨大化') cell.baseScore+=3;
       if(cell.card.enhance==='肥大化'){const a=Math.round(GameData.BINGO_MULTIPLIER_BASE[cell.symbol]*2*(sqP1?2:1));GameState.currentScore=Math.max(0,GameState.currentScore+a);}
     });
+    // #2 肥大化などビンゴを介さない加点でも目標点数到達で即座にゲームクリアにする
+    if(GameState.currentScore>=GameState.targetScore){ this.renderAll(); this.finishStage('win'); return; }
     if(card?.enhance==='ドロー'){ this.drawOne(); if(GameState.symbolPassiveTier.Square>=3) this.drawOne(); }
     // #A シカクパッシブ3：シカクカードをプレイした時、カードを1枚ドロー
     if(card&&card.symbol==='Square'&&owner==='player'&&GameState.symbolPassiveTier.Square>=1){ const dc=this.drawOne(); if(dc) dc.baseScore+=1; }
@@ -841,6 +843,8 @@ const GameMainScene = {
       if(cell.card.enhance==='巨大化') cell.baseScore+=3;
       if(cell.card.enhance==='肥大化'){const a=Math.round(GameData.BINGO_MULTIPLIER_BASE[cell.symbol]*2*(sqP1b?2:1));GameState.currentScore=Math.max(0,GameState.currentScore+a);}
     });
+    // #2 肥大化などビンゴを介さない加点でも目標点数到達で即座にゲームクリアにする
+    if(GameState.currentScore>=GameState.targetScore){ this.renderAll(); this.finishStage('win'); return; }
     if(card.enhance==='ドロー'){ this.drawOne(); if(GameState.symbolPassiveTier.Square>=3) this.drawOne(); }
     // #A シカクパッシブ3
     if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1){ const dc=this.drawOne(); if(dc) dc.baseScore+=1; }
@@ -1418,7 +1422,7 @@ const GameMainScene = {
 
   // #A ボスクリア時：記号パッシブ選択モーダル（ゲームメイン画面上にオーバーレイ表示）
   renderPassiveChoiceModal(){
-    const el=document.createElement('div'); el.className='pack-modal-overlay';
+    const el=document.createElement('div'); el.className='pack-modal-overlay passive-choice-overlay';
     const box=document.createElement('div'); box.className='pack-modal';
     box.innerHTML='<h3>記号パッシブを1つ選んでください</h3>';
     const grid=document.createElement('div'); grid.className='pack-card-grid';
