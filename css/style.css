@@ -258,6 +258,7 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .sym-Triangle{ color:var(--triangle); }
 .sym-Square{ color:var(--square); }
 .sym-Cross{ color:var(--cross); }
+.sym-Hoshi{ color:#fbbf24; }
 
 /* --- #1 Card hover tooltip & #5 drag --- */
 .card-wrapper{ position:relative; display:inline-block; }
@@ -392,10 +393,10 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 /* 指令官：白→黒グラデ＋藍色の正方形 */
 .card.trait-指令官 {
   background: linear-gradient(to bottom, #e8e8f0, #1a1a2e);
-  position: relative; overflow: hidden;
+  position: relative;
 }
 .card.trait-指令官::after {
-  content:''; position:absolute; inset:0;
+  content:''; position:absolute; inset:0; border-radius:inherit;
   background-image: radial-gradient(circle, #4a5a9a 1px, transparent 1px);
   background-size: 12px 12px; opacity:0.4;
 }
@@ -527,3 +528,53 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .result-debug-log{width:100%;max-width:420px;max-height:180px;overflow-y:auto;background:#0e1018;border-radius:10px;padding:8px 12px;font-size:10px;color:var(--text-dim);font-family:'Space Mono',monospace;line-height:1.5;text-align:left;}
 .result-debug-title{font-weight:900;color:var(--text);margin-bottom:4px;}
 .result-debug-line{word-break:break-all;margin-bottom:2px;}
+
+/* #2(B) マップ選択：デバッグ用ゴールドボタン */
+.debug-gold-btn{margin-left:auto;background:#3a2f4d;border:1px dashed #8a7bb0;color:#c9b8ff;font-size:11px;padding:4px 8px;border-radius:8px;}
+
+/* #5 盤面カードを手札と同じUIで表示するためのサイズ調整 */
+.board .cell.card{width:100%;height:100%;cursor:default;}
+.board .cell.card:hover{transform:none;}
+
+/* #1 マルパッシブ2：マルマルチ(パッシブ)専用バッジ（通常の強化効果とは別枠の黄色丸） */
+.passive-multi-badge{position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:#fbbf24;color:#1a1a1a;font-size:8px;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 0 4px rgba(251,191,36,.9);z-index:3;}
+
+/* #5 肥大化・巨大化：ターンごとに数値が変化する様をパルスで表現 */
+.enhance-pulse{animation:enhancePulse 1.4s ease-in-out infinite;}
+@keyframes enhancePulse{0%,100%{filter:brightness(1);}50%{filter:brightness(1.35);}}
+
+/* #5 パッシブ効果：タップで吹き出し表示 */
+.passive-info-panel{position:relative;background:var(--panel);}
+.passive-info-panel::before{content:'';position:absolute;top:-8px;left:24px;border:8px solid transparent;border-bottom-color:var(--panel);}
+
+/* #2 点数計算をより派手に演出 */
+.score-badge-final{animation:scoreFinalPop .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes scoreFinalPop{0%{transform:translateX(-50%) scale(.2);opacity:0;}60%{transform:translateX(-50%) scale(1.3);opacity:1;}100%{transform:translateX(-50%) scale(1);opacity:1;}}
+.scoring-cell{animation:scoringGlow 1s ease-in-out infinite;}
+@keyframes scoringGlow{0%,100%{box-shadow:0 0 4px rgba(251,191,36,.3);}50%{box-shadow:0 0 16px rgba(251,191,36,.9);}}
+.add-score-bar.negative .as-eq{color:#ff6b6b;}
+.score-badge-final.negative{background:#ff6b6b;color:#fff;}
+
+/* #6 ショップ画面：スマホ縦画面で下スクロール不要になるよう圧縮 */
+@media (max-width:480px) and (orientation:portrait){
+  .shop-screen{gap:8px;max-width:100%;}
+  .shop-header{gap:2px;}
+  .shop-slot{width:47%;min-width:120px;padding:8px;min-height:76px;gap:4px;}
+  .shop-slot .slot-title{font-size:11px;}
+  .shop-slot .slot-desc{font-size:9px;line-height:1.25;}
+  .shop-slot .buy-btn{font-size:10px;padding:5px 8px;}
+  .relic-card{padding:6px;font-size:10px;}
+  .relic-display-row{gap:4px;}
+}
+
+/* #3 ホシパッシブ1：ボス効果リロールボタン */
+.boss-reroll-btn{margin-top:6px;width:100%;background:#3a2f1a;border:1px solid #fbbf24;color:#fbbf24;font-size:10px;padding:6px 8px;border-radius:8px;}
+
+/* #6 盤面配置演出：置いた瞬間にポップ＆フラッシュ */
+.cell.place-pop{animation:placePop .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes placePop{
+  0%{transform:scale(.4);box-shadow:0 0 0 rgba(251,191,36,0);}
+  40%{transform:scale(1.18);box-shadow:0 0 22px rgba(251,191,36,.85);}
+  70%{transform:scale(.96);}
+  100%{transform:scale(1);box-shadow:0 0 0 rgba(251,191,36,0);}
+}

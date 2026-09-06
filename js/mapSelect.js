@@ -7,6 +7,7 @@ const MapSelectScene = {
     const boss=stages.find(s=>s.key==='boss');
     const bossCount=boss?boss.bossEffectCount:1;
     if(!GameState.pendingBossEffect&&GameData.BOSS_EFFECT_POOL.length>0){
+      GameState.bossRerollUsed=false; // #3 新しいボス出現時にリロール権をリセット
       if(bossCount<=1){
         GameState.pendingBossEffect=GlobalFunctions.randChoice(GameData.BOSS_EFFECT_POOL);
       }else{
@@ -23,6 +24,10 @@ const MapSelectScene = {
     const el=document.createElement('div'); el.className='map-screen';
     const header=document.createElement('div'); header.className='map-header';
     header.innerHTML=`<span>所持G：${GameState.gold}</span><span>第${GameState.currentFloor}階層</span>`;
+    // #2(B) デバッグ促進用：タップで20000G付与するボタン
+    const debugGoldBtn=document.createElement('button'); debugGoldBtn.className='debug-gold-btn'; debugGoldBtn.textContent='🐞+20000G';
+    debugGoldBtn.addEventListener('click',()=>{ GameState.gold+=20000; this.renderAll(); });
+    header.appendChild(debugGoldBtn);
     el.appendChild(header);
     const path=document.createElement('div'); path.className='map-path';
     const stages=GameData.buildFloorStages(GameState.currentFloor);
@@ -34,9 +39,14 @@ const MapSelectScene = {
       // #4 「クリア済み・再挑戦」表記を廃止
       card.className='stage-card'+(locked?' locked':'');
       let bossInfoHtml='';
+      let bossRerollBtnHtml='';
       if(stage.key==='boss'&&GameState.pendingBossEffect){
         const effects=Array.isArray(GameState.pendingBossEffect)?GameState.pendingBossEffect:[GameState.pendingBossEffect];
         bossInfoHtml=`<div class="boss-preview"><div class="boss-preview-title">ボス効果</div>${effects.map(b=>`<div class="boss-preview-item"><b>${b.name}</b>：${b.desc}</div>`).join('')}</div>`;
+        // #3 ホシパッシブ1：ボス効果を一度だけリロール可能
+        if(!locked&&GameState.symbolPassiveTier.Hoshi>=1&&!GameState.bossRerollUsed){
+          bossRerollBtnHtml=`<button class="boss-reroll-btn">☆ボス効果リロール（残り1回）</button>`;
+        }
       }
       // #7 スキップ報酬内容をステージ上に表示
       let skipBonusHtml='';
@@ -49,10 +59,20 @@ const MapSelectScene = {
       const actionsHtml=isCleared
         ? `<div class="stage-actions"><div class="stage-done-tag">クリア済み</div></div>`
         : `<div class="stage-actions"><button class="challenge-btn" ${locked?'disabled':''}>挑戦する</button>${stage.skippable?`<button class="skip-btn" ${locked?'disabled':''}>スキップ</button>`:''}</div>`;
-      card.innerHTML=`<div class="stage-tag">${stage.tag}</div><div class="stage-name">${stage.name}</div><div class="stage-goal">目標：${GlobalFunctions.formatScore(stage.targetScore)}点</div>${bossInfoHtml}${skipBonusHtml}${actionsHtml}`;
+      card.innerHTML=`<div class="stage-tag">${stage.tag}</div><div class="stage-name">${stage.name}</div><div class="stage-goal">目標：${GlobalFunctions.formatScore(stage.targetScore)}点</div>${bossInfoHtml}${bossRerollBtnHtml}${skipBonusHtml}${actionsHtml}`;
       path.appendChild(card);
       const challengeBtn=card.querySelector('.challenge-btn');
       if(challengeBtn) challengeBtn.addEventListener('click',()=>{ if(locked) return; App.showGameMain(stage); });
+      // #3 ホシパッシブ1：ボス効果リロール
+      const bossRerollBtn=card.querySelector('.boss-reroll-btn');
+      if(bossRerollBtn) bossRerollBtn.addEventListener('click',()=>{
+        const bossCount=Array.isArray(GameState.pendingBossEffect)?GameState.pendingBossEffect.length:1;
+        GameState.pendingBossEffect = bossCount<=1
+          ? GlobalFunctions.randChoice(GameData.BOSS_EFFECT_POOL)
+          : GlobalFunctions.shuffle(GameData.BOSS_EFFECT_POOL).slice(0,bossCount);
+        GameState.bossRerollUsed=true;
+        this.renderAll();
+      });
       const skipBtn=card.querySelector('.skip-btn');
       if(skipBtn) skipBtn.addEventListener('click',()=>{
         if(locked||isCleared) return;
@@ -119,21 +139,21 @@ const MapSelectScene = {
     const key=GameState.currentFloor+'_'+stage.key;
     if(this._skipBonusCache[key]===undefined){
       const type=GameData.pickSkipBonusType();
-      let label=null, extra=null;
-      if(type==='relic'){ extra=ShopScene.pickRelic(); label='レリック🔴：'+extra.name; }
-      else if(type==='normal_upgrade'){ extra=GlobalFunctions.randChoice(GameData.NORMAL_SELECT_POOL.filter(e=>!e.rarity)); label='通常アップグレード：'+extra.name; }
-      else if(type==='special_upgrade'){ extra=GlobalFunctions.randChoice(GameData.SPECIAL_SELECT_POOL); label='特別アップグレード：'+extra.name; }
+      let label=null;
+      if(type==='relic'){ label='レリック🔴：ランダムレリック1つを獲得'; }
+      else if(type==='normal_upgrade'){ label='通常アップグレード：ショップでカードと効果を選択'; }
+      else if(type==='special_upgrade'){ label='特別アップグレード：ショップでカードと効果を選択'; }
       else if(type==='dream_card'){ label='ドリームカードパック'; }
-      this._skipBonusCache[key]=type?{type,label,extra}:null;
+      this._skipBonusCache[key]=type?{type,label}:null;
     }
     return this._skipBonusCache[key];
   },
 
-  // スキップ報酬の追加ボーナスを実際に付与する
+  // #8 スキップ報酬の追加ボーナスを実際に付与する（通常/特別アップグレードは通常通りショップでカード・効果を選択させる）
   applySkipBonusEffect(bonus){
     if(!bonus||!bonus.type) return '';
     if(bonus.type==='relic'){
-      const relic=bonus.extra;
+      const relic=ShopScene.pickRelic();
       if(ShopScene.canAcquireRelic(relic)){
         GameState.relics.push(relic);
         ShopScene.applyRelicGrantEffect(relic);
@@ -143,15 +163,19 @@ const MapSelectScene = {
       GameState.gold+=5; return 'レリック枠が満杯のため代わりにG+5';
     }
     if(bonus.type==='normal_upgrade'||bonus.type==='special_upgrade'){
-      const eff=bonus.extra; if(!eff||GameState.currentDeck.length===0) return '';
-      let targets=[];
-      if(eff.targetMax>0){
-        const n=Math.min(eff.targetMax,GameState.currentDeck.length);
-        targets=GlobalFunctions.shuffle(GameState.currentDeck.map((_,idx)=>idx)).slice(0,n);
-      }
-      ShopScene.applyEffect(eff.id,targets);
-      targets.forEach(idx=>{ const c=GameState.currentDeck[idx]; if(c) GlobalFunctions.recordCard(c); });
-      return `${eff.name}を適用`;
+      if(GameState.currentDeck.length===0) return '';
+      const slotType = bonus.type==='special_upgrade' ? 'special' : 'normal';
+      let pool = slotType==='special'
+        ? GameData.SPECIAL_SELECT_POOL.filter(e=>!GameState.usedSpecialEffectIds.includes(e.id))
+        : GameData.NORMAL_SELECT_POOL.filter(e=>{ if(e.rarity) return Math.random()<e.rarity; return true; });
+      if(pool.length===0) pool = (slotType==='special'?GameData.SPECIAL_SELECT_POOL:GameData.NORMAL_SELECT_POOL.filter(e=>!e.rarity));
+      const pickN = slotType==='special' ? 2 : 3;
+      const effectPool = GlobalFunctions.shuffle(pool).slice(0, Math.min(pickN, pool.length));
+      const pickCount = Math.min(8, GameState.currentDeck.length);
+      const cardIndexes = GlobalFunctions.shuffle(GameState.currentDeck.map((_,idx)=>idx)).slice(0, pickCount);
+      // #8 通常のショップ購入と同じ「効果→カード」選択モーダルをショップ画面側で開かせる
+      ShopScene.pickingPack = { slotType, slotRef:null, effectPool, chosenEffect:null, cardIndexes, selectedTargets:new Set() };
+      return 'ショップでカードと効果を選択してください';
     }
     if(bonus.type==='dream_card'){
       const card=GameData.generateShopCard();

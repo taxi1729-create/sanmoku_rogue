@@ -7,7 +7,8 @@ const GameState = {
   currentFloor:1,          // #12 現在の階層
   maxClearedFloor:0,        // #12 最高クリア階層
   maxClearedStage:'',       // #12 最高クリアステージ名
-  symbolPassiveTier:{ Circle:0, Triangle:0, Square:0, Cross:0 }, // #A 記号パッシブ（0=未取得,1-3=段階）
+  symbolPassiveTier:{ Circle:0, Triangle:0, Square:0, Cross:0, Hoshi:0 }, // #A 記号パッシブ（0=未取得,1-3=段階）
+  bossRerollUsed:false, // #3 ホシパッシブ1：ボス効果リロールの使用済みフラグ
 
   effectiveHandSize(){ return GameData.HAND_SIZE + this.handSizeBonus; },
   effectiveMaxRounds(){ return GameData.MAX_ROUNDS + this.roundsBonus; },
@@ -41,7 +42,7 @@ const GameState = {
     this.usedSpecialEffectIds=[]; this.discardedPile=[];
     this.specialPackExhausted=false; this.pendingBossEffect=null;
     this.currentFloor=1;
-    this.symbolPassiveTier={ Circle:0, Triangle:0, Square:0, Cross:0 };
+    this.symbolPassiveTier={ Circle:0, Triangle:0, Square:0, Cross:0, Hoshi:0 };
     GameData.BINGO_MULTIPLIER_BASE={...GameData.BINGO_MULTIPLIER_BASE_ORIGINAL};
     GameData.CORRECTION_BASE_SCORE=0; GameData.CORRECTION_MULTIPLIER=0;
     GameData.FINAL_MULTIPLIER=1; GameData.FINAL_ADD=0;
@@ -66,6 +67,7 @@ const GameState = {
       rerollBonus:this.rerollBonus, usedSpecialEffectIds:this.usedSpecialEffectIds,
       pendingBossEffect:this.pendingBossEffect,
       symbolPassiveTier:this.symbolPassiveTier,
+      bossRerollUsed:this.bossRerollUsed,
       multBase:{...GameData.BINGO_MULTIPLIER_BASE},
       corrBase:GameData.CORRECTION_BASE_SCORE,
       savedFloorStage: (this.currentStage?this.currentStage.key:''),
@@ -83,7 +85,9 @@ const GameState = {
     this.rerollBonus=d.rerollBonus||0;
     this.usedSpecialEffectIds=d.usedSpecialEffectIds||[];
     this.pendingBossEffect=d.pendingBossEffect||null;
-    this.symbolPassiveTier=d.symbolPassiveTier||{ Circle:0, Triangle:0, Square:0, Cross:0 };
+    this.symbolPassiveTier=d.symbolPassiveTier||{ Circle:0, Triangle:0, Square:0, Cross:0, Hoshi:0 };
+    if(this.symbolPassiveTier.Hoshi===undefined) this.symbolPassiveTier.Hoshi=0;
+    this.bossRerollUsed=d.bossRerollUsed||false;
     if(d.multBase) Object.assign(GameData.BINGO_MULTIPLIER_BASE,d.multBase);
     if(d.corrBase!=null) GameData.CORRECTION_BASE_SCORE=d.corrBase;
   },

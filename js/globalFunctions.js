@@ -5,6 +5,7 @@ const GlobalFunctions = {
   loadImage(path){ return new Promise((res,rej)=>{const img=new Image();img.onload=()=>res(img);img.onerror=()=>res(null);img.src=path;}); },
   playSE(name){},
   formatScore(n){ return Math.floor(n).toLocaleString('ja-JP'); },
+  formatSigned(n){ const v=Math.floor(n); return (v>=0?'+':'')+v.toLocaleString('ja-JP'); },
 
   // #8 セーブ/ロード (3スロット)
   SAVE_KEY:'siren_spire_save_v1',

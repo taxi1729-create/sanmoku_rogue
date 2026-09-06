@@ -40,6 +40,8 @@ const ShopScene = {
     let price=1;
     if(relic.relicEnhance==='ren_discard_sell') price=Math.floor(GameState.currentDeck.length/2);
     else if(ren) price+=2;
+    // #3 ショップでの売却時もレリック効果を確実に除去する（ペイント等の永続効果が残るバグ修正）
+    if(typeof GameMainScene!=='undefined') GameMainScene.removeRelicEffect(relic);
     GameState.relics.splice(idx,1);
     GameState.gold+=price;
     this.activeRelicId=null;
@@ -546,7 +548,7 @@ const ShopScene = {
       const price = this.relicPrice(relic);
       const ren = relic.relicEnhance ? GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance) : null;
       slot.className='shop-slot relic-shop-slot pickup-slot';
-      slot.innerHTML=`<div class="relic-shop-card pickup"><div class="relic-shop-badge">レリック🔴</div><div class="relic-name">${relic.name}</div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}</div><div class="slot-desc">${relic.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||GameState.relics.length>=GameState.effectiveMaxRelics()?'disabled':''}>購入（${price}G）</button>`;
+      slot.innerHTML=`<div class="relic-shop-card pickup"><div class="relic-shop-badge">レリック🔴</div><div class="relic-name">${relic.name}</div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}</div><div class="slot-desc">${relic.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||!this.canAcquireRelic(relic)?'disabled':''}>購入（${price}G）</button>`;
       slot.querySelector('.buy-btn').addEventListener('click', () => this.buyRelic(i, true));
       row.appendChild(slot);
     });
@@ -615,7 +617,7 @@ const ShopScene = {
         const r=slot._relic;
         const ren=r.relicEnhance?GameData.RELIC_ENHANCE_POOL.find(x=>x.id===r.relicEnhance):null;
         el.className+=' pickup-slot';
-        el.innerHTML=`<div class="slot-title"><div class="relic-shop-badge">レリック🔴</div>${r.name}${ren?`<span class="relic-enhance-tag"> ${ren.name}</span>`:''}</div><div class="slot-desc">${r.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||GameState.relics.length>=GameState.effectiveMaxRelics()?'disabled':''}>購入（${price}G）</button>`;
+        el.innerHTML=`<div class="slot-title"><div class="relic-shop-badge">レリック🔴</div>${r.name}${ren?`<span class="relic-enhance-tag"> ${ren.name}</span>`:''}</div><div class="slot-desc">${r.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||!this.canAcquireRelic(r)?'disabled':''}>購入（${price}G）</button>`;
         el.querySelector('.buy-btn').addEventListener('click', () => this.buyPickupRelic(slot));
         row.appendChild(el); return;
       }
