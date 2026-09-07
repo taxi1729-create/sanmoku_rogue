@@ -360,6 +360,10 @@ const GameMainScene = {
     this.board[cellIdx]={symbol,baseScore,owner,card};
     this.lastPlacedCell=cellIdx;
     if(owner==='npc') this.lastNpcCell=cellIdx;
+    // #3 シカクパッシブ1：プレイしたシカクカード自身にも基礎点+1を永続付与（盤面配置時点で反映）
+    if(card&&card.symbol==='Square'&&owner==='player'&&GameState.symbolPassiveTier.Square>=1){
+      card.baseScore+=1; this.board[cellIdx].baseScore+=1;
+    }
     // #6 配置演出：置いた瞬間のポップアニメーション
     this.justPlacedCell=cellIdx;
     setTimeout(()=>{ if(this.justPlacedCell===cellIdx){ this.justPlacedCell=null; this.renderAll(); } },550);
@@ -368,7 +372,7 @@ const GameMainScene = {
     const sqP1=GameState.symbolPassiveTier.Square>=3; // #A シカクパッシブ3：強化効果2倍
     this.board.forEach(cell=>{
       if(!cell?.card) return;
-      if(cell.card.enhance==='巨大化') cell.baseScore+=3;
+      if(cell.card.enhance==='巨大化') cell.baseScore+=3*(GameState.symbolPassiveTier.Square>=3?2:1); // #2 シカクパッシブ3：巨大化も2倍対象
       if(cell.card.enhance==='肥大化'){const a=Math.round(GameData.BINGO_MULTIPLIER_BASE[cell.symbol]*2*(sqP1?2:1));GameState.currentScore=Math.max(0,GameState.currentScore+a);}
     });
     // #2 肥大化などビンゴを介さない加点でも目標点数到達で即座にゲームクリアにする
@@ -418,10 +422,18 @@ const GameMainScene = {
       return {sym,cells};
     };
 
+    // #2 ハブ：2つ以上のビンゴに関わるマスを判定するため、消費前の全窓を走査してマスごとのビンゴ関与数を数える
+    const cellBingoCount={};
+    this.windows.forEach((win)=>{
+      const r=evalWin(win); if(!r) return;
+      win.cells.forEach(ci=>{ cellBingoCount[ci]=(cellBingoCount[ci]||0)+1; });
+    });
+
     const scoringRelics=new Set();
     const makeResult=(idx,win,r,baseMult)=>{
+      const sqP3=GameState.symbolPassiveTier.Square>=3; // #A シカクパッシブ3：強化効果2倍
       // #A 記号パッシブ：カード基礎点の個別補正（マルP3の加算、シカクP2の2倍、バツP2のデッキ枚数×3上書き）
-      const perCellScore=(c)=>{
+      const perCellScore=(c,ci)=>{
         let v=c.baseScore;
         if(c.card?._passiveScoreAdd) v+=c.card._passiveScoreAdd;
         if(c.symbol==='Square'&&GameState.symbolPassiveTier.Square>=2) v*=2;
@@ -431,9 +443,13 @@ const GameMainScene = {
           const n=GameState.currentDeck.filter(cc=>cc.symbol==='Triangle').length/total;
           v*=(1+n);
         }
+        // #2 ハブ：2つ以上のビンゴに関わるマスはカード基礎点×1.5（シカクパッシブ3で×2）
+        if(c.card?.enhance==='ハブ'&&(cellBingoCount[ci]||0)>=2){
+          v*=sqP3?2:1.5;
+        }
         return v;
       };
-      const cardScores=r.cells.map(perCellScore);
+      const cardScores=win.cells.map((ci,i)=>perCellScore(r.cells[i],ci));
       // #A バツパッシブ3：一番高いビンゴ倍率をバツ倍率に反映
       if(r.sym==='Cross'&&GameState.symbolPassiveTier.Cross>=1){
         baseMult=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s]));
@@ -560,6 +576,7 @@ const GameMainScene = {
 
   async showScoreStep(b){
     const before=GameState.currentScore, after=Math.max(0,before+b.score);
+    const finalDelta=after-before; // #6 常にこの一つの値に向かって単調に近づけることで、演算途中の符号反転を防ぐ
 
     // #1 各セルを1枚ずつ0.4秒ポップ（同セルが複数ビンゴに属する場合、その分繰り返す）
     for(const cellIdx of b.cells){
@@ -574,25 +591,26 @@ const GameMainScene = {
     this.scoringAnim.phase=1; this.scoringAnim.componentLive=0; this.renderAll(); await this.sleep(150);
     for(let s=1;s<=8;s++){
       this.scoringAnim.componentLive=Math.round(b.totalBase*s/8);
+      // #6 灰色で見せている計算過程の数値を、加算点数バッジにも連動させる（符号反転しないよう最終値の一部として進める）
+      this.scoringAnim.liveScore=Math.round(before+finalDelta*0.3*(s/8));
       this.renderAll(); await this.sleep(45);
     }
     await this.sleep(200);
     // step 2: ビンゴ倍率
     this.scoringAnim.phase=2; this.renderAll(); await this.sleep(500);
-    // step 3: 乗算カウントアップ（3列相当の倍率まで）
+    // step 3: 乗算カウントアップ（最終値の60%まで単調に進める）
     this.scoringAnim.phase=3;
-    const nonBoostedMult=GameData.BINGO_MULTIPLIER_BASE[b.symbol]+GameData.CORRECTION_MULTIPLIER;
-    const step3Target=Math.round(b.totalBase*((b.isQuad||b.isPenta)?nonBoostedMult:b.mult));
+    const step3Target=Math.round(before+finalDelta*0.6);
     this.renderAll();
     for(let s=1;s<=10;s++){
       this.scoringAnim.liveScore=Math.round(before+(step3Target-before)*s/10);
       this.renderAll(); await this.sleep(50);
     }
     await this.sleep(150);
-    // step 4: 4列×1.5 / 5列×2（実際の倍率まで引き上げる）
+    // step 4: 4列×1.5 / 5列×2（最終値の85%まで単調に進める）
     if(b.isQuad||b.isPenta){
       this.scoringAnim.phase=4;
-      const step4Target=Math.round(b.totalBase*b.mult);
+      const step4Target=Math.round(before+finalDelta*0.85);
       this.renderAll();
       for(let s=1;s<=10;s++){
         this.scoringAnim.liveScore=Math.round(before+(step4Target-before)*s/10);
@@ -600,10 +618,12 @@ const GameMainScene = {
       }
       await this.sleep(150);
     }
-    // step 5: 最終乗算補正
-    this.scoringAnim.phase=5; this.renderAll(); await this.sleep(500);
-    // step 6: 最終加算補正
-    if(b.finalAdd){ this.scoringAnim.phase=6; this.renderAll(); await this.sleep(500); }
+    // step 5: 最終乗算補正（最終値の95%まで）
+    this.scoringAnim.phase=5;
+    this.scoringAnim.liveScore=Math.round(before+finalDelta*0.95);
+    this.renderAll(); await this.sleep(500);
+    // step 6: 最終加算補正（残り5%を含め満額に到達）
+    if(b.finalAdd){ this.scoringAnim.phase=6; this.scoringAnim.liveScore=after; this.renderAll(); await this.sleep(500); }
     // #2 確定：獲得点数を盤面ポップアップに明示表示
     GameState.currentScore=after;
     this.scoringAnim.liveScore=after; this.scoringAnim.reached=GameState.currentScore>=GameState.targetScore; this.scoringAnim.phase=8;
@@ -824,6 +844,8 @@ const GameMainScene = {
   async executePlacement(targets,card){
     const mainCi=targets[0];
     const isPaint=card.trait==='塗りつぶし'||card.trait==='塗りつぶし(レリック)';
+    // #3 シカクパッシブ1：プレイしたシカクカード自身にも基礎点+1を永続付与
+    if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1) card.baseScore+=1;
     for(const ci of targets){
       if(this.board[ci]?.card&&isPaint) GameState.discardPile.push(this.board[ci].card);
       this.board[ci]={symbol:card.symbol,baseScore:card.baseScore,owner:'player',card:ci===mainCi?card:null};
@@ -840,7 +862,7 @@ const GameMainScene = {
     const sqP1b=GameState.symbolPassiveTier.Square>=3; // #A シカクパッシブ3
     this.board.forEach(cell=>{
       if(!cell?.card) return;
-      if(cell.card.enhance==='巨大化') cell.baseScore+=3;
+      if(cell.card.enhance==='巨大化') cell.baseScore+=3*(GameState.symbolPassiveTier.Square>=3?2:1); // #2 シカクパッシブ3：巨大化も2倍対象
       if(cell.card.enhance==='肥大化'){const a=Math.round(GameData.BINGO_MULTIPLIER_BASE[cell.symbol]*2*(sqP1b?2:1));GameState.currentScore=Math.max(0,GameState.currentScore+a);}
     });
     // #2 肥大化などビンゴを介さない加点でも目標点数到達で即座にゲームクリアにする
@@ -892,7 +914,7 @@ const GameMainScene = {
       case 'round_boost': GameState.roundsBonus=Math.max(0,GameState.roundsBonus-1); break;
       case 'reroll_boost': GameState.rerollBonus=Math.max(0,GameState.rerollBonus-2); GameState.rerollCount=Math.max(0,GameState.rerollCount-2); break;
       case 'hand_boost': GameState.handSizeBonus=Math.max(0,GameState.handSizeBonus-3); break;
-      case 'paint': this.removePaintRelic(); GameState.turnsBonus+=2; break;
+      case 'paint': this.removePaintRelic(); GameState.turnsBonus+=8; break; // #10 ターン変動-8に修正
       case 'jamming_boost': GameState.rerollCount+=3; break;
       case 'base_boost': GameData.FINAL_ADD=Math.max(0,GameData.FINAL_ADD-2000); break;
       default: break;
@@ -1021,7 +1043,7 @@ const GameMainScene = {
       const mult=GameData.BINGO_MULTIPLIER_BASE[card.symbol]||0;
       const val=Math.round(mult*2*(sqP3?2:1));
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap enhance-pulse"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge gold-text">+${val}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
+      return `<div class="card-symbol-wrap enhance-pulse"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge${sqP3?' passive-value':' gold-text'}">+${val}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
     // マルチ系
     const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
@@ -1048,16 +1070,26 @@ const GameMainScene = {
     if(ms&&card.symbol===ms&&card.baseScore>card.number){
       bonusHtml=`<span class="card-score-bonus">+${card.baseScore-card.number}</span>`;
     } else if(card.enhance==='数値強化'){
-      bonusHtml=`<span class="card-score-bonus">+${15*(sqP3?2:1)}</span>`;
+      bonusHtml=`<span class="card-score-bonus${sqP3?' passive-value':''}">+${15*(sqP3?2:1)}</span>`;
     } else if(card.enhance==='ブルジョワ'){
       // #2 動的：現在G×4（シカクパッシブ3で×8）
       const mulG=sqP3?8:4;
       const bonus=currentGold*mulG;
-      bonusHtml=`<span class="card-score-bonus gold-text">+${bonus}(×${mulG}G)</span>`;
+      bonusHtml=`<span class="card-score-bonus gold-text${sqP3?' passive-value':''}">+${bonus}(×${mulG}G)</span>`;
     }
 
-    let scoreHtml=`<span class="card-number">${dotsSpan}${card.baseScore}${bonusHtml}</span>`;
-    if(card.enhance==='ドロー') scoreHtml+=`<span class="card-draw-label">draw${sqP3?2:1}</span>`;
+    // #4 パッシブ効果でカード基礎点が変化する場合、青字で実効値を表示する
+    let displayScore=card.baseScore, scoreIsPassive=false;
+    if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=2){ displayScore=card.baseScore*2; scoreIsPassive=true; }
+    else if(card.symbol==='Cross'&&GameState.symbolPassiveTier.Cross>=2){ displayScore=GameState.currentDeck.length*3; scoreIsPassive=true; }
+    else if(card.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=1){
+      const total=GameState.currentDeck.length||1;
+      const n=GameState.currentDeck.filter(cc=>cc.symbol==='Triangle').length/total;
+      displayScore=Math.round(card.baseScore*(1+n)); scoreIsPassive=true;
+    }
+    const numHtml=scoreIsPassive?`<span class="passive-value">${displayScore}</span>`:`${card.baseScore}`;
+    let scoreHtml=`<span class="card-number">${dotsSpan}${numHtml}${bonusHtml}</span>`;
+    if(card.enhance==='ドロー') scoreHtml+=`<span class="card-draw-label${sqP3?' passive-value':''}">draw${sqP3?2:1}</span>`;
     return scoreHtml;
   },
 
@@ -1223,9 +1255,11 @@ const GameMainScene = {
         c.innerHTML=`${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card, GameState.gold)}`;
       }
 
-      // ドラッグ（マウス：0.18秒長押し、タッチ：0.38秒長押し）
+      // ドラッグ（マウス：0.18秒長押し、タッチ：0.25秒長押し）
       if(this.currentSide==='player'&&!this.resultState&&!this.rerollMode){
-        let dragTimer=null, isDragging=false, dragGhost=null;
+        let dragTimer=null, isDragging=false, dragGhost=null, dragTooltip=null;
+
+        const removeDragTooltip=()=>{ if(dragTooltip){ dragTooltip.remove(); dragTooltip=null; } };
 
         const startDrag=(x,y)=>{
           isDragging=true;
@@ -1237,16 +1271,29 @@ const GameMainScene = {
           dragGhost.style.left=(x-33)+'px'; dragGhost.style.top=(y-46)+'px';
           document.body.appendChild(dragGhost);
           c.classList.add('dragging-origin');
+          // #8 ドラッグ開始時に効果テキストを吹き出し表示（移動を始めたらしまう）
+          const lines=[];
+          if(card.jamming){const emoji=GameData.JAMMING_EMOJI[card.jamming]||'';lines.push(`<span class="desc-jamming">${emoji} 【${card.jamming}】${GameData.JAMMING_DESC[card.jamming]||''}</span>`);}
+          if(card.enhance) lines.push(`<span class="desc-enhance">【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}</span>`);
+          if(card.trait)   lines.push(`<span class="desc-trait">【${card.trait}】${GameData.TRAIT_DESC[card.trait]||''}</span>`);
+          if(lines.length>0){
+            dragTooltip=document.createElement('div'); dragTooltip.className='drag-tooltip-bubble';
+            dragTooltip.innerHTML=lines.join('<br>');
+            dragTooltip.style.left=x+'px'; dragTooltip.style.top=(y-70)+'px';
+            document.body.appendChild(dragTooltip);
+          }
           this.renderAll();
         };
         const clearDrag=()=>{
           if(dragGhost){ dragGhost.remove(); dragGhost=null; }
+          removeDragTooltip();
           c.classList.remove('dragging-origin');
           document.querySelectorAll('.cell.touch-hover').forEach(x=>x.classList.remove('touch-hover'));
           isDragging=false;
         };
         const moveDrag=(x,y)=>{
           if(!isDragging) return;
+          removeDragTooltip(); // #8 カードが移動を始めたら吹き出しをしまう
           if(dragGhost){ dragGhost.style.left=(x-33)+'px'; dragGhost.style.top=(y-46)+'px'; }
           document.querySelectorAll('.cell.touch-hover').forEach(x=>x.classList.remove('touch-hover'));
           const el=document.elementFromPoint(x,y);
@@ -1275,7 +1322,7 @@ const GameMainScene = {
         c.addEventListener('touchstart',(e)=>{
           if(e.touches.length!==1) return;
           const t=e.touches[0];
-          dragTimer=setTimeout(()=>startDrag(t.clientX,t.clientY), 380);
+          dragTimer=setTimeout(()=>startDrag(t.clientX,t.clientY), 250);
         },{passive:true});
         c.addEventListener('touchmove',(e)=>{
           const t=e.touches[0];
@@ -1430,7 +1477,8 @@ const GameMainScene = {
       const p=GameData.SYMBOL_PASSIVES[cand.symbol][cand.nextTier];
       const wrap=document.createElement('div'); wrap.className='card-pick-wrap';
       const item=document.createElement('div'); item.className=`card sym-${cand.symbol}`;
-      item.innerHTML=`<div class="info-title sym-${cand.symbol}">${GameData.SYMBOL_LABEL[cand.symbol]} ${GameData.SYMBOL_PASSIVE_NAMES[cand.symbol]} Lv${cand.nextTier}</div>`;
+      // #5 記号とレベルをカード風に表示（右下にレベルバッジ）
+      item.innerHTML=`<span class="passive-pick-symbol sym-${cand.symbol}">${GameData.SYMBOL_LABEL[cand.symbol]}</span><span class="passive-pick-level">Lv${cand.nextTier}</span>`;
       wrap.appendChild(item);
       const desc=document.createElement('div'); desc.className='card-pick-desc';
       desc.innerHTML=`<b>${p.name}</b><br>${p.desc}<br><span style="color:var(--gold)">${p.live()}</span>`;
@@ -1468,7 +1516,11 @@ const GameMainScene = {
   renderPassiveInfoPanel(){
     const sym=this.activePassiveInfo; if(!sym) return null;
     const tier=GameState.symbolPassiveTier[sym]||0;
+    // #1 どこをタップしても閉じるよう全画面の透明バックドロップを敷く
+    const backdrop=document.createElement('div'); backdrop.className='passive-info-backdrop';
+    backdrop.addEventListener('click',()=>{ this.activePassiveInfo=null; this.renderAll(); });
     const panel=document.createElement('div'); panel.className='info-panel passive-info-panel';
+    panel.addEventListener('click',(e)=>e.stopPropagation());
     let html=`<div class="info-title sym-${sym}">${GameData.SYMBOL_LABEL[sym]} ${GameData.SYMBOL_PASSIVE_NAMES[sym]}（現在Lv${tier}）</div>`;
     for(let t=1;t<=3;t++){
       const p=GameData.SYMBOL_PASSIVES[sym][t];
@@ -1476,6 +1528,7 @@ const GameMainScene = {
       html+=`<div class="passive-detail-row${got?' got':''}"><b>Lv${t} ${p.name}</b>${got?'（習得済）':''}<br>${p.desc}${got?`<br><span style="color:var(--gold)">${p.live()}</span>`:''}</div>`;
     }
     panel.innerHTML=html;
-    return panel;
+    backdrop.appendChild(panel);
+    return backdrop;
   },
 };

@@ -165,28 +165,32 @@ const MapSelectScene = {
     if(bonus.type==='normal_upgrade'||bonus.type==='special_upgrade'){
       if(GameState.currentDeck.length===0) return '';
       const slotType = bonus.type==='special_upgrade' ? 'special' : 'normal';
-      let pool = slotType==='special'
-        ? GameData.SPECIAL_SELECT_POOL.filter(e=>!GameState.usedSpecialEffectIds.includes(e.id))
-        : GameData.NORMAL_SELECT_POOL.filter(e=>{ if(e.rarity) return Math.random()<e.rarity; return true; });
-      if(pool.length===0) pool = (slotType==='special'?GameData.SPECIAL_SELECT_POOL:GameData.NORMAL_SELECT_POOL.filter(e=>!e.rarity));
-      const pickN = slotType==='special' ? 2 : 3;
-      const effectPool = GlobalFunctions.shuffle(pool).slice(0, Math.min(pickN, pool.length));
       const pickCount = Math.min(8, GameState.currentDeck.length);
       const cardIndexes = GlobalFunctions.shuffle(GameState.currentDeck.map((_,idx)=>idx)).slice(0, pickCount);
+      let effectPool;
+      if(slotType==='special'){
+        const unused = GameData.SPECIAL_SELECT_POOL.filter(e=>!GameState.usedSpecialEffectIds.includes(e.id));
+        // #9 特別アップグレードを全て取得済みの場合、既に取得済みの効果を再度出さず「確定性質変化付与」にする（ショップの仕様と統一）
+        if(unused.length===0){
+          const forcedEffect = { id:'grant_trait', name:'性質変化付与（確定）', desc:'カードを1枚選択しランダムな性質変化を付与', targetMin:1, targetMax:1 };
+          effectPool = [forcedEffect];
+        }else{
+          effectPool = GlobalFunctions.shuffle(unused).slice(0, Math.min(2, unused.length));
+        }
+      }else{
+        const pool = GameData.NORMAL_SELECT_POOL.filter(e=>{ if(e.rarity) return Math.random()<e.rarity; return true; });
+        const finalPool = pool.length>0 ? pool : GameData.NORMAL_SELECT_POOL.filter(e=>!e.rarity);
+        effectPool = GlobalFunctions.shuffle(finalPool).slice(0, Math.min(3, finalPool.length));
+      }
       // #8 通常のショップ購入と同じ「効果→カード」選択モーダルをショップ画面側で開かせる
       ShopScene.pickingPack = { slotType, slotRef:null, effectPool, chosenEffect:null, cardIndexes, selectedTargets:new Set() };
       return 'ショップでカードと効果を選択してください';
     }
     if(bonus.type==='dream_card'){
-      const card=GameData.generateShopCard();
-      card.baseScore=GlobalFunctions.randInt(120,150); card.number=card.baseScore;
-      card.enhance=GlobalFunctions.randChoice(GameData.ENHANCE_NAME_POOL);
-      card.jamming=GlobalFunctions.randChoice(Object.keys(GameData.JAMMING_DESC));
-      card.trait=GlobalFunctions.randChoice(GameData.TRAIT_NAME_POOL);
-      GameData.applyGrantSideEffects(card);
-      GameState.currentDeck.push(card);
-      GlobalFunctions.recordCard(card);
-      return 'ドリームカードを獲得';
+      // #9 ドリームパックも通常通りショップでカードを選択できるようにする
+      const candidates=[ShopScene.genDreamCard(), ShopScene.genDreamCard()];
+      ShopScene.pickingCardPack = { candidates, pickCount:1, isDream:true };
+      return 'ショップでドリームカードを選択してください';
     }
     return '';
   },

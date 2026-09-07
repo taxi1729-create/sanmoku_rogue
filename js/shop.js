@@ -188,7 +188,7 @@ const ShopScene = {
       case 'round_boost': GameState.roundsBonus += 1; break;
       case 'reroll_boost': GameState.rerollBonus += 2; GameState.rerollCount += 2; break;
       case 'hand_boost': GameState.handSizeBonus += 3; break;
-      case 'paint': GameState.currentDeck.forEach(c=>{ if(!c.trait) c.trait = '塗りつぶし(レリック)'; }); GameState.turnsBonus -= 2; break;
+      case 'paint': GameState.currentDeck.forEach(c=>{ if(!c.trait) c.trait = '塗りつぶし(レリック)'; }); GameState.turnsBonus -= 8; break; // #10 ターン変動-8に修正
       case 'jamming_boost': GameState.rerollCount = Math.max(0, GameState.rerollCount - 3); break;
       default: break;
     }
