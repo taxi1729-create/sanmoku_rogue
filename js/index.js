@@ -117,16 +117,21 @@ const App = {
         html+=`<div class="gallery-item"><b>${r.name}</b>${ren?`<span class="relic-enhance-tag"> ${ren.name}</span>`:''}<div class="gallery-desc">${r.desc}${ren?`<br>【${ren.name}】${ren.desc}`:''}</div></div>`;
       });
       html+='</div></div>';
-      html+=`<div class="gallery-section"><h3>デッキ（${(b.deck||[]).length}枚）</h3><div class="gallery-list">`;
-      (b.deck||[]).forEach(c=>{
-        const tags=[c.jamming,c.enhance,c.trait].filter(Boolean).join(' / ');
-        html+=`<div class="gallery-item"><b>${GameData.SYMBOL_LABEL[c.symbol]||c.symbol} ${c.baseScore}</b>${tags?`<div class="gallery-desc">${tags}</div>`:''}</div>`;
-      });
-      html+='</div></div>';
+      html+=`<div class="gallery-section"><h3>デッキ（${(b.deck||[]).length}枚）</h3><div class="gallery-card-grid"></div></div>`;
     }
     html+='<button id="btn-back">タイトルへ</button>';
     el.innerHTML=html;
     this.container.appendChild(el);
+    // #7 デッキ確認：性質変化(トレイト)の見た目（材質・アニメーション）をゲーム内カードと同じに反映する
+    if(b){
+      const grid=el.querySelector('.gallery-card-grid');
+      if(grid) (b.deck||[]).forEach(c=>{
+        const cardEl=document.createElement('div');
+        cardEl.className='card'+(c.trait?` trait-${c.trait.replace(/[()]/g,'')}`:'');
+        cardEl.innerHTML=`${GameMainScene.cardTagsHtml(c)}${GameMainScene.cardSymbolHtml(c)}${GameMainScene.cardScoreHtml(c,0)}`;
+        grid.appendChild(cardEl);
+      });
+    }
     el.querySelector('#btn-back').addEventListener('click',()=>this.showTitle());
   },
 };

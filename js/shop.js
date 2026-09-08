@@ -303,7 +303,7 @@ const ShopScene = {
       case 'duplicate': { const i=targetIndexes[0]; const src=deck[i]; if(!src) return []; const clone={...src,id:'dup_'+Date.now()+'_'+Math.floor(Math.random()*100000)}; GameState.currentDeck.push(clone); this.message='複製した'; return [clone]; }
       case 'grant_enhance': { const i=targetIndexes[0]; const c=deck[i]; if(!c) return []; c.enhance=GlobalFunctions.randChoice(GameData.ENHANCE_NAME_POOL); GameData.applyGrantSideEffects(c, GameState.gold); this.message=`カード強化「${c.enhance}」付与`; return [c]; }
       case 'grant_jamming': { const i=targetIndexes[0]; const c=deck[i]; if(!c) return []; c.jamming=GlobalFunctions.randChoice(Object.keys(GameData.JAMMING_DESC)); this.message=`ジャミング「${c.jamming}」付与`; return [c]; }
-      case 'grant_trait': case 'grant_trait_rare': { const i=targetIndexes[0]; const c=deck[i]; if(!c) return []; c.trait=GlobalFunctions.randChoice(GameData.TRAIT_NAME_POOL); GameData.applyGrantSideEffects(c); this.message=`性質変化「${c.trait}」付与`; return [c]; }
+      case 'grant_trait': case 'grant_trait_rare': { const i=targetIndexes[0]; const c=deck[i]; if(!c) return []; c.trait=GlobalFunctions.randChoice(GameData.TRAIT_NAME_POOL); GameData.applyGrantSideEffects(c, GameState.gold); this.message=`性質変化「${c.trait}」付与`; return [c]; }
       case 'hand_up2':       GameState.handSizeBonus+=2; this.message='手札上限+2'; return [];
       case 'reroll_up2':     GameState.rerollCount+=2; this.message='リロール+2'; return [];
       case 'round_up1':      GameState.roundsBonus+=1; this.message='ラウンド数+1'; return [];
@@ -349,7 +349,7 @@ const ShopScene = {
     const price = GameState.shopPriceOf(this.slotPrice('enhance_pack'));
     if(GameState.gold < price) return;
     GameState.gold -= price; slot.used = true;
-    const gen = () => { const c = GameData.generateShopCard(); c.enhance = GlobalFunctions.randChoice(GameData.ENHANCE_NAME_POOL); GameData.applyGrantSideEffects(c); return c; };
+    const gen = () => { const c = GameData.generateShopCard(); c.enhance = GlobalFunctions.randChoice(GameData.ENHANCE_NAME_POOL); GameData.applyGrantSideEffects(c, GameState.gold); return c; };
     this.pickingCardPack = { candidates:[gen(),gen(),gen()], pickCount:1 };
     this.renderAll();
   },
@@ -417,7 +417,7 @@ const ShopScene = {
     card.enhance = GlobalFunctions.randChoice(GameData.ENHANCE_NAME_POOL);
     card.jamming = GlobalFunctions.randChoice(Object.keys(GameData.JAMMING_DESC));
     card.trait = GlobalFunctions.randChoice(GameData.TRAIT_NAME_POOL);
-    GameData.applyGrantSideEffects(card);
+    GameData.applyGrantSideEffects(card, GameState.gold);
     return card;
   },
   buyDreamCard(slot){

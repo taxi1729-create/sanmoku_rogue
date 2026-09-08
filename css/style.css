@@ -259,6 +259,7 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .sym-Square{ color:var(--square); }
 .sym-Cross{ color:var(--cross); }
 .sym-Hoshi{ color:#fbbf24; }
+.sym-Check{ color:#34d399; }
 
 /* --- #1 Card hover tooltip & #5 drag --- */
 .card-wrapper{ position:relative; display:inline-block; }
@@ -379,6 +380,8 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .gallery-list{ display:flex; flex-wrap:wrap; gap:8px; }
 .gallery-item{ background:var(--panel-2); border-radius:8px; padding:8px 12px; font-size:12px; max-width:200px; }
 .gallery-item b{ color:var(--text); display:block; margin-bottom:3px; }
+/* #7 デッキ確認：ゲーム内と同じカードUIをグリッド表示 */
+.gallery-card-grid{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
 .gallery-desc{ color:var(--text-dim); line-height:1.4; font-size:11px; }
 
 /* --- title record --- */

@@ -1,6 +1,6 @@
 const GameData = {
   SYMBOLS: ['Circle', 'Triangle', 'Square', 'Cross'],
-  SYMBOL_LABEL: { Circle:'○', Triangle:'△', Square:'□', Cross:'×', Hoshi:'☆' },
+  SYMBOL_LABEL: { Circle:'○', Triangle:'△', Square:'□', Cross:'×', Hoshi:'☆', Check:'✓' },
   MULTI_SYMBOL_LABEL: { 'マルマルチ':'○', 'サンカクマルチ':'△', 'シカクマルチ':'□', 'バツマルチ':'×', 'オールマルチ':'○△□' },
 
   // #1 シカクを7倍に修正
@@ -79,7 +79,7 @@ const GameData = {
     'マキシマム':   'ビンゴ時、最多記号とビンゴ記号が同じなら補正倍率+1',
     '将軍':         'ビンゴ時、手札にある場合最終乗算補正×1.1',
     '保留':         'ラウンド終了時、捨て札にならず保留される',
-    '竜頭蛇尾':     'ゲーム開始時カード基礎点+300（上限）。手札に来るたびに-100（最初の手札では-100しない）',
+    '竜頭蛇尾':     'ゲーム開始時カード基礎点+300（上限）。手札に来るたびに-100（最初の手札では-100しない）。補正が0になったら性質変化は解除される',
   },
   TRAIT_NAME_POOL: ['塗りつぶし','指令官','ネガティブ','ディスカード','レリック特攻','ミニマム','マキシマム','将軍','保留','竜頭蛇尾'],
 
@@ -97,23 +97,32 @@ const GameData = {
 
   // #A 記号パッシブ（ボスクリアごとに1つ選択・3段階）
   // #3 パッシブ選択候補のシンボル一覧（ホシは実際のカード記号ではなくパッシブ専用枠）
-  PASSIVE_SYMBOLS: ['Circle','Triangle','Square','Cross','Hoshi'],
-  SYMBOL_PASSIVE_NAMES: { Circle:'マルパッシブ', Triangle:'サンカクパッシブ', Square:'シカクパッシブ', Cross:'バツパッシブ', Hoshi:'ホシパッシブ' },
+  PASSIVE_SYMBOLS: ['Circle','Triangle','Square','Cross','Hoshi','Check'],
+  SYMBOL_PASSIVE_NAMES: { Circle:'マルパッシブ', Triangle:'サンカクパッシブ', Square:'シカクパッシブ', Cross:'バツパッシブ', Hoshi:'ホシパッシブ', Check:'チェックパッシブ' },
   SYMBOL_PASSIVES: {
     Circle: {
-      1: { name:'マル・トライフォース', desc:'ビンゴ時、盤面にマル・サンカク・シカクを全て含んでいた場合、残りラウンドを1追加する',
-        live(){ return '盤面に3種の記号が揃うたびに、そのステージの残りラウンド+1'; } },
+      1: { name:'マル・オンプレイ', desc:'マルカードをプレイした時、盤面にあるマルカードの数×マルビンゴ倍率×10点を現在の点数に加算する',
+        live(){ const n=(typeof GameMainScene!=='undefined'&&GameMainScene.board)?GameMainScene.board.filter(c=>c&&c.symbol==='Circle').length:GameState.currentDeck.filter(c=>c.symbol==='Circle').length; const mult=GameData.BINGO_MULTIPLIER_BASE.Circle; return `現在の盤面のマル枚数:${n} × マル倍率(${Math.round(mult*100)/100}) × 10 = +${Math.round(n*mult*10)}点`; } },
       2: { name:'マル・ドリームセット', desc:'ゲーム開始時、デッキから合計10枚のカードの基礎点+20とマルマルチ(パッシブ専用枠)を付与する。ステージ終了後に取り除く（カード強化効果とは別枠）',
         live(){ const n=Math.min(10,GameState.currentDeck.length); return `対象:${n}枚 基礎点+20 / マルマルチ付与（ステージ限定）`; } },
-      3: { name:'マル・エスカレート', desc:'ステージクリア時、マルのビンゴ倍率を1.1倍(小数点切り上げ)する',
-        live(){ return `現在のマル倍率:${Math.round(GameData.BINGO_MULTIPLIER_BASE.Circle*100)/100} → クリア時 ${Math.ceil(GameData.BINGO_MULTIPLIER_BASE.Circle*1.1)}`; } },
+      3: { name:'マル・エスカレート', desc:'ステージクリア時、マルのビンゴ倍率を1.5倍(小数点切り上げ)する',
+        live(){ return `現在のマル倍率:${Math.round(GameData.BINGO_MULTIPLIER_BASE.Circle*100)/100} → クリア時 ${Math.ceil(GameData.BINGO_MULTIPLIER_BASE.Circle*1.5)}`; } },
+    },
+    // #8 チェックパッシブ（旧マルパッシブ1の効果を継承）
+    Check: {
+      1: { name:'チェック・トライフォース', desc:'ビンゴ時、盤面にマル・サンカク・シカクを全て含んでいた場合、残りラウンドを1追加する',
+        live(){ return '盤面に3種の記号が揃うたびに、そのステージの残りラウンド+1'; } },
+      2: { name:'チェック・コーナー', desc:'ゲーム開始時、盤面の4隅にカード基礎点100・オールマルチ強化付きのマルカードを配置する',
+        live(){ return '盤面4隅に基礎点100・オールマルチのマルカードを配置'; } },
+      3: { name:'チェック・エンデュランス', desc:'ゲーム中、3回ビンゴするまでラウンドが終了しない',
+        live(){ const n=GameState.bingoCountThisStage||0; return `このステージのビンゴ回数：${n}/3`; } },
     },
     Triangle: {
       1: { name:'サンカク・レシオ', desc:'デッキ内のサンカクカード比率nを計算し、サンカクカードの基礎点に(1+n)を乗算する',
         live(){ const total=GameState.currentDeck.length||1; const n=GameState.currentDeck.filter(c=>c.symbol==='Triangle').length/total; return `サンカク比率n=${Math.round(n*100)/100} → サンカク基礎点×${Math.round((1+n)*100)/100}`; } },
       2: { name:'サンカク・レゾナンス', desc:'デッキ内のジャミング効果を持つカード1枚につき、最終補正倍率+0.1する',
         live(){ const n=GameState.currentDeck.filter(c=>c.jamming).length; return `ジャミング所持カード:${n}枚 → 最終補正倍率+${Math.round(n*0.1*100)/100}`; } },
-      3: { name:'サンカク・エコー', desc:'ジャミング効果を使用した次のターンに、もう一度同じ効果をNPCに付与する',
+      3: { name:'サンカク・エコー', desc:'サンカクカードのジャミング効果を使用した次のターンに、もう一度同じ効果をNPCに付与する',
         live(){ return 'ジャミングカード使用の1ターン後に同じ効果を再付与'; } },
     },
     Square: {
@@ -277,7 +286,7 @@ const GameData = {
     let enhance = Math.random() < 0.2 ? GlobalFunctions.randChoice(this.ENHANCE_NAME_POOL) : null;
     let trait = Math.random() < 0.05 ? GlobalFunctions.randChoice(this.TRAIT_NAME_POOL) : null;
     const card = { id:'shopcard_'+Date.now()+'_'+Math.floor(Math.random()*100000), symbol, number:baseScore, baseScore, jamming, enhance, trait };
-    this.applyGrantSideEffects(card);
+    this.applyGrantSideEffects(card, (typeof GameState!=='undefined')?GameState.gold:0); // #1 生成時に現在Gを正しく反映
     return card;
   },
 
