@@ -46,7 +46,7 @@ const GameData = {
     'リンク':   '次のNPCターン、このカードの十字マスにしか置けない。置けない場合スタン',
     '引き直し': '配置時、直前のNPCが置いたバツを取り除く。次のNPCターン、そのマス以外に置けない。他に置けない場合スタン',
     '封印':     '次のNPCターン、このカードの周囲8マスに置けない。他に置けない場合スタン',
-    '誘導':     '次のNPCターン、盤面中央4マス（2-3列/行）にしか置けない。他に置けない場合スタン',
+    '誘導':     '次のNPCターン、盤面中央（4×4なら2×2、5×5なら3×3）にしか置けない。他に置けない場合スタン',
   },
 
   ENHANCE_DESC: {
@@ -71,8 +71,9 @@ const GameData = {
   TRAIT_DESC: {
     '塗りつぶし':         '使用中マスを含む好きなマスに配置できる（1タップで対象選択、2タップ目で確定）',
     '塗りつぶし(レリック)':'塗りつぶしと同じ効果。換金対象外。レリック売却・使用不可でも引き続き効果を持つ',
-    '指令官':       'ターン7・8でビンゴした時、補正倍率×1.2',
+    '指令官':       'ターン7〜10でビンゴした時、補正倍率×1.2',
     'ネガティブ':   '使用してもターンが終了せず追加ターンになる',
+    'ネガティブ(パッシブ)': '使用してもターンが終了せず追加ターンになる（マルパッシブ2により付与）',
     'ディスカード': '捨て札になった時2G得る',
     'レリック特攻': '基礎点+10n n=レリック所持数',
     'ミニマム':     'ビンゴ時、盤面最少記号の数を補正倍率に加算',
@@ -84,8 +85,8 @@ const GameData = {
   TRAIT_NAME_POOL: ['塗りつぶし','指令官','ネガティブ','ディスカード','レリック特攻','ミニマム','マキシマム','将軍','保留','竜頭蛇尾'],
 
   applyGrantSideEffects(card, gold=0){
-    // #1 シカクパッシブ3：対象の強化効果（数値強化・ブルジョワ・マルチ系）の数値を2倍にする
-    const sqP3 = (typeof GameState!=='undefined') && GameState.symbolPassiveTier?.Square>=3;
+    // #1 シカクパッシブ3：シカクカードのみ対象の強化効果（数値強化・ブルジョワ・マルチ系）の数値を2倍にする
+    const sqP3 = (typeof GameState!=='undefined') && GameState.symbolPassiveTier?.Square>=3 && card.symbol==='Square';
     const mul = sqP3?2:1;
     if(card.enhance === '数値強化') card.baseScore += 15*mul;
     if(card.trait === '竜頭蛇尾') card.baseScore += 300;
@@ -103,10 +104,10 @@ const GameData = {
     Circle: {
       1: { name:'マル・オンプレイ', desc:'マルカードをプレイした時、盤面にあるマルカードの数×マルビンゴ倍率×10点を現在の点数に加算する',
         live(){ const n=(typeof GameMainScene!=='undefined'&&GameMainScene.board)?GameMainScene.board.filter(c=>c&&c.symbol==='Circle').length:GameState.currentDeck.filter(c=>c.symbol==='Circle').length; const mult=GameData.BINGO_MULTIPLIER_BASE.Circle; return `現在の盤面のマル枚数:${n} × マル倍率(${Math.round(mult*100)/100}) × 10 = +${Math.round(n*mult*10)}点`; } },
-      2: { name:'マル・ドリームセット', desc:'ゲーム開始時、デッキから合計10枚のカードの基礎点+20とマルマルチ(パッシブ専用枠)を付与する。ステージ終了後に取り除く（カード強化効果とは別枠）',
-        live(){ const n=Math.min(10,GameState.currentDeck.length); return `対象:${n}枚 基礎点+20 / マルマルチ付与（ステージ限定）`; } },
-      3: { name:'マル・エスカレート', desc:'ステージクリア時、マルのビンゴ倍率を1.5倍(小数点切り上げ)する',
-        live(){ return `現在のマル倍率:${Math.round(GameData.BINGO_MULTIPLIER_BASE.Circle*100)/100} → クリア時 ${Math.ceil(GameData.BINGO_MULTIPLIER_BASE.Circle*1.5)}`; } },
+      2: { name:'マル・ネガティブセット', desc:'ゲーム開始時、全てのマルカードに性質変化：ネガティブ(パッシブ)を付与する。既に性質変化があるカードには上書きしない（ただしペイントの塗りつぶしには上書きする）',
+        live(){ const n=GameState.currentDeck.filter(c=>c.symbol==='Circle').length; return `対象候補：マルカード${n}枚（性質変化未所持、または塗りつぶし所持のもの）`; } },
+      3: { name:'マル・エスカレート', desc:'ステージクリア時、マルのビンゴ倍率を1.2倍(小数点切り上げ)する',
+        live(){ return `現在のマル倍率:${Math.round(GameData.BINGO_MULTIPLIER_BASE.Circle*100)/100} → クリア時 ${Math.ceil(GameData.BINGO_MULTIPLIER_BASE.Circle*1.2)}`; } },
     },
     // #8 チェックパッシブ（旧マルパッシブ1の効果を継承）
     Check: {
@@ -130,7 +131,7 @@ const GameData = {
         live(){ return 'シカクカードプレイ時：自身の基礎点+1（永続）、ドロー+1枚（そのカードにも基礎点+1）'; } },
       2: { name:'シカク・ダブル', desc:'シカクカードのカード基礎点が常に2倍になる',
         live(){ return 'シカクカードの基礎点計算に×2が常時適用'; } },
-      3: { name:'シカク・アンプ', desc:'カード強化効果を2倍にする。対象:数値強化、拡大、横拡張、縦拡張、マルマルチ、サンカクマルチ、シカクマルチ、ハブ、連鎖、巨大化、肥大化、ブルジョワ、ドロー',
+      3: { name:'シカク・アンプ', desc:'シカクカードの強化効果を2倍にする（シカクカードのみ有効）。対象:数値強化、拡大、横拡張、縦拡張、シカクマルチ、ハブ、連鎖、巨大化、肥大化、ブルジョワ、ドロー',
         live(){ return '対象の強化効果の数値・枚数が通常の2倍になる'; } },
     },
     Cross: {
@@ -211,15 +212,15 @@ const GameData = {
     { id:'square_boost', name:'シカク補正',       desc:'シカクでビンゴした時、補正基礎点+60' },
     { id:'combo', name:'コンボ',           desc:'前ラウンドと異なる記号でビンゴした時、補正倍率+1.5' },
     { id:'relic_boost', name:'レリック強化',     desc:'レリック所持数nに応じ、補正基礎点+5+8n' },
-    { id:'paint', name:'ペイント',         desc:'全カードに塗りつぶし(レリック)付与。1ラウンドのターン数-8。売却・使用不可時は効果を除去' },
+    { id:'paint', name:'ペイント',         desc:'ゲーム開始時、ランダムな記号を1つ選び、その記号の全カードに塗りつぶし(レリック)を付与。1ラウンドのターン数-8。売却・使用不可時は効果を除去' },
     { id:'turn_boost', name:'ターン強化',       desc:'ビンゴ時、経過ターン数nに応じてスコア×1.1^n' },
-    { id:'jamming_boost', name:'ジャミング増強',   desc:'リロール回数-3回' },
+    { id:'jamming_boost', name:'ジャミング増強',   desc:'ジャミング効果を適用したターン、混乱効果も追加で発動する（混乱付与時、現在の点数に目標点数×0.05を加算）。手札上限-3' },
     { id:'empty_boost', name:'空きマス強化',     desc:'ビンゴ時、空きマス数nに応じ補正倍率+6n+5' },
     { id:'draw_boost', name:'ドロー強化',       desc:'ターン終了時カードを1枚ドロー' },
     { id:'last_stand', name:'背水の陣',         desc:'4ラウンド以降、最終乗算補正×2' },
     { id:'base_boost', name:'補正基礎点強化',   desc:'最終加算補正+2000' },
-    { id:'round_boost', name:'ラウンド強化',     desc:'挑戦できるラウンド数+1（購入時即時）' },
-    { id:'reroll_boost', name:'リロール強化',     desc:'リロール回数+2（購入時即時）' },
+    { id:'round_boost', name:'ラウンド強化',     desc:'ラウンド終了時、最終加算補正+1000×n（n=現在ラウンド）' },
+    { id:'reroll_boost', name:'リロール強化',     desc:'ビンゴ時、残りリロール回数n×10を補正基礎点に加算' },
     { id:'hand_boost', name:'手札強化',         desc:'手札上限+3（購入時即時）' },
     { id:'gold_boost', name:'G獲得',            desc:'ステージクリア時、追加でG+3を得る' },
   ],

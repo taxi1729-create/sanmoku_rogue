@@ -73,6 +73,8 @@ const App = {
   showMapSelect(){ this.container.innerHTML=''; MapSelectScene.render(this.container); },
   showGameMain(stage){ this.container.innerHTML=''; GameMainScene.render(this.container,stage); },
   showShop(){ this.container.innerHTML=''; ShopScene.render(this.container); },
+  // #2 階層10クリア時のエンディング（ゲームクリア画面＋スタッフロール）
+  showEnding(){ this.container.innerHTML=''; EndingScene.render(this.container); },
 
   showGallery(){
     this.container.innerHTML='';

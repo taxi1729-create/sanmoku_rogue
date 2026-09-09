@@ -1,6 +1,6 @@
 const MapSelectScene = {
   container:null, pendingReward:null,
-  render(container){ this.container=container; this._initBossEffect(); this.renderAll(); },
+  render(container){ this.container=container; this._initBossEffect(); this.renderAll(); TutorialOverlay.show('mapSelect'); },
 
   _initBossEffect(){
     const stages=GameData.buildFloorStages(GameState.currentFloor);
@@ -96,7 +96,8 @@ const MapSelectScene = {
       const nextFloor=GameState.currentFloor+1;
       const done=document.createElement('div'); done.style.marginTop='18px';
       if(GameState.currentFloor>=10){
-        done.innerHTML=`<div style="color:var(--gold);font-weight:900;margin-bottom:10px;">🎉 全10階層クリア！おめでとうございます！</div><button id="btn-back-title">タイトルに戻る</button>`;
+        // #2 階層10クリア時はエンディング（ゲームクリア画面＋スタッフロール）へ
+        done.innerHTML=`<div style="color:var(--gold);font-weight:900;margin-bottom:10px;">🎉 全10階層クリア！おめでとうございます！</div><button id="btn-show-ending">エンディングへ</button>`;
       }else if(GameState.currentFloor===5){
         done.innerHTML=`<div style="color:var(--square);font-weight:900;margin-bottom:10px;">第5階層クリア！ゲームクリア！やり込み要素として第6階層以降も挑戦できます。</div><button id="btn-next-floor">第${nextFloor}階層へ</button><button id="btn-back-title" style="margin-left:8px;">タイトルに戻る</button>`;
       }else{
@@ -116,6 +117,12 @@ const MapSelectScene = {
         });
         const t=el.querySelector('#btn-back-title');
         if(t) t.addEventListener('click',()=>App.showTitle());
+        // #2 階層10クリア時：エンディング（ゲームクリア画面＋スタッフロール）へ
+        const eb=el.querySelector('#btn-show-ending');
+        if(eb) eb.addEventListener('click',()=>{
+          App.saveGame();
+          App.showEnding();
+        });
       });
     }
     this.container.appendChild(el);

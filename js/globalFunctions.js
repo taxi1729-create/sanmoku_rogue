@@ -59,4 +59,27 @@ const GlobalFunctions = {
       return false;
     }catch(e){ return false; }
   },
+
+  // #3 ゲームスコア最高得点（全ランを通しての自己ベスト）
+  HIGH_SCORE_KEY:'siren_spire_high_score',
+  getHighScore(){
+    try{ return parseInt(localStorage.getItem(this.HIGH_SCORE_KEY)||'0',10)||0; }catch(e){ return 0; }
+  },
+  saveHighScoreIfBetter(score){
+    try{
+      const cur=this.getHighScore();
+      if(score>cur){ localStorage.setItem(this.HIGH_SCORE_KEY,String(Math.floor(score))); return true; }
+      return false;
+    }catch(e){ return false; }
+  },
+
+  // #1 チュートリアル既読フラグ（セーブデータに依存せず、端末単位で一度だけ表示する）
+  TUTORIAL_KEY:'siren_spire_tutorial_seen',
+  getTutorialSeen(){
+    try{ return JSON.parse(localStorage.getItem(this.TUTORIAL_KEY)||'{}'); }catch(e){ return {}; }
+  },
+  isTutorialSeen(key){ return !!this.getTutorialSeen()[key]; },
+  markTutorialSeen(key){
+    try{ const t=this.getTutorialSeen(); t[key]=true; localStorage.setItem(this.TUTORIAL_KEY,JSON.stringify(t)); }catch(e){}
+  },
 };

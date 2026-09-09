@@ -416,8 +416,8 @@ button:disabled{opacity:.35;cursor:not-allowed;}
   background-size: 12px 12px; opacity:0.4;
 }
 
-/* ネガティブ：ラメ・浮遊 */
-.card.trait-ネガティブ {
+/* ネガティブ：ラメ・浮遊（マルパッシブ2で付与される「ネガティブ(パッシブ)」にも同じ見た目を適用） */
+.card.trait-ネガティブ, .card.trait-ネガティブパッシブ {
   background: linear-gradient(135deg, #2c2c54, #a29bfe, #fd79a8, #2c2c54);
   background-size: 300% 300%;
   animation: lameFloat 3s ease-in-out infinite, bgShift 4s ease infinite;
@@ -460,6 +460,15 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 @keyframes frameMinimum {
   0%,100%{inset:-4px; opacity:1;} 50%{inset:4px; opacity:0.5;}
 }
+/* #5 ミニマム：カード内の文字列・記号自体も縮小をループする */
+.card.trait-ミニマム .card-symbol-wrap,
+.card.trait-ミニマム .card-symbol-expand,
+.card.trait-ミニマム .card-number{
+  animation: textShrinkLoop 1.8s ease-in-out infinite;
+}
+@keyframes textShrinkLoop{
+  0%,100%{ transform:scale(1); } 50%{ transform:scale(0.65); }
+}
 
 /* マキシマム：枠が拡大 */
 .card.trait-マキシマム {
@@ -471,6 +480,16 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 }
 @keyframes frameMaximum {
   0%,100%{inset:-4px; opacity:0.5;} 50%{inset:-12px; opacity:1;}
+}
+/* #5 マキシマム：カード内の文字列・記号自体も拡大をループする */
+.card.trait-マキシマム .card-symbol-wrap,
+.card.trait-マキシマム .card-symbol-expand,
+.card.trait-マキシマム .card-number{
+  animation: textGrowLoop 1.8s ease-in-out infinite;
+  transform-origin:center;
+}
+@keyframes textGrowLoop{
+  0%,100%{ transform:scale(1); } 50%{ transform:scale(1.4); }
 }
 
 /* 将軍：炎と石 */
@@ -606,3 +625,54 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 
 /* #4 パッシブ効果で変化した数値を青色で強調表示 */
 .passive-value{color:#3b82f6;font-weight:900;}
+
+/* #6 ドロー演出：デッキから出現したように見せる */
+.card.card-draw-in{ animation: cardDrawIn .5s cubic-bezier(.2,.9,.3,1.2); }
+@keyframes cardDrawIn{
+  0%{ transform:translateY(40px) scale(.3); opacity:0; filter:brightness(1.6); }
+  60%{ transform:translateY(-6px) scale(1.08); opacity:1; }
+  100%{ transform:translateY(0) scale(1); opacity:1; filter:brightness(1); }
+}
+
+/* #6 ラウンドを大きく表示、点数は「現在/目標」でまとめて表示 */
+.round-big-stat{display:flex;flex-direction:column;gap:2px;}
+.round-big-stat .label{font-size:11px;color:var(--text-dim);}
+.round-big-value{font-size:28px;font-weight:900;color:var(--gold);line-height:1;}
+.round-big-value .round-big-max{font-size:16px;color:var(--text-dim);font-weight:700;}
+.score-combined-stat{margin-top:6px;}
+.score-combined-stat .value{font-size:18px;font-weight:900;}
+
+/* #2 エンディング：ゲームクリア画面＋スタッフロール */
+.ending-screen{
+  position:fixed; inset:0; z-index:90; background:#05060a;
+  display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+  padding:6vh 20px 20px; text-align:center; overflow:hidden;
+}
+.ending-clear-title{font-size:36px;font-weight:900;color:var(--gold);letter-spacing:.1em;text-shadow:0 0 20px rgba(251,191,36,.6);animation:endingTitlePulse 2s ease-in-out infinite;}
+@keyframes endingTitlePulse{0%,100%{opacity:.85;}50%{opacity:1;text-shadow:0 0 32px rgba(251,191,36,.9);}}
+.ending-clear-sub{margin-top:10px;font-size:15px;color:var(--text);}
+.ending-clear-score{margin-top:6px;font-size:12px;color:var(--text-dim);}
+.ending-credits-viewport{
+  position:relative; width:100%; max-width:480px; flex:1; margin-top:24px;
+  overflow:hidden; -webkit-mask-image:linear-gradient(to bottom, transparent, #000 8%, #000 92%, transparent);
+  mask-image:linear-gradient(to bottom, transparent, #000 8%, #000 92%, transparent);
+}
+.ending-credits-scroll{
+  position:absolute; top:100%; left:0; width:100%;
+  display:flex; flex-direction:column; align-items:center; gap:4px; line-height:1.8;
+}
+.ending-credits-scroll.scrolling{ animation: endingCreditsScroll 22s linear forwards; }
+@keyframes endingCreditsScroll{ from{ top:100%; } to{ top:-160%; } }
+.ending-credits-title{font-size:20px;font-weight:900;color:var(--text);margin-bottom:4px;}
+.ending-credits-role{font-size:12px;letter-spacing:.15em;color:var(--accent);font-weight:700;}
+.ending-credits-name{font-size:14px;color:var(--text);}
+#btn-skip-credits{margin-top:14px;flex-shrink:0;}
+
+/* #1 チュートリアルオーバーレイ */
+.tutorial-overlay{z-index:95;}
+.tutorial-modal{max-width:420px;}
+.tutorial-step-count{font-size:11px;color:var(--text-dim);margin:4px 0 10px;}
+.tutorial-step-text{font-size:13px;line-height:1.7;text-align:left;min-height:80px;}
+.tutorial-btn-row{display:flex;justify-content:space-between;gap:10px;margin-top:16px;}
+.tutorial-btn-row button{flex:1;}
+#tut-skip{background:transparent;border:1px solid #4a4560;color:var(--text-dim);}

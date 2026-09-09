@@ -14,6 +14,7 @@ const ShopScene = {
     this.container = container;
     if(!this.offers) this.offers = this.generateOffers();
     this.renderAll();
+    TutorialOverlay.show('shop');
   },
 
   // #27 重み付き抽選で8枠を生成 + 確定枠3つ
@@ -185,11 +186,11 @@ const ShopScene = {
 
   applyRelicGrantEffect(relic){
     switch(relic.id){
-      case 'round_boost': GameState.roundsBonus += 1; break;
-      case 'reroll_boost': GameState.rerollBonus += 2; GameState.rerollCount += 2; break;
+      case 'round_boost': break; // #7 効果を「ラウンド終了時、最終加算補正+1000×現在ラウンド」に変更（購入時の即時付与は廃止）
+      case 'reroll_boost': break; // #7 効果を「ビンゴ時、補正基礎点+リロール回数×10」に変更（購入時の即時付与は廃止）
       case 'hand_boost': GameState.handSizeBonus += 3; break;
-      case 'paint': GameState.currentDeck.forEach(c=>{ if(!c.trait) c.trait = '塗りつぶし(レリック)'; }); GameState.turnsBonus -= 8; break; // #10 ターン変動-8に修正
-      case 'jamming_boost': GameState.rerollCount = Math.max(0, GameState.rerollCount - 3); break;
+      case 'paint': { const sym=GlobalFunctions.randChoice(GameData.SYMBOLS); GameState.currentDeck.forEach(c=>{ if(c.symbol===sym) c.trait='塗りつぶし(レリック)'; }); GameState.turnsBonus -= 8; break; } // #5 ランダムな記号1つの全カードに変更
+      case 'jamming_boost': GameState.handSizeBonus-=3; break; // #7 手札上限-3に変更
       default: break;
     }
     // #22 ブラックカード即時反映

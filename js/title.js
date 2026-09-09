@@ -3,11 +3,15 @@ const TitleScene = {
     const el=document.createElement('div'); el.className='title-screen';
     const maxInfo=GameState.maxClearedFloor>0
       ?`<div class="title-record">最高クリア：第${GameState.maxClearedFloor}階層 ${GameState.maxClearedStage}</div>`:'';
+    // #3 ゲームスコア最高得点を表示
+    const highScore=GlobalFunctions.getHighScore();
+    const highScoreInfo=highScore>0?`<div class="title-record">最高得点：${GlobalFunctions.formatScore(highScore)}</div>`:'';
     el.innerHTML=`
       <div>
         <div class="title-logo">三目ローグライク</div>
         <div class="title-sub">roguelike tic-tac-toe deckbuilder</div>
         ${maxInfo}
+        ${highScoreInfo}
       </div>
       <div class="title-menu">
         <button id="btn-new">はじめから</button>
