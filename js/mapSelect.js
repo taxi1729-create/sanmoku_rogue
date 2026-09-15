@@ -260,7 +260,7 @@ const MapSelectScene = {
     if(bonus.type==='normal_explosive_upgrade'){
       if(GameState.currentDeck.length===0) return '';
       ShopScene.pickingPack = ShopScene.buildExplosiveUpgradePack(null);
-      return 'ショップで💥爆発通常アップグレードを選択してください（6つから最大3つまで選択可）';
+      return 'ショップで💥爆発通常アップグレードを選択してください（5つから最大3つまで選択可）';
     }
     return '';
   },

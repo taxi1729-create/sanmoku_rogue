@@ -193,7 +193,7 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 
 /* Pack modals */
 .pack-modal-overlay{position:fixed;inset:0;background:rgba(6,7,12,.82);display:flex;align-items:center;justify-content:center;z-index:60;}
-.pack-modal{background:var(--panel);border-radius:16px;padding:22px;max-width:640px;text-align:center;}
+.pack-modal{background:var(--panel);border-radius:16px;padding:22px;max-width:640px;max-height:88vh;overflow-y:auto;text-align:center;}
 .pack-modal-wide{max-width:760px;}
 .pack-modal h3{font-size:14px;margin-bottom:14px;}
 .pack-card-grid{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
@@ -767,6 +767,14 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .score-calc-box.scb-highlight{background:linear-gradient(135deg,#2a2440,#3a2f1a);border:1px solid var(--gold);}
 .score-calc-box.scb-highlight .scb-value{color:var(--gold);font-size:15px;}
 .score-calc-box.scb-highlight.negative .scb-value{color:#ff6b6b;}
+/* #4 カード基礎点+補正基礎点、ビンゴ倍率+補正倍率のブロック融合演出（掛け算に見えないよう、2マス→1マスへ） */
+.score-calc-box.scb-merged{ background:linear-gradient(135deg,#241d3d,#3a2c6a); border:1px solid #8a6bd6; animation:scbMergePulse .6s ease; }
+.score-calc-box.scb-merged .scb-value{ color:#cbb8ff; }
+@keyframes scbMergePulse{
+  0%{ transform:scale(.72); opacity:.35; box-shadow:0 0 0 rgba(138,107,214,0); }
+  55%{ transform:scale(1.14); box-shadow:0 0 16px rgba(138,107,214,.85); }
+  100%{ transform:scale(1); opacity:1; box-shadow:0 0 0 rgba(138,107,214,0); }
+}
 @media (max-width:480px){
   .score-calc-grid{grid-template-columns:repeat(4,1fr);gap:4px;}
   .score-calc-box{padding:4px 2px;}

@@ -300,10 +300,11 @@ const ShopScene = {
     const pickCount = Math.min(10, GameState.currentDeck.length);
     const cardIndexes = GlobalFunctions.shuffle(GameState.currentDeck.map((_,idx)=>idx)).slice(0, pickCount);
     const targetCards = cardIndexes.map(i=>GameState.currentDeck[i]);
-    const effectPool = GlobalFunctions.shuffle(pool).slice(0, Math.min(6, pool.length));
+    // #3 選択肢を6→5つに変更（OKボタンが画面外に押し出されるのを防ぐため）
+    const effectPool = GlobalFunctions.shuffle(pool).slice(0, Math.min(5, pool.length));
     return { slotType:'normal_explosive', slotRef:slotRef||null, effectPool, chosenEffect:null, cardIndexes, targetCards, selectedTargets:new Set(), picksRemaining:3, fullPool:pool };
   },
-  // #6 爆発通常アップグレード：選択肢6つ・対象カード10枚・同じ購入内で最大3回まで連続して効果を選択できる。10G、ショップに20%の確率で出現
+  // #6/#3 爆発通常アップグレード：選択肢5つ・対象カード10枚・同じ購入内で最大3回まで連続して効果を選択できる。10G、ショップに20%の確率で出現
   buyExplosiveUpgrade(slot){
     const price = GameState.shopPriceOf(GameData.SHOP_PRICES.normalExplosiveUpgrade);
     if(GameState.gold < price || GameState.currentDeck.length === 0) return;
@@ -335,27 +336,34 @@ const ShopScene = {
     this.renderAll();
   },
 
-  async confirmPack(){
+  confirmPack(){
     const p = this.pickingPack; if(!p?.chosenEffect) return;
     if(p.selectedTargets.size < p.chosenEffect.targetMin) return;
     const targetIdxs = Array.from(p.selectedTargets);
+    // #1 このタップで選ばれた効果への参照をローカルに固定しておく（アニメーション中に別の選択肢がタップされても、
+    //    後段の候補プール更新が誤って新しい選択中の効果を参照しないようにするための対策）
+    const chosenEffectRef = p.chosenEffect;
     // #5 アップグレード演出：適用前のカードの見た目を保持しておく（横回転演出・換金演出用）
     const beforeSnapshots = targetIdxs.map(i => ({ ...GameState.currentDeck[i] }));
-    const effectId = p.chosenEffect.id;
+    const effectId = chosenEffectRef.id;
     const affected = this.applyEffect(effectId, targetIdxs);
     if(p.slotType === 'special') GameState.usedSpecialEffectIds.push(effectId);
+    // #2 カード変化ポップアップは画面右に非ブロッキング表示するだけで、以降の操作を待たせない（自分自身のタイマーで消える）
     if(affected?.length > 0 || effectId==='cash_in'){
+      const revealToken = {};
+      this._activeRevealToken = revealToken;
       this.cardRevealPopup = { cards: affected, effectId, before: beforeSnapshots, cashGain: this._lastCashGain };
       this._lastCashGain = null;
-      this.renderAll();
-      await this.sleep(2200);
-      this.cardRevealPopup = null;
+      setTimeout(() => {
+        // 後から出た別のポップアップを誤って消さないよう、また既にショップを離れていたら何もしない
+        if(this._activeRevealToken === revealToken && this.offers){ this.cardRevealPopup = null; this.renderAll(); }
+      }, 2200);
     }
     // #6 爆発通常アップグレード：選択済みの効果を候補から取り除き、残りの選択肢の中からのみ続けて選べるようにする（新規補充はしない）
     if(p.slotType === 'normal_explosive'){
       p.cardIndexes = p.targetCards.map(c=>GameState.currentDeck.indexOf(c)).filter(idx=>idx>=0);
       p.targetCards = p.cardIndexes.map(i=>GameState.currentDeck[i]);
-      p.effectPool = p.effectPool.filter(e => e !== p.chosenEffect);
+      p.effectPool = p.effectPool.filter(e => e !== chosenEffectRef);
       p.picksRemaining -= 1;
       if(p.picksRemaining>0 && p.cardIndexes.length>0 && p.effectPool.length>0){
         p.chosenEffect=null; p.selectedTargets=new Set();
@@ -751,7 +759,7 @@ const ShopScene = {
   slotDesc(type){
     const descs = { pickup_relic:'ランダムなレリックを購入', card_pack:'カード2枚から1枚選択', pickup_upgrade:'通常セレクトから3つ', normal_upgrade:'通常セレクトから3つ', special_upgrade:'特別セレクトから2つ', card_focus:'カード4枚から2枚ピックアップ', bingo_focus:'ビンゴ倍率強化を選択', dream_card:'カード2枚から1枚ピックアップ（全効果付き）',
       enhance_pack:'強化付きカード3枚から1枚選択', jamming_pack:'ジャミング付きカード3枚から1枚選択', relic_pack:'レリック3つから1つ選択・売却してストック確保も可能',
-      normal_explosive_upgrade:'通常セレクトから6つ・対象カード10枚・6つの中から最大3つまで選択（補充なし）' };
+      normal_explosive_upgrade:'通常セレクトから5つ・対象カード10枚・5つの中から最大3つまで選択（補充なし）' };
     return descs[type] || '';
   },
 

@@ -76,10 +76,18 @@ const GameMainScene = {
       d.innerHTML=`<div class="scb-label">${label}</div><div class="scb-value">${val}</div>`;
       return d;
     };
-    wrap.appendChild(box('カード基礎点',fmt(b.cardBase)));
-    wrap.appendChild(box('補正基礎点',fmt(b.correctionBase)));
-    wrap.appendChild(box('ビンゴ倍率',fmtMult(b.bingoMult)));
-    wrap.appendChild(box('補正倍率',fmtMult(b.correctionMult)));
+    // #4 補正基礎点まで表示したら、カード基礎点と補正基礎点のブロックを1つに融合し「基礎点」として表示する（掛け算に見えて紛らわしいため）
+    if(b.baseIsMerged) wrap.appendChild(box('基礎点',fmt(b.totalBaseVal),'scb-merged'));
+    else{
+      wrap.appendChild(box('カード基礎点',fmt(b.cardBase)));
+      wrap.appendChild(box('補正基礎点',fmt(b.correctionBase)));
+    }
+    // #4 補正倍率まで表示したら、ビンゴ倍率と補正倍率のブロックを1つに融合し「倍率」として表示する（掛け算に見えて紛らわしいため）
+    if(b.multIsMerged) wrap.appendChild(box('倍率',fmtMult(b.totalMultVal),'scb-merged'));
+    else{
+      wrap.appendChild(box('ビンゴ倍率',fmtMult(b.bingoMult)));
+      wrap.appendChild(box('補正倍率',fmtMult(b.correctionMult)));
+    }
     wrap.appendChild(box(b.lineLabel||'列補正',b.lineFactor==null?'-':('×'+b.lineFactor)));
     wrap.appendChild(box('最終乗算補正',fmtMult(b.finalMult)));
     wrap.appendChild(box('最終加算補正',fmt(b.finalAdd)));
@@ -323,7 +331,7 @@ const GameMainScene = {
       let clearBonusMsg=null;
       if(GameState.currentDeck.length>0 && GameData.pickClearBonusType()==='normal_explosive_upgrade'){
         ShopScene.pickingPack = ShopScene.buildExplosiveUpgradePack(null);
-        clearBonusMsg='💥爆発通常アップグレード：ショップで6つから最大3つまで選択できます';
+        clearBonusMsg='💥爆発通常アップグレード：ショップで5つから最大3つまで選択できます';
       }
       GameState.lastReward={type:'clear',stageName:this.stage.name,gold:rd.total,breakdown:rd,debugLog:this.logs?this.logs.slice(-30):[],extra:clearBonusMsg};
       this.addLog(`クリア報酬：G+${rd.total}${rd.doubled?'（第6階層以降のため最終値を2倍）':''}${clearBonusMsg?'／'+clearBonusMsg:''}`);
@@ -764,22 +772,23 @@ const GameMainScene = {
 
     // #5 ビンゴ演出：8マス（カード基礎点／補正基礎点／ビンゴ倍率／補正倍率／列補正／最終乗算補正／最終加算補正／加算点数）を14ステップで更新する
     const lineLabel=b.isPenta?'5列':(b.isQuad?'4列':'3列');
-    this.scoreBoxes={cardBase:null,correctionBase:null,bingoMult:null,correctionMult:null,lineFactor:null,lineLabel,finalMult:null,finalAdd:null,addScore:null};
+    this.scoreBoxes={cardBase:null,correctionBase:null,bingoMult:null,correctionMult:null,lineFactor:null,lineLabel,finalMult:null,finalAdd:null,addScore:null,
+      baseIsMerged:false,totalBaseVal:null,multIsMerged:false,totalMultVal:null};
     const step=async(mut,ms)=>{ mut(); this.renderAll(); await this.sleep(ms); };
 
     // 1. カード基礎点を計算
     await step(()=>{ this.scoreBoxes.cardBase=b.cardBaseSum; },550);
     // 2. 補正基礎点を計算
     await step(()=>{ this.scoreBoxes.correctionBase=b.correctionBaseTotal; },550);
-    // 3. カード基礎点と補正基礎点を足し合わせた数値を２つのマスに上書きして表示
-    await step(()=>{ this.scoreBoxes.cardBase=b.totalBase; this.scoreBoxes.correctionBase=b.totalBase; },650);
+    // 3. #4 カード基礎点と補正基礎点は掛け算ではなく足し算のため、2つのブロックを1つに融合し「基礎点」として表示する
+    await step(()=>{ this.scoreBoxes.baseIsMerged=true; this.scoreBoxes.totalBaseVal=b.totalBase; },650);
     // 4. ビンゴ倍率表示
     await step(()=>{ this.scoreBoxes.bingoMult=b.pureBaseMult; },550);
     // 5. 補正倍率を計算
     await step(()=>{ this.scoreBoxes.correctionMult=b.correctionMultiplier; },550);
-    // 6. ビンゴ倍率と補正倍率を足し合わせた数値を二つのマスに上書きして表示
+    // 6. #4 ビンゴ倍率と補正倍率も掛け算ではなく足し算のため、2つのブロックを1つに融合し「倍率」として表示する
     const combinedMult=b.pureBaseMult+b.correctionMultiplier;
-    await step(()=>{ this.scoreBoxes.bingoMult=combinedMult; this.scoreBoxes.correctionMult=combinedMult; },650);
+    await step(()=>{ this.scoreBoxes.multIsMerged=true; this.scoreBoxes.totalMultVal=combinedMult; },650);
     // 7. 列補正を表示
     await step(()=>{ this.scoreBoxes.lineFactor=b.lineFactor; },550);
     // 8. 基礎点と倍率を乗算したものを加算点数に表示
