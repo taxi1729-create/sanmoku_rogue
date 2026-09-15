@@ -1,6 +1,7 @@
 const App = {
   container: null,
   currentSaveSlot: 0,
+  selectedGameMode: 'normal', // #9 「はじめから」画面で選択するゲームモード
 
   init(){
     this.container=document.getElementById('app');
@@ -27,7 +28,8 @@ const App = {
       const btn=document.createElement('div'); btn.className='save-slot'+(save?' has-save':'');
       if(save){
         const d=new Date(save.savedAt); const ds=d.toLocaleString('ja-JP');
-        btn.innerHTML=`<div class="slot-info"><b>スロット${i+1}</b> 第${save.currentFloor||1}階層 G:${save.gold||0} （${ds}）</div>`;
+        const modeTag=(save.gameMode&&save.gameMode!=='normal')?` [${GameData.GAME_MODES[save.gameMode]?.name||save.gameMode}]`:'';
+        btn.innerHTML=`<div class="slot-info"><b>スロット${i+1}</b>${modeTag} 第${save.currentFloor||1}階層 G:${save.gold||0} （${ds}）</div>`;
         if(mode==='load'){
           const loadBtn=document.createElement('button'); loadBtn.textContent='ロード';
           loadBtn.addEventListener('click',()=>{ this.currentSaveSlot=i; this.loadGame(i); });
@@ -48,11 +50,41 @@ const App = {
       }
       slotList.appendChild(btn);
     }
+    // #9 「はじめから」の場合のみ、セーブデータ欄の下にゲームモード選択欄を追加する
+    if(mode==='new'){
+      el.appendChild(this.renderGameModeSelector());
+    }
+  },
+
+  // #9 ゲームモード選択（現在のモード表示＋切替＋初期デッキ/レリック/パッシブのプレビュー）
+  renderGameModeSelector(){
+    const wrap=document.createElement('div'); wrap.className='gamemode-select';
+    wrap.style.marginTop='20px';
+    const modes=Object.values(GameData.GAME_MODES);
+    const current=GameData.GAME_MODES[this.selectedGameMode]||GameData.GAME_MODES.normal;
+    wrap.innerHTML=`
+      <div class="shop-section-title">ゲームモード：現在のモードは${current.name}です</div>
+      <div class="gamemode-btn-row"></div>
+      <div class="gamemode-preview">
+        <div class="info-desc"><b>初期デッキ：</b>${current.deckDesc}</div>
+        <div class="info-desc"><b>初期所持レリック：</b>${current.relicDesc}</div>
+        <div class="info-desc"><b>初期付与パッシブ：</b>${current.passiveDesc}</div>
+      </div>
+    `;
+    const btnRow=wrap.querySelector('.gamemode-btn-row');
+    modes.forEach(m=>{
+      const b=document.createElement('button');
+      b.textContent=m.name;
+      b.className='gamemode-btn'+(this.selectedGameMode===m.id?' active':'');
+      b.addEventListener('click',()=>{ this.selectedGameMode=m.id; this.showSaveSlotSelect('new'); });
+      btnRow.appendChild(b);
+    });
+    return wrap;
   },
 
   startNewGame(slotIndex){
     this.currentSaveSlot=slotIndex;
-    GameState.initNewGame();
+    GameState.initNewGame(this.selectedGameMode);
     GameState.currentFloor=1;
     this.showMapSelect();
   },

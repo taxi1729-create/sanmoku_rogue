@@ -119,6 +119,14 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .relic-info-panel{border:1px solid #6a4ad4;}
 .relic-enhance-desc{color:var(--gold)!important;}
 .sell-relic-btn{margin-top:8px;background:#3d1a1a;color:var(--cross);font-size:12px;padding:7px 12px;border-radius:8px;}
+.relic-reorder-row{display:flex;gap:8px;margin-top:8px;}
+.relic-move-btn{background:#1e1830;color:#cfc7ff;font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid #6a4ad4;}
+.relic-move-btn:disabled{opacity:.35;cursor:default;}
+/* #3 デッキ画面のソート・統計パネル */
+.deck-stats-panel{ display:flex; flex-wrap:wrap; gap:8px 14px; background:var(--panel); border:1px solid #2b3150; border-radius:10px; padding:8px 12px; margin:8px 0; font-size:12px; }
+.deck-sort-row{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+.deck-sort-btn{ background:var(--panel); border:1px solid #3a2c6a; border-radius:8px; padding:5px 10px; font-size:11px; color:#cfc7ff; }
+.deck-sort-btn.active{ border-color:var(--gold); background:#1e1830; color:var(--gold); }
 
 /* Hand */
 .hand-area{width:100%;display:flex;flex-direction:column;gap:8px;align-items:center;}
@@ -203,7 +211,44 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .card-pick-wrap .card:hover{transform:translateY(-6px);border-color:var(--gold);}
 .card-pick-desc{font-size:10px;color:var(--text-dim);text-align:center;line-height:1.4;}
 .card-reveal-popup{background:var(--panel);border:1px solid var(--gold);border-radius:16px;padding:22px 28px;text-align:center;}
+/* #7 カード変化ポップアップは画面右側に固定表示し、裏側のショップ操作をブロックしない */
+.card-reveal-toast{ position:fixed; top:50%; right:8px; transform:translateY(-50%); z-index:70; pointer-events:none; max-width:180px; }
+.card-reveal-toast .card-reveal-popup{ pointer-events:auto; padding:14px 12px; box-shadow:0 6px 22px rgba(0,0,0,.5); }
+.card-reveal-toast .pack-card-grid{ max-height:none; }
 .card.reveal-glow{box-shadow:0 0 18px rgba(251,191,36,.6);border-color:var(--gold);}
+/* #5 アップグレード演出：カードは位置を変えず、横向きに一回転して変化後の姿を見せる */
+.flip-card-wrap{ width:66px; height:104px; perspective:900px; }
+.flip-card-inner{ position:relative; width:100%; height:100%; transform-style:preserve-3d; animation:cardFlipReveal 1.3s cubic-bezier(.4,.1,.2,1) forwards; }
+.flip-card-face{ position:absolute; inset:0; backface-visibility:hidden; }
+.flip-card-face .card{ width:100%; height:100%; cursor:default; }
+.flip-card-face.flip-card-front{ transform:rotateY(0deg); }
+.flip-card-face.flip-card-back{ transform:rotateY(180deg); }
+@keyframes cardFlipReveal{
+  0%{ transform:rotateY(0deg); }
+  100%{ transform:rotateY(180deg); }
+}
+/* #5 換金演出：カードがGに変わる */
+.cash-flip-wrap{ width:66px; height:104px; perspective:900px; }
+.cash-flip-inner{ position:relative; width:100%; height:100%; transform-style:preserve-3d; animation:cardFlipReveal 1.3s cubic-bezier(.4,.1,.2,1) forwards; }
+.cash-flip-face{ position:absolute; inset:0; backface-visibility:hidden; }
+.cash-flip-face .card{ width:100%; height:100%; cursor:default; }
+.cash-flip-front{ transform:rotateY(0deg); }
+.cash-flip-back{ transform:rotateY(180deg); }
+.gold-coin-card{ width:100%; height:100%; border-radius:8px; background:radial-gradient(circle at 35% 30%,#fff6c8,var(--gold) 65%,#8a6b12); border:2px solid #8a6b12; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:14px; color:#3a2c00; text-shadow:0 1px 0 rgba(255,255,255,.5); box-shadow:0 0 14px rgba(251,191,36,.7); }
+/* #5 複製演出：カードが2枚に分裂する（画面サイズが変わってもズレないよう、重ね配置はgrid、移動量は要素自身の幅に対する%で指定） */
+.dup-anim-wrap{ display:grid; grid-template-areas:"stack"; justify-items:center; align-items:center; padding:10px 26px; }
+.dup-anim-card{ grid-area:stack; margin:0; }
+.dup-anim-card.dup-left{ animation:dupSplitLeft 1s ease forwards; }
+.dup-anim-card.dup-right{ opacity:0; animation:dupSplitRight 1s ease forwards; }
+@keyframes dupSplitLeft{
+  0%{ transform:translateX(0); }
+  100%{ transform:translateX(-70%); }
+}
+@keyframes dupSplitRight{
+  0%{ transform:translateX(0) scale(.9); opacity:0; }
+  40%{ opacity:1; }
+  100%{ transform:translateX(70%) scale(1); opacity:1; }
+}
 
 /* Smartphone landscape */
 @media (max-height:500px) and (orientation:landscape){
@@ -293,7 +338,14 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .card-symbol-expand.horiz{ flex-direction:row; gap:2px; }
 .card-symbol-expand.vert{ flex-direction:column; gap:0; }
 .card-symbol-expand.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:0; width:100%; justify-items:center; }
+.card-symbol-expand.grid2.grid4{ grid-template-columns:1fr 1fr; gap:1px; padding:1px; border:1px dashed rgba(79,209,255,.5); border-radius:4px; }
 .esym{ font-size:15px; line-height:1; }
+/* #4 シカクパッシブ2：拡張/拡大が強化されている間、シカク記号を青く光らせて拡縮させるループアニメーション */
+.esym.square-boosted{ animation:squareBoostPulse 1.2s ease-in-out infinite; color:#4fd1ff; text-shadow:0 0 4px #4fd1ff,0 0 8px #4fd1ff; }
+@keyframes squareBoostPulse{
+  0%,100%{ transform:scale(1); text-shadow:0 0 3px #4fd1ff,0 0 6px #4fd1ff; }
+  50%{ transform:scale(1.25); text-shadow:0 0 6px #4fd1ff,0 0 14px #4fd1ff; }
+}
 
 /* --- ジャミング絵文字 #5 --- */
 .card-jamming-emoji{ font-size:13px; line-height:1; margin-top:2px; }
@@ -372,6 +424,11 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .slot-list{ display:flex; flex-direction:column; gap:12px; width:100%; max-width:480px; }
 .save-slot{ background:var(--panel); border:1px solid #2b3150; border-radius:12px; padding:14px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .save-slot.has-save{ border-color:#4a3680; }
+.gamemode-select{ width:100%; max-width:480px; }
+.gamemode-btn-row{ display:flex; gap:10px; margin:8px 0 12px; flex-wrap:wrap; }
+.gamemode-btn{ background:var(--panel); border:2px solid #3a2c6a; border-radius:9px; padding:8px 14px; color:#cfc7ff; }
+.gamemode-btn.active{ border-color:var(--gold); background:#1e1830; }
+.gamemode-preview{ background:var(--panel); border:1px solid #2b3150; border-radius:10px; padding:10px 12px; text-align:left; }
 .slot-info{ font-size:13px; color:var(--text-dim); }
 
 /* --- #9 図鑑 --- */
@@ -676,3 +733,44 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .tutorial-btn-row{display:flex;justify-content:space-between;gap:10px;margin-top:16px;}
 .tutorial-btn-row button{flex:1;}
 #tut-skip{background:transparent;border:1px solid #4a4560;color:var(--text-dim);}
+
+/* #7 シカクパッシブ3：デッキ画面での強化効果スワップ */
+.swap-hint{font-size:11px;color:var(--gold);margin:4px 0 8px;}
+.card.swap-candidate{cursor:pointer;box-shadow:0 0 0 1px rgba(52,211,153,.4);}
+.card.swap-picked{box-shadow:0 0 0 3px #34d399,0 0 14px rgba(52,211,153,.8);}
+
+/* #1/#2 マップ一覧（確認のみ） */
+.map-preview-list{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto;}
+.map-preview-row{display:flex;align-items:center;gap:8px;background:var(--panel-2);border-radius:8px;padding:8px 12px;font-size:12px;}
+.map-preview-row.cleared{opacity:.6;}
+.map-preview-tag{font-weight:900;color:var(--accent);}
+.map-preview-name{flex:1;text-align:left;}
+.map-preview-target{color:var(--text-dim);}
+.map-preview-done{color:var(--gold);font-weight:700;}
+
+/* #1 上画面：ラウンド/点数/デッキ操作/レリック/パッシブをまとめたボックス */
+.top-info-box{
+  width:100%; display:flex; flex-direction:column; gap:8px;
+  background:var(--panel); border:1px solid #2b3150; border-radius:14px; padding:10px 12px;
+}
+
+/* #4 新規強化効果の見た目 */
+.enhance-overlay-emoji{position:absolute;font-size:11px;bottom:1px;right:1px;opacity:.9;pointer-events:none;}
+.card-overlay-stack{position:relative;}
+.card-overlay-stack .overlay-inner{position:absolute;font-size:60%;opacity:.55;transform:translate(3px,3px);}
+
+/* #5 ビンゴ演出：8マスの計算過程表示 */
+.score-calc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;width:100%;margin-top:6px;}
+.score-calc-box{background:#111624;border-radius:8px;padding:6px 4px;text-align:center;}
+.scb-label{font-size:9px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.scb-value{font-size:13px;font-weight:900;color:var(--text);margin-top:2px;}
+.score-calc-box.scb-highlight{background:linear-gradient(135deg,#2a2440,#3a2f1a);border:1px solid var(--gold);}
+.score-calc-box.scb-highlight .scb-value{color:var(--gold);font-size:15px;}
+.score-calc-box.scb-highlight.negative .scb-value{color:#ff6b6b;}
+@media (max-width:480px){
+  .score-calc-grid{grid-template-columns:repeat(4,1fr);gap:4px;}
+  .score-calc-box{padding:4px 2px;}
+  .scb-label{font-size:8px;}
+  .scb-value{font-size:11px;}
+  .score-calc-box.scb-highlight .scb-value{font-size:13px;}
+}

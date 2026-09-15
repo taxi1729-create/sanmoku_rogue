@@ -12,7 +12,13 @@ const ShopScene = {
 
   render(container){
     this.container = container;
-    if(!this.offers) this.offers = this.generateOffers();
+    // #6 階層10：固定ラインナップの最終ショップ（更新なし）
+    if(this.fixedFinalShop && !this.offers){
+      this.offers = { fixedRelics:[], fixedCardPack:[], fixedUpgrade:[],
+        randomSlots:[{type:'dream_card'},{type:'relic_pack'},{type:'relic_pack'},{type:'special_upgrade'}] };
+    } else if(!this.offers){
+      this.offers = this.generateOffers();
+    }
     this.renderAll();
     TutorialOverlay.show('shop');
   },
@@ -24,6 +30,11 @@ const ShopScene = {
     const fixedUpgrade = [{ type:'pickup_upgrade' }];
     const randomSlots = [];
     for(let i = 0; i < 8; i++) randomSlots.push({ type: GameData.pickWeightedType() });
+    // #6 爆発通常アップグレード：通常の重み付き抽選とは別に、ショップ生成のたび20%の確率で1枠を確保して出現させる
+    if(Math.random() < 0.2){
+      const idx = Math.floor(Math.random()*randomSlots.length);
+      randomSlots[idx] = { type:'normal_explosive_upgrade' };
+    }
     // #5 レリック欄は廃止。ランダムスロットのpickup_relicのみ
     return { fixedRelics, fixedCardPack, fixedUpgrade, randomSlots };
   },
@@ -34,9 +45,9 @@ const ShopScene = {
     return { ...base, relicEnhance };
   },
 
-  shopSellRelic(relicId){
-    const idx=GameState.relics.findIndex(r=>r.id===relicId); if(idx<0) return;
-    const relic=GameState.relics[idx];
+  // #10 修正：同一idの重複レリックでも、選択された個体（配列index）を正しく特定して売却する
+  shopSellRelic(idx){
+    const relic=GameState.relics[idx]; if(!relic) return;
     const ren=GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance);
     let price=1;
     if(relic.relicEnhance==='ren_discard_sell') price=Math.floor(GameState.currentDeck.length/2);
@@ -98,40 +109,68 @@ const ShopScene = {
     const emoji=card.jamming?(GameData.JAMMING_EMOJI[card.jamming]||''):'';
     const emojiHtml=emoji?`<div class="card-jamming-emoji">${emoji}</div>`:'';
     const multiSym=GameData.MULTI_SYMBOL_LABEL[card.enhance];
+    const passiveMultiHtml=card._passiveMultiSymbol?`<span class="passive-multi-badge" title="マルマルチ(パッシブ)">${card._passiveMultiSymbol}</span>`:'';
 
     // 拡張・拡大
+    const squareBoosted=card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=2;
+    const boostCls=squareBoosted?' square-boosted':'';
     if(card.enhance==='横拡張')
-      return `<div class="card-symbol-expand horiz"><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span></div>${emojiHtml}`;
+      return `<div class="card-symbol-expand horiz"><span class="sym-${card.symbol} esym${boostCls}">${label}</span><span class="sym-${card.symbol} esym${boostCls}">${label}</span></div>${emojiHtml}${passiveMultiHtml}`;
     if(card.enhance==='縦拡張')
-      return `<div class="card-symbol-expand vert"><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span></div>${emojiHtml}`;
+      return `<div class="card-symbol-expand vert"><span class="sym-${card.symbol} esym${boostCls}">${label}</span><span class="sym-${card.symbol} esym${boostCls}">${label}</span></div>${emojiHtml}${passiveMultiHtml}`;
     if(card.enhance==='拡大')
-      return `<div class="card-symbol-expand grid2"><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span><span class="sym-${card.symbol} esym">${label}</span></div>${emojiHtml}`;
+      return `<div class="card-symbol-expand grid2${squareBoosted?' grid4':''}"><span class="sym-${card.symbol} esym${boostCls}">${label}</span><span class="sym-${card.symbol} esym${boostCls}">${label}</span><span class="sym-${card.symbol} esym${boostCls}">${label}</span><span class="sym-${card.symbol} esym${boostCls}">${label}</span></div>${emojiHtml}${passiveMultiHtml}`;
 
     // 巨大化：記号1.5倍
     if(card.enhance==='巨大化'){
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol} sym-large">${label}</span>${sub}</div>${emojiHtml}`;
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol} sym-large">${label}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
     // ハブ：記号右に➕
     if(card.enhance==='ハブ'){
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">➕</span>${sub}</div>${emojiHtml}`;
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">➕</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
     // 連鎖：記号右に🤝
     if(card.enhance==='連鎖'){
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">🤝</span>${sub}</div>${emojiHtml}`;
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">🤝</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
     // 肥大化：記号横に "+倍率*2" (黄色)
     if(card.enhance==='肥大化'){
       const mult=GameData.BINGO_MULTIPLIER_BASE[card.symbol]||0;
       const val=mult*2;
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge gold-text">+${val}</span>${sub}</div>${emojiHtml}`;
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge gold-text">+${val}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
+    }
+    // #2 エクステンド：記号右に⏩
+    if(card.enhance==='エクステンド'){
+      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">⏩</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
+    }
+    // #2 トップスピード：記号右に💨
+    if(card.enhance==='トップスピード'){
+      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">💨</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
+    }
+    // #2 重ね掛け：記号右に「重」
+    if(card.enhance==='重ね掛け'){
+      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">重</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
+    }
+    // #2 加重：記号右に🃏
+    if(card.enhance==='加重'){
+      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">🃏</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
+    }
+    // #2 ギャンブル：記号右に🎰
+    if(card.enhance==='ギャンブル'){
+      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">🎰</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
     // マルチ系
     const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-    return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span>${sub}</div>${emojiHtml}`;
+    return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
   },
 
   // #4 右上数字にブルジョワ・ドロー情報を付加
@@ -188,7 +227,7 @@ const ShopScene = {
     switch(relic.id){
       case 'round_boost': break; // #7 効果を「ラウンド終了時、最終加算補正+1000×現在ラウンド」に変更（購入時の即時付与は廃止）
       case 'reroll_boost': break; // #7 効果を「ビンゴ時、補正基礎点+リロール回数×10」に変更（購入時の即時付与は廃止）
-      case 'hand_boost': GameState.handSizeBonus += 3; break;
+      case 'hand_boost': break; // #1 効果を「ビンゴ時、手札の数×3を補正倍率に加算」に変更（購入時の即時付与は廃止）
       case 'paint': { const sym=GlobalFunctions.randChoice(GameData.SYMBOLS); GameState.currentDeck.forEach(c=>{ if(c.symbol===sym) c.trait='塗りつぶし(レリック)'; }); GameState.turnsBonus -= 8; break; } // #5 ランダムな記号1つの全カードに変更
       case 'jamming_boost': GameState.handSizeBonus-=3; break; // #7 手札上限-3に変更
       default: break;
@@ -254,6 +293,25 @@ const ShopScene = {
     this.renderAll();
   },
 
+  // #6/#7 爆発通常アップグレードのパック内容を生成する共通処理（ショップ購入・スキップ報酬・クリア報酬から共通で使う）
+  buildExplosiveUpgradePack(slotRef){
+    let pool = GameData.NORMAL_SELECT_POOL.filter(e => { if(e.rarity) return Math.random() < e.rarity; return true; });
+    if(pool.length === 0) pool = GameData.NORMAL_SELECT_POOL.filter(e => !e.rarity);
+    const pickCount = Math.min(10, GameState.currentDeck.length);
+    const cardIndexes = GlobalFunctions.shuffle(GameState.currentDeck.map((_,idx)=>idx)).slice(0, pickCount);
+    const targetCards = cardIndexes.map(i=>GameState.currentDeck[i]);
+    const effectPool = GlobalFunctions.shuffle(pool).slice(0, Math.min(6, pool.length));
+    return { slotType:'normal_explosive', slotRef:slotRef||null, effectPool, chosenEffect:null, cardIndexes, targetCards, selectedTargets:new Set(), picksRemaining:3, fullPool:pool };
+  },
+  // #6 爆発通常アップグレード：選択肢6つ・対象カード10枚・同じ購入内で最大3回まで連続して効果を選択できる。10G、ショップに20%の確率で出現
+  buyExplosiveUpgrade(slot){
+    const price = GameState.shopPriceOf(GameData.SHOP_PRICES.normalExplosiveUpgrade);
+    if(GameState.gold < price || GameState.currentDeck.length === 0) return;
+    GameState.gold -= price; slot.used = true;
+    this.pickingPack = this.buildExplosiveUpgradePack(slot);
+    this.renderAll();
+  },
+
   // #29 特別セレクト全引き後は確定性質変化付与
   buySpecialPackExhausted(slotRef){
     const price = GameState.shopPriceOf(GameData.SHOP_PRICES.specialUpgrade);
@@ -280,9 +338,31 @@ const ShopScene = {
   async confirmPack(){
     const p = this.pickingPack; if(!p?.chosenEffect) return;
     if(p.selectedTargets.size < p.chosenEffect.targetMin) return;
-    const affected = this.applyEffect(p.chosenEffect.id, Array.from(p.selectedTargets));
-    if(p.slotType === 'special') GameState.usedSpecialEffectIds.push(p.chosenEffect.id);
-    if(affected?.length > 0){ this.cardRevealPopup = { cards: affected }; this.renderAll(); await this.sleep(2000); this.cardRevealPopup = null; }
+    const targetIdxs = Array.from(p.selectedTargets);
+    // #5 アップグレード演出：適用前のカードの見た目を保持しておく（横回転演出・換金演出用）
+    const beforeSnapshots = targetIdxs.map(i => ({ ...GameState.currentDeck[i] }));
+    const effectId = p.chosenEffect.id;
+    const affected = this.applyEffect(effectId, targetIdxs);
+    if(p.slotType === 'special') GameState.usedSpecialEffectIds.push(effectId);
+    if(affected?.length > 0 || effectId==='cash_in'){
+      this.cardRevealPopup = { cards: affected, effectId, before: beforeSnapshots, cashGain: this._lastCashGain };
+      this._lastCashGain = null;
+      this.renderAll();
+      await this.sleep(2200);
+      this.cardRevealPopup = null;
+    }
+    // #6 爆発通常アップグレード：選択済みの効果を候補から取り除き、残りの選択肢の中からのみ続けて選べるようにする（新規補充はしない）
+    if(p.slotType === 'normal_explosive'){
+      p.cardIndexes = p.targetCards.map(c=>GameState.currentDeck.indexOf(c)).filter(idx=>idx>=0);
+      p.targetCards = p.cardIndexes.map(i=>GameState.currentDeck[i]);
+      p.effectPool = p.effectPool.filter(e => e !== p.chosenEffect);
+      p.picksRemaining -= 1;
+      if(p.picksRemaining>0 && p.cardIndexes.length>0 && p.effectPool.length>0){
+        p.chosenEffect=null; p.selectedTargets=new Set();
+        this.renderAll();
+        return;
+      }
+    }
     this.pickingPack = null; this.renderAll();
   },
   skipPack(){ this.message = 'スキップした'; this.pickingPack = null; this.renderAll(); },
@@ -300,7 +380,7 @@ const ShopScene = {
       case 'number_up3':     targetIndexes.forEach(i=>{ if(deck[i]) deck[i].baseScore+=3; }); this.message = '基礎点+3×3枚'; return targetIndexes.map(i=>deck[i]).filter(Boolean);
       case 'base_up5':       targetIndexes.forEach(i=>{ if(deck[i]) deck[i].baseScore+=10; }); this.message = '基礎点+10'; return targetIndexes.map(i=>deck[i]).filter(Boolean);
       case 'symbol_change':  targetIndexes.forEach(i=>{ const c=deck[i]; if(!c) return; c.symbol=GlobalFunctions.randChoice(['Circle','Triangle','Square'].filter(s=>s!==c.symbol)); }); this.message = '記号変化'; return targetIndexes.map(i=>deck[i]).filter(Boolean);
-      case 'cash_in': { const i=targetIndexes[0]; const c=deck[i]; if(!c) return []; const g=this.calcCashGain(c); GameState.currentDeck=deck.filter((_,idx)=>idx!==i); GameState.gold+=g; this.message=`換金G+${g}`; return []; }
+      case 'cash_in': { const i=targetIndexes[0]; const c=deck[i]; if(!c) return []; const g=this.calcCashGain(c); GameState.currentDeck=deck.filter((_,idx)=>idx!==i); GameState.gold+=g; this._lastCashGain=g; this.message=`換金G+${g}`; return []; }
       case 'duplicate': { const i=targetIndexes[0]; const src=deck[i]; if(!src) return []; const clone={...src,id:'dup_'+Date.now()+'_'+Math.floor(Math.random()*100000)}; GameState.currentDeck.push(clone); this.message='複製した'; return [clone]; }
       case 'grant_enhance': { const i=targetIndexes[0]; const c=deck[i]; if(!c) return []; c.enhance=GlobalFunctions.randChoice(GameData.ENHANCE_NAME_POOL); GameData.applyGrantSideEffects(c, GameState.gold); this.message=`カード強化「${c.enhance}」付与`; return [c]; }
       case 'grant_jamming': { const i=targetIndexes[0]; const c=deck[i]; if(!c) return []; c.jamming=GlobalFunctions.randChoice(Object.keys(GameData.JAMMING_DESC)); this.message=`ジャミング「${c.jamming}」付与`; return [c]; }
@@ -335,13 +415,14 @@ const ShopScene = {
       case 'enhance_pack': this.buyEnhancePack(slot); break;
       case 'jamming_pack': this.buyJammingPack(slot); break;
       case 'relic_pack': this.buyRelicPack(slot); break;
+      case 'normal_explosive_upgrade': this.buyExplosiveUpgrade(slot); break;
       default: break;
     }
   },
 
   slotPrice(type){
     const map = { pickup_relic:GameData.SHOP_PRICES.pickupRelic, card_pack:GameData.SHOP_PRICES.cardPack, pickup_upgrade:GameData.SHOP_PRICES.pickupUpgrade, normal_upgrade:GameData.SHOP_PRICES.normalUpgrade, special_upgrade:GameData.SHOP_PRICES.specialUpgrade, card_focus:GameData.SHOP_PRICES.cardFocus, bingo_focus:GameData.SHOP_PRICES.bingoFocus, dream_card:GameData.SHOP_PRICES.dreamCard,
-      enhance_pack:GameData.SHOP_PRICES.enhancePack, jamming_pack:GameData.SHOP_PRICES.jammingPack, relic_pack:GameData.SHOP_PRICES.relicPack };
+      enhance_pack:GameData.SHOP_PRICES.enhancePack, jamming_pack:GameData.SHOP_PRICES.jammingPack, relic_pack:GameData.SHOP_PRICES.relicPack, normal_explosive_upgrade:GameData.SHOP_PRICES.normalExplosiveUpgrade };
     return map[type] || 3;
   },
 
@@ -431,7 +512,7 @@ const ShopScene = {
 
   rerollOffers(){ const price=GameState.shopPriceOf(GameData.SHOP_PRICES.reroll); if(GameState.gold<price) return; GameState.gold-=price; this.offers=this.generateOffers(); this.message='品揃えを更新した'; this.renderAll(); },
 
-  leaveShop(){ this.offers=null; this.pickingPack=null; this.pickingCardPack=null; this.cardRevealPopup=null; this.message=null; this.activeRelicId=null; GameState.lastReward=null; App.showMapSelect(); },
+  leaveShop(){ this.offers=null; this.fixedFinalShop=false; this.pickingPack=null; this.pickingCardPack=null; this.cardRevealPopup=null; this.message=null; this.activeRelicId=null; GameState.lastReward=null; App.showMapSelect(); },
 
   // ===== Render =====
   renderAll(){
@@ -444,6 +525,12 @@ const ShopScene = {
     if(r){ const b=r.breakdown; rewardText = b ? `${r.stageName}を${r.type==='skip'?'スキップ':'クリア'}：基本6 ＋ 残りラウンド${b.roundBonus} ＋ 残りリロール${b.rerollBonus} ＋ レリック${b.relicBonus} ＋ カード${b.cardBonus}${b.doubled?'（2倍済）':''} ＝ G+${r.gold}${r.extra?`／追加報酬：${r.extra}`:''}` : `${r.stageName}：G+${r.gold}${r.extra?`／追加報酬：${r.extra}`:''}`; }
     const header = document.createElement('div'); header.className='shop-header';
     header.innerHTML = `<h2>ショップ</h2>${rewardText?`<div class="shop-reward">${rewardText}</div>`:''}<div class="shop-gold">所持G：${GameState.gold}</div>${this.message?`<div class="shop-message">${this.message}</div>`:''}`;
+    // #2 ショップ画面でデッキ・マップ一覧を確認できるようにする
+    const shopViewBtns = document.createElement('div'); shopViewBtns.style.cssText='display:flex;gap:8px;justify-content:center;margin-top:6px;';
+    const deckBtn2 = document.createElement('button'); deckBtn2.textContent=`デッキ確認(${GameState.currentDeck.length})`; deckBtn2.addEventListener('click',()=>GameMainScene.showDeckModal('deck'));
+    const mapBtn2 = document.createElement('button'); mapBtn2.textContent='マップ一覧'; mapBtn2.addEventListener('click',()=>GameMainScene.showDeckModal('map'));
+    shopViewBtns.appendChild(deckBtn2); shopViewBtns.appendChild(mapBtn2);
+    header.appendChild(shopViewBtns);
     el.appendChild(header);
 
     // #4 ショップ内レリック表示（ゲームプレイ中と同様のカード表示＋売却）
@@ -453,25 +540,30 @@ const ShopScene = {
     if(GameState.relics.length===0){
       const empty=document.createElement('div');empty.className='relic-empty';empty.textContent='なし';relicRow.appendChild(empty);
     }else{
-      GameState.relics.forEach(relic => {
+      // #10/#11 修正：同一idの重複レリックを個別に識別できるよう配列indexで管理する
+      GameState.relics.forEach((relic,i) => {
         const rc = document.createElement('div');
-        rc.className='relic-card'+(this.activeRelicId===relic.id?' active':'');
+        rc.className='relic-card'+(this.activeRelicId===i?' active':'');
         rc.innerHTML=`<div class="relic-name">${relic.name}</div>${relic.relicEnhance?`<div class="relic-enhance-tag">${GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance)?.name||''}</div>`:''}`;
-        rc.addEventListener('click', () => { this.activeRelicId=(this.activeRelicId===relic.id)?null:relic.id; this.renderAll(); });
+        rc.addEventListener('click', () => { this.activeRelicId=(this.activeRelicId===i)?null:i; this.renderAll(); });
         relicRow.appendChild(rc);
       });
     }
     relicArea.appendChild(relicRow);
-    if(this.activeRelicId){
-      const relic = GameState.relics.find(r=>r.id===this.activeRelicId);
+    if(this.activeRelicId!=null){
+      const relic = GameState.relics[this.activeRelicId];
       if(relic){
+        const idx=this.activeRelicId;
         const ren=GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance);
         let sellPrice=1;
         if(relic.relicEnhance==='ren_discard_sell') sellPrice=Math.floor(GameState.currentDeck.length/2);
         else if(ren) sellPrice+=2;
         const infoDiv=document.createElement('div'); infoDiv.className='relic-info-panel'; infoDiv.style.marginTop='8px';
-        infoDiv.innerHTML=`<div class="info-title">${relic.name}</div><div class="info-desc">${relic.desc}</div>${ren?`<div class="info-desc relic-enhance-desc">【${ren.name}】${ren.desc}</div>`:''}<button class="sell-relic-btn">売却（${sellPrice}G）</button>`;
-        infoDiv.querySelector('.sell-relic-btn').addEventListener('click', ()=>this.shopSellRelic(relic.id));
+        infoDiv.innerHTML=`<div class="info-title">${relic.name}</div><div class="info-desc">${relic.desc}</div>${ren?`<div class="info-desc relic-enhance-desc">【${ren.name}】${ren.desc}</div>`:''}<div class="relic-reorder-row"><button class="relic-move-btn" ${idx<=0?'disabled':''}>◀ 左へ</button><button class="relic-move-btn" ${idx>=GameState.relics.length-1?'disabled':''}>右へ ▶</button></div><button class="sell-relic-btn">売却（${sellPrice}G）</button>`;
+        const moveBtns=infoDiv.querySelectorAll('.relic-move-btn');
+        moveBtns[0].addEventListener('click', ()=>{ if(GameState.moveRelic(idx,-1)){ this.activeRelicId=idx-1; this.renderAll(); } });
+        moveBtns[1].addEventListener('click', ()=>{ if(GameState.moveRelic(idx,1)){ this.activeRelicId=idx+1; this.renderAll(); } });
+        infoDiv.querySelector('.sell-relic-btn').addEventListener('click', ()=>this.shopSellRelic(idx));
         relicArea.appendChild(infoDiv);
       }
     }
@@ -488,7 +580,10 @@ const ShopScene = {
 
 
     const actions = document.createElement('div'); actions.className='shop-actions';
-    const rerollBtn = document.createElement('button'); rerollBtn.textContent=`品揃え更新（${GameState.shopPriceOf(GameData.SHOP_PRICES.reroll)}G）`; rerollBtn.disabled=GameState.gold<GameState.shopPriceOf(GameData.SHOP_PRICES.reroll); rerollBtn.addEventListener('click',()=>this.rerollOffers()); actions.appendChild(rerollBtn);
+    if(!this.fixedFinalShop){
+      // #6 最終ショップ（階層10）は品揃え更新不可
+      const rerollBtn = document.createElement('button'); rerollBtn.textContent=`品揃え更新（${GameState.shopPriceOf(GameData.SHOP_PRICES.reroll)}G）`; rerollBtn.disabled=GameState.gold<GameState.shopPriceOf(GameData.SHOP_PRICES.reroll); rerollBtn.addEventListener('click',()=>this.rerollOffers()); actions.appendChild(rerollBtn);
+    }
     const backBtn = document.createElement('button'); backBtn.textContent='マップに戻る'; backBtn.addEventListener('click',()=>this.leaveShop()); actions.appendChild(backBtn);
     el.appendChild(actions);
     this.container.appendChild(el);
@@ -525,12 +620,13 @@ const ShopScene = {
     modal.appendChild(ownedTitle);
     const ownedRow = document.createElement('div'); ownedRow.className='relic-display-row';
     if(GameState.relics.length===0){ const empty=document.createElement('div'); empty.className='relic-empty'; empty.textContent='なし'; ownedRow.appendChild(empty); }
-    else GameState.relics.forEach(relic => {
+    else GameState.relics.forEach((relic,i) => {
       const ren = relic.relicEnhance ? GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance) : null;
       let sellPrice=1; if(relic.relicEnhance==='ren_discard_sell') sellPrice=Math.floor(GameState.currentDeck.length/2); else if(ren) sellPrice+=2;
       const rc = document.createElement('div'); rc.className='relic-card';
+      // #10 修正：個体（配列index）を指定して売却する
       rc.innerHTML = `<div class="relic-name">${relic.name}</div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}<button class="sell-relic-btn" style="margin-top:4px;">売却（${sellPrice}G）</button>`;
-      rc.querySelector('.sell-relic-btn').addEventListener('click', () => this.shopSellRelic(relic.id));
+      rc.querySelector('.sell-relic-btn').addEventListener('click', () => this.shopSellRelic(i));
       ownedRow.appendChild(rc);
     });
     modal.appendChild(ownedRow);
@@ -654,7 +750,8 @@ const ShopScene = {
 
   slotDesc(type){
     const descs = { pickup_relic:'ランダムなレリックを購入', card_pack:'カード2枚から1枚選択', pickup_upgrade:'通常セレクトから3つ', normal_upgrade:'通常セレクトから3つ', special_upgrade:'特別セレクトから2つ', card_focus:'カード4枚から2枚ピックアップ', bingo_focus:'ビンゴ倍率強化を選択', dream_card:'カード2枚から1枚ピックアップ（全効果付き）',
-      enhance_pack:'強化付きカード3枚から1枚選択', jamming_pack:'ジャミング付きカード3枚から1枚選択', relic_pack:'レリック3つから1つ選択・売却してストック確保も可能' };
+      enhance_pack:'強化付きカード3枚から1枚選択', jamming_pack:'ジャミング付きカード3枚から1枚選択', relic_pack:'レリック3つから1つ選択・売却してストック確保も可能',
+      normal_explosive_upgrade:'通常セレクトから6つ・対象カード10枚・6つの中から最大3つまで選択（補充なし）' };
     return descs[type] || '';
   },
 
@@ -713,7 +810,10 @@ const ShopScene = {
     const p = this.pickingPack;
     const overlay = document.createElement('div'); overlay.className='pack-modal-overlay';
     const modal = document.createElement('div'); modal.className='pack-modal pack-modal-wide';
-    modal.innerHTML = '<h3>効果を選択してください</h3>';
+    const isExplosive = p.slotType === 'normal_explosive';
+    modal.innerHTML = isExplosive
+      ? `<h3>💥爆発通常アップグレード（残り選択回数：${p.picksRemaining}/3）</h3>`
+      : '<h3>効果を選択してください</h3>';
     // #5 ビンゴ倍率表示パネルをモーダル左側に追加
     const multPanel = document.createElement('div'); multPanel.className='modal-mult-panel';
     const multRows = GameData.SYMBOLS.map(s=>{
@@ -764,22 +864,63 @@ const ShopScene = {
     });
     modal.appendChild(grid);
     const btnRow = document.createElement('div'); btnRow.className='pack-modal-actions';
-    const confirmBtn = document.createElement('button'); confirmBtn.textContent='決定'; confirmBtn.disabled=!eff||(needsTarget&&p.selectedTargets.size<eff.targetMin); confirmBtn.addEventListener('click',()=>this.confirmPack()); btnRow.appendChild(confirmBtn);
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = (isExplosive && p.picksRemaining>1) ? '決定して次へ' : '決定';
+    confirmBtn.disabled=!eff||(needsTarget&&p.selectedTargets.size<eff.targetMin); confirmBtn.addEventListener('click',()=>this.confirmPack()); btnRow.appendChild(confirmBtn);
     const skipBtn = document.createElement('button'); skipBtn.textContent='スキップ'; skipBtn.addEventListener('click',()=>this.skipPack()); btnRow.appendChild(skipBtn);
     modal.appendChild(btnRow);
     overlay.appendChild(modal); return overlay;
   },
 
   renderCardRevealPopup(){
-    const overlay = document.createElement('div'); overlay.className='pack-modal-overlay';
+    // #7 画面右側に非ブロッキングで表示し、裏のショップ操作と並行して見られるようにする
+    const overlay = document.createElement('div'); overlay.className='card-reveal-toast';
     const box = document.createElement('div'); box.className='card-reveal-popup';
-    box.innerHTML = '<div class="gr-label">カードが更新されました</div>';
+    const p = this.cardRevealPopup;
+    const effectId = p.effectId;
+    const before = p.before || [];
     const grid = document.createElement('div'); grid.className='pack-card-grid';
-    this.cardRevealPopup.cards.forEach(card => {
+
+    // #5 換金：カードがGに変わる演出（横回転してG面を見せる）
+    if(effectId === 'cash_in'){
+      box.innerHTML = '<div class="gr-label">換金しました</div>';
+      const b = before[0];
+      if(b){
+        const wrap = document.createElement('div'); wrap.className='cash-flip-wrap';
+        wrap.innerHTML = `<div class="cash-flip-inner">
+          <div class="cash-flip-face cash-flip-front"><div class="card${b.trait?' trait-'+b.trait.replace(/[()]/g,''):''}">${this.cardTagsHtml(b)}${this.cardSymbolHtml(b)}${this.cardScoreHtml(b)}</div></div>
+          <div class="cash-flip-face cash-flip-back"><div class="gold-coin-card">+${p.cashGain||0}G</div></div>
+        </div>`;
+        grid.appendChild(wrap);
+      }
+      box.appendChild(grid); overlay.appendChild(box); return overlay;
+    }
+
+    // #5 複製：カードが2枚に分裂する演出
+    if(effectId === 'duplicate'){
+      box.innerHTML = '<div class="gr-label">カードが複製されました</div>';
+      const b = before[0]; const dup = p.cards[0];
+      if(b && dup){
+        const wrap = document.createElement('div'); wrap.className='dup-anim-wrap';
+        const mk=(c,cls)=>{ const d=document.createElement('div'); d.className='card dup-anim-card '+cls+(c.trait?' trait-'+c.trait.replace(/[()]/g,''):''); d.innerHTML=`${this.cardTagsHtml(c)}${this.cardSymbolHtml(c)}${this.cardScoreHtml(c)}`; return d; };
+        wrap.appendChild(mk(b,'dup-left'));
+        wrap.appendChild(mk(dup,'dup-right'));
+        grid.appendChild(wrap);
+      }
+      box.appendChild(grid); overlay.appendChild(box); return overlay;
+    }
+
+    // #5 それ以外（強化付与・数値変化・記号変化など）：カードの位置を変えず横向きに一回転し、変化後の姿を見せる
+    box.innerHTML = '<div class="gr-label">カードが更新されました</div>';
+    p.cards.forEach((card,i) => {
+      const b = before[i] || card;
       const wrap = document.createElement('div'); wrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:6px;';
-      const item = document.createElement('div'); item.className='card reveal-glow'+(card.trait?' trait-'+card.trait.replace(/[()]/g,''):'');
-      item.innerHTML = `${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card, GameState.gold)}`;
-      wrap.appendChild(item);
+      const flip = document.createElement('div'); flip.className='flip-card-wrap';
+      flip.innerHTML = `<div class="flip-card-inner">
+        <div class="flip-card-face flip-card-front"><div class="card${b.trait?' trait-'+b.trait.replace(/[()]/g,''):''}">${this.cardTagsHtml(b)}${this.cardSymbolHtml(b)}${this.cardScoreHtml(b)}</div></div>
+        <div class="flip-card-face flip-card-back"><div class="card reveal-glow${card.trait?' trait-'+card.trait.replace(/[()]/g,''):''}">${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card, GameState.gold)}</div></div>
+      </div>`;
+      wrap.appendChild(flip);
       // #2 カード更新時は説明を常時表示（吹き出し不要でパネルとして表示）
       const lines=[];
       if(card.jamming){ const emoji=GameData.JAMMING_EMOJI[card.jamming]||''; lines.push(`<span class="desc-jamming">${emoji} 【${card.jamming}】${GameData.JAMMING_DESC[card.jamming]||''}</span>`); }

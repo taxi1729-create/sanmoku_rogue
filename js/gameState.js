@@ -7,9 +7,13 @@ const GameState = {
   currentFloor:1,          // #12 現在の階層
   maxClearedFloor:0,        // #12 最高クリア階層
   maxClearedStage:'',       // #12 最高クリアステージ名
-  symbolPassiveTier:{ Circle:0, Triangle:0, Square:0, Cross:0, Hoshi:0, Check:0 }, // #A 記号パッシブ（0=未取得,1-3=段階）
+  symbolPassiveTier:{ Circle:0, Triangle:0, Square:0, Cross:0, Hoshi:0, Check:0, Seven:0 }, // #A 記号パッシブ（0=未取得,1-3=段階）
   bingoCountThisStage:0, // #8 チェックパッシブ3：このステージのビンゴ回数
+  totalBingoCount:0, // #新規 セブンパッシブ2：累計ビンゴ回数（ゲーム開始でリセット）
+  sevenPendingMultBoost:false, // #新規 セブンパッシブ2：次のビンゴで最終乗算補正×7を発動するフラグ
   bossRerollUsed:false, // #3 ホシパッシブ1：ボス効果リロールの使用済みフラグ
+  finalShopDone:false, floor10SpecialBoss:false, // #6 階層10特殊構成
+  gameMode:'normal', // #9 ゲームモード（normal=通常デッキ／tengame=テンゲーム）
 
   effectiveHandSize(){ return GameData.HAND_SIZE + this.handSizeBonus; },
   effectiveMaxRounds(){ return GameData.MAX_ROUNDS + this.roundsBonus; },
@@ -33,18 +37,28 @@ const GameState = {
   usedRelicSlots(){ return this.relicCount(); },
   canAddRelic(relic){ return this.usedRelicSlots() + this.slotsForRelic(relic) <= this.effectiveMaxRelics(); },
   shopPriceOf(basePrice){ return this.relics.some(r=>r.relicEnhance==='ren_black')?Math.ceil(basePrice/2):basePrice; },
+  // #11 レリックの並び替え（メイン画面・ショップ・マップで共通利用。処理順は常に配列の左から右）
+  moveRelic(index,dir){
+    const to=index+dir;
+    if(index<0||index>=this.relics.length||to<0||to>=this.relics.length) return false;
+    const tmp=this.relics[index]; this.relics[index]=this.relics[to]; this.relics[to]=tmp;
+    return true;
+  },
 
-  initNewGame(){
-    this.currentDeck=GameData.buildInitialDeck();
+  initNewGame(mode){
+    this.gameMode = mode || this.gameMode || 'normal';
+    this.currentDeck=GameData.buildDeckForMode(this.gameMode);
     this.gold=0; this.relics=[]; this.clearedStages=[];
+    this.finalShopDone=false; // #6 階層10特殊構成の初回フラグをリセット
     this.rerollCount=GameData.INITIAL_REROLL;
     this.handSizeBonus=0; this.roundsBonus=0; this.turnsBonus=0;
     this.relicSlotBonus=0; this.rerollBonus=0;
     this.usedSpecialEffectIds=[]; this.discardedPile=[];
     this.specialPackExhausted=false; this.pendingBossEffect=null;
     this.currentFloor=1;
-    this.symbolPassiveTier={ Circle:0, Triangle:0, Square:0, Cross:0, Hoshi:0, Check:0 };
+    this.symbolPassiveTier={ Circle:0, Triangle:0, Square:0, Cross:0, Hoshi:0, Check:0, Seven:0 };
     this.bingoCountThisStage=0;
+    this.totalBingoCount=0; this.sevenPendingMultBoost=false;
     GameData.BINGO_MULTIPLIER_BASE={...GameData.BINGO_MULTIPLIER_BASE_ORIGINAL};
     GameData.CORRECTION_BASE_SCORE=0; GameData.CORRECTION_MULTIPLIER=0;
     GameData.FINAL_MULTIPLIER=1; GameData.FINAL_ADD=0;
@@ -56,6 +70,12 @@ const GameState = {
     this.rerollCount=GameData.INITIAL_REROLL+this.rerollBonus;
     this.hand=[]; this.reserve=[]; this.discardPile=[];
     this.drawPile=GlobalFunctions.shuffle(this.currentDeck);
+    // #4 トップスピード：ゲーム開始時、このカードをデッキの一番上（＝配列の末尾＝最初に引かれる位置）に配置する
+    const topSpeedCards=this.drawPile.filter(c=>c.enhance==='トップスピード');
+    if(topSpeedCards.length>0){
+      this.drawPile=this.drawPile.filter(c=>c.enhance!=='トップスピード');
+      this.drawPile.push(...topSpeedCards);
+    }
   },
 
   // #8 セーブデータ変換
@@ -69,7 +89,11 @@ const GameState = {
       rerollBonus:this.rerollBonus, usedSpecialEffectIds:this.usedSpecialEffectIds,
       pendingBossEffect:this.pendingBossEffect,
       symbolPassiveTier:this.symbolPassiveTier,
+      totalBingoCount:this.totalBingoCount,
+      sevenPendingMultBoost:this.sevenPendingMultBoost,
       bossRerollUsed:this.bossRerollUsed,
+      finalShopDone:this.finalShopDone,
+      gameMode:this.gameMode,
       multBase:{...GameData.BINGO_MULTIPLIER_BASE},
       corrBase:GameData.CORRECTION_BASE_SCORE,
       savedFloorStage: (this.currentStage?this.currentStage.key:''),
@@ -87,10 +111,15 @@ const GameState = {
     this.rerollBonus=d.rerollBonus||0;
     this.usedSpecialEffectIds=d.usedSpecialEffectIds||[];
     this.pendingBossEffect=d.pendingBossEffect||null;
-    this.symbolPassiveTier=d.symbolPassiveTier||{ Circle:0, Triangle:0, Square:0, Cross:0, Hoshi:0, Check:0 };
+    this.symbolPassiveTier=d.symbolPassiveTier||{ Circle:0, Triangle:0, Square:0, Cross:0, Hoshi:0, Check:0, Seven:0 };
     if(this.symbolPassiveTier.Hoshi===undefined) this.symbolPassiveTier.Hoshi=0;
     if(this.symbolPassiveTier.Check===undefined) this.symbolPassiveTier.Check=0;
+    if(this.symbolPassiveTier.Seven===undefined) this.symbolPassiveTier.Seven=0;
+    this.totalBingoCount=d.totalBingoCount||0;
+    this.sevenPendingMultBoost=d.sevenPendingMultBoost||false;
     this.bossRerollUsed=d.bossRerollUsed||false;
+    this.finalShopDone=d.finalShopDone||false;
+    this.gameMode=d.gameMode||'normal';
     if(d.multBase) Object.assign(GameData.BINGO_MULTIPLIER_BASE,d.multBase);
     if(d.corrBase!=null) GameData.CORRECTION_BASE_SCORE=d.corrBase;
   },

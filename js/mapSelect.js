@@ -1,6 +1,20 @@
 const MapSelectScene = {
-  container:null, pendingReward:null,
-  render(container){ this.container=container; this._initBossEffect(); this.renderAll(); TutorialOverlay.show('mapSelect'); },
+  container:null, pendingReward:null, activeRelicId:null, // #11 マップ画面でのレリック選択・並び替え
+  render(container){
+    this.container=container;
+    // #6 階層10：初回のみ10Gを受け取り、固定ラインナップの最終ショップへ直行する
+    if(GameState.currentFloor>=10&&!GameState.finalShopDone){
+      GameState.finalShopDone=true;
+      GameState.gold+=10;
+      App.saveGame();
+      ShopScene.fixedFinalShop=true;
+      App.showShop();
+      return;
+    }
+    this._initBossEffect();
+    this.renderAll();
+    TutorialOverlay.show('mapSelect');
+  },
 
   _initBossEffect(){
     const stages=GameData.buildFloorStages(GameState.currentFloor);
@@ -15,6 +29,9 @@ const MapSelectScene = {
         GameState.pendingBossEffect=GlobalFunctions.shuffle(GameData.BOSS_EFFECT_POOL).slice(0,bossCount);
       }
     }
+    // #6 階層10特有ボス効果：5ターンごと（6,11,16…ターン）に次のターンがNPCになる（2つのランダムボス効果とは別枠）
+    if(GameState.currentFloor>=10) GameState.floor10SpecialBoss=true;
+    else GameState.floor10SpecialBoss=false;
   },
 
   renderAll(){
@@ -28,7 +45,13 @@ const MapSelectScene = {
     const debugGoldBtn=document.createElement('button'); debugGoldBtn.className='debug-gold-btn'; debugGoldBtn.textContent='🐞+20000G';
     debugGoldBtn.addEventListener('click',()=>{ GameState.gold+=20000; this.renderAll(); });
     header.appendChild(debugGoldBtn);
+    // #2 マップ選択画面でデッキを確認できるようにする
+    const deckBtn=document.createElement('button'); deckBtn.className='debug-gold-btn'; deckBtn.textContent=`デッキ確認(${GameState.currentDeck.length})`;
+    deckBtn.addEventListener('click',()=>GameMainScene.showDeckModal('deck'));
+    header.appendChild(deckBtn);
     el.appendChild(header);
+    // #11 マップ画面でも所持レリックを確認・並び替えできるようにする
+    el.appendChild(this.renderRelicSection());
     const path=document.createElement('div'); path.className='map-path';
     const stages=GameData.buildFloorStages(GameState.currentFloor);
     stages.forEach((stage,i)=>{
@@ -130,6 +153,39 @@ const MapSelectScene = {
     window.scrollTo(0,scrollY);
   },
 
+  // #11 レリック表示・並び替え（他画面と同じくindexで個体を識別。処理順は常に配列の左から右）
+  renderRelicSection(){
+    const area=document.createElement('div'); area.className='shop-relic-confirm';
+    area.innerHTML=`<div class="shop-section-title">所持レリック（${GameState.usedRelicSlots()}/${GameState.effectiveMaxRelics()}）</div>`;
+    const row=document.createElement('div'); row.className='relic-display-row';
+    if(GameState.relics.length===0){
+      const empty=document.createElement('div'); empty.className='relic-empty'; empty.textContent='なし'; row.appendChild(empty);
+    }else{
+      GameState.relics.forEach((relic,i)=>{
+        const rc=document.createElement('div');
+        rc.className='relic-card'+(this.activeRelicId===i?' active':'');
+        rc.innerHTML=`<div class="relic-name">${relic.name}</div>${relic.relicEnhance?`<div class="relic-enhance-tag">${GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance)?.name||''}</div>`:''}`;
+        rc.addEventListener('click',()=>{ this.activeRelicId=(this.activeRelicId===i)?null:i; this.renderAll(); });
+        row.appendChild(rc);
+      });
+    }
+    area.appendChild(row);
+    if(this.activeRelicId!=null){
+      const idx=this.activeRelicId;
+      const relic=GameState.relics[idx];
+      if(relic){
+        const ren=GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance);
+        const infoDiv=document.createElement('div'); infoDiv.className='relic-info-panel'; infoDiv.style.marginTop='8px';
+        infoDiv.innerHTML=`<div class="info-title">${relic.name}</div><div class="info-desc">${relic.desc}</div>${ren?`<div class="info-desc relic-enhance-desc">【${ren.name}】${ren.desc}</div>`:''}<div class="relic-reorder-row"><button class="relic-move-btn" ${idx<=0?'disabled':''}>◀ 左へ</button><button class="relic-move-btn" ${idx>=GameState.relics.length-1?'disabled':''}>右へ ▶</button></div>`;
+        const moveBtns=infoDiv.querySelectorAll('.relic-move-btn');
+        moveBtns[0].addEventListener('click',()=>{ if(GameState.moveRelic(idx,-1)){ this.activeRelicId=idx-1; this.renderAll(); } });
+        moveBtns[1].addEventListener('click',()=>{ if(GameState.moveRelic(idx,1)){ this.activeRelicId=idx+1; this.renderAll(); } });
+        area.appendChild(infoDiv);
+      }
+    }
+    return area;
+  },
+
   renderRewardPopup(){
     const r=this.pendingReward;
     const overlay=document.createElement('div'); overlay.className='pack-modal-overlay';
@@ -150,6 +206,7 @@ const MapSelectScene = {
       if(type==='relic'){ label='レリック🔴：ランダムレリック1つを獲得'; }
       else if(type==='normal_upgrade'){ label='通常アップグレード：ショップでカードと効果を選択'; }
       else if(type==='special_upgrade'){ label='特別アップグレード：ショップでカードと効果を選択'; }
+      else if(type==='normal_explosive_upgrade'){ label='💥爆発通常アップグレード：ショップで最大3つ選択'; }
       else if(type==='dream_card'){ label='ドリームカードパック'; }
       this._skipBonusCache[key]=type?{type,label}:null;
     }
@@ -198,6 +255,12 @@ const MapSelectScene = {
       const candidates=[ShopScene.genDreamCard(), ShopScene.genDreamCard()];
       ShopScene.pickingCardPack = { candidates, pickCount:1, isDream:true };
       return 'ショップでドリームカードを選択してください';
+    }
+    // #7 爆発通常アップグレードをスキップ報酬に組み込む
+    if(bonus.type==='normal_explosive_upgrade'){
+      if(GameState.currentDeck.length===0) return '';
+      ShopScene.pickingPack = ShopScene.buildExplosiveUpgradePack(null);
+      return 'ショップで💥爆発通常アップグレードを選択してください（6つから最大3つまで選択可）';
     }
     return '';
   },
