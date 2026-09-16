@@ -101,10 +101,12 @@ const GameData = {
     const multiMap = { 'マルマルチ':'Circle', 'サンカクマルチ':'Triangle', 'シカクマルチ':'Square' };
     const matched = multiMap[card.enhance];
     if(matched && card.symbol === matched) card.baseScore += 20*mul;
-    // #4 加重：付与時、デッキ内の同じ記号を持つカードの枚数×0.5を基礎点に加算
+    // #4 加重：付与時、デッキ内の同じ記号を持つカードの枚数×0.5を基礎点に加算（表示用に加算量を保存しておく）
     if(card.enhance === '加重' && typeof GameState!=='undefined'){
       const n = GameState.currentDeck.filter(c=>c.symbol===card.symbol).length;
-      card.baseScore += n*0.5;
+      const add = n*0.5;
+      card.baseScore += add;
+      card._weightedBonus = add; // #3 「基礎点+◯」表示用
     }
     // #4 トップスピード：カード基礎点+5（付与時に即時加算。デッキ先頭配置は別途ステージ開始時に処理）
     if(card.enhance === 'トップスピード') card.baseScore += 5;
@@ -116,10 +118,10 @@ const GameData = {
   SYMBOL_PASSIVE_NAMES: { Circle:'マルパッシブ', Triangle:'サンカクパッシブ', Square:'シカクパッシブ', Cross:'バツパッシブ', Hoshi:'ホシパッシブ', Check:'チェックパッシブ', Seven:'セブンパッシブ' },
   SYMBOL_PASSIVES: {
     Circle: {
-      1: { name:'マル・オンプレイ', desc:'マルカードをプレイした時、盤面にあるマルカードの数×マルビンゴ倍率×10点を現在の点数に加算する',
+      1: { name:'マル・ネガティブセット', desc:'ゲーム開始時、ランダムなマルカード3×n枚（n=マルビンゴ倍率/10、小数点切り捨て）に性質変化：ネガティブ(パッシブ)を付与する。既に性質変化があるカードには上書きしない（ただしペイントの塗りつぶしには上書きする）。ゲーム終了時にネガティブ(パッシブ)は取り除かれる。ショップ内での性質変化カードの出現確率が2倍になる',
+        live(){ const n=Math.floor((GameData.BINGO_MULTIPLIER_BASE.Circle||0)/10); return `対象枚数：3×${n}＝${3*n}枚（マル倍率${Math.round((GameData.BINGO_MULTIPLIER_BASE.Circle||0)*100)/100}より算出）`; } },
+      2: { name:'マル・オンプレイ', desc:'マルカードをプレイした時、盤面にあるマルカードの数×マルビンゴ倍率×10点を現在の点数に加算する',
         live(){ const n=(typeof GameMainScene!=='undefined'&&GameMainScene.board)?GameMainScene.board.filter(c=>c&&c.symbol==='Circle').length:GameState.currentDeck.filter(c=>c.symbol==='Circle').length; const mult=GameData.BINGO_MULTIPLIER_BASE.Circle; return `現在の盤面のマル枚数:${n} × マル倍率(${Math.round(mult*100)/100}) × 10 = +${Math.round(n*mult*10)}点`; } },
-      2: { name:'マル・ネガティブセット', desc:'ゲーム開始時、全てのマルカードに性質変化：ネガティブ(パッシブ)を付与する。既に性質変化があるカードには上書きしない（ただしペイントの塗りつぶしには上書きする）',
-        live(){ const n=GameState.currentDeck.filter(c=>c.symbol==='Circle').length; return `対象候補：マルカード${n}枚（性質変化未所持、または塗りつぶし所持のもの）`; } },
       3: { name:'マル・エスカレート', desc:'ステージクリア時、マルのビンゴ倍率を1.2倍(小数点切り上げ)する',
         live(){ return `現在のマル倍率:${Math.round(GameData.BINGO_MULTIPLIER_BASE.Circle*100)/100} → クリア時 ${Math.ceil(GameData.BINGO_MULTIPLIER_BASE.Circle*1.2)}`; } },
     },
@@ -237,7 +239,7 @@ const GameData = {
     { id:'relic_boost', name:'レリック強化',     desc:'レリック所持数nに応じ、補正基礎点+5+8n' },
     { id:'paint', name:'ペイント',         desc:'ゲーム開始時、ランダムな記号を1つ選び、その記号の全カードに塗りつぶし(レリック)を付与。1ラウンドのターン数-8。売却・使用不可時は効果を除去' },
     { id:'turn_boost', name:'ターン強化',       desc:'ビンゴ時、経過ターン数nに応じて最終乗算補正×1.01^n' },
-    { id:'jamming_boost', name:'ジャミング増強',   desc:'カードに付与されているジャミング効果が混乱の場合、効果をスタンに変更する（変更時、現在の点数に目標点数×0.05を加算）。手札上限-3' },
+    { id:'jamming_boost', name:'ジャミング増強',   desc:'ビンゴ阻害が実際にNPCのバツビンゴを阻止した時、ビンゴ阻害自体の効果は残したままスタンを追加で発動する（発動時、現在の点数に目標点数×0.05を加算）。手札上限-3' },
     { id:'empty_boost', name:'空きマス強化',     desc:'ビンゴ時、空きマス数nに応じ補正倍率+6n+5' },
     { id:'draw_boost', name:'ドロー強化',       desc:'ターン終了時カードを1枚ドロー' },
     { id:'last_stand', name:'背水の陣',         desc:'4ラウンド以降、最終乗算補正×2' },
@@ -314,7 +316,10 @@ const GameData = {
     const baseScore = GlobalFunctions.randInt(1, 50);
     let jamming = Math.random() < 0.5 ? GlobalFunctions.randChoice(Object.keys(this.JAMMING_DESC)) : null;
     let enhance = Math.random() < 0.2 ? GlobalFunctions.randChoice(this.ENHANCE_NAME_POOL) : null;
-    let trait = Math.random() < 0.05 ? GlobalFunctions.randChoice(this.TRAIT_NAME_POOL) : null;
+    // #8 マルパッシブ2：ショップ内での性質変化カードの出現確率を2倍にする
+    let traitChance=0.05;
+    if(typeof GameState!=='undefined' && GameState.symbolPassiveTier?.Circle>=2) traitChance*=2;
+    let trait = Math.random() < traitChance ? GlobalFunctions.randChoice(this.TRAIT_NAME_POOL) : null;
     const card = { id:'shopcard_'+Date.now()+'_'+Math.floor(Math.random()*100000), symbol, number:baseScore, baseScore, jamming, enhance, trait };
     this.applyGrantSideEffects(card, (typeof GameState!=='undefined')?GameState.gold:0); // #1 生成時に現在Gを正しく反映
     return card;

@@ -158,10 +158,11 @@ const ShopScene = {
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
       return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">重</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
-    // #2 加重：記号右に🃏
+    // #3 加重：記号右に「基礎点+◯」（加算値は黄色）
     if(card.enhance==='加重'){
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">🃏</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
+      const addVal=card._weightedBonus!=null?card._weightedBonus:0;
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">基礎点<span class="gold-text">+${addVal}</span></span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
     // #2 ギャンブル：記号右に🎰
     if(card.enhance==='ギャンブル'){
@@ -314,6 +315,7 @@ const ShopScene = {
   },
 
   // #29 特別セレクト全引き後は確定性質変化付与
+  // #9 「カードを1つ選択し、基礎点+30する」を選択肢に追加する
   buySpecialPackExhausted(slotRef){
     const price = GameState.shopPriceOf(GameData.SHOP_PRICES.specialUpgrade);
     if(GameState.gold < price || GameState.currentDeck.length === 0) return;
@@ -322,7 +324,8 @@ const ShopScene = {
     const pickCount = Math.min(8, GameState.currentDeck.length);
     const cardIndexes = GlobalFunctions.shuffle(GameState.currentDeck.map((_,idx)=>idx)).slice(0, pickCount);
     const forcedEffect = { id:'grant_trait', name:'性質変化付与（確定）', desc:'カードを1枚選択しランダムな性質変化を付与', targetMin:1, targetMax:1 };
-    this.pickingPack = { slotType:'special', slotRef, effectPool:[forcedEffect], chosenEffect:null, cardIndexes, selectedTargets:new Set() };
+    const forcedEffect2 = { id:'base_up30', name:'基礎点上昇（確定）', desc:'カードを1枚選択し、基礎点+30する', targetMin:1, targetMax:1 };
+    this.pickingPack = { slotType:'special', slotRef, effectPool:[forcedEffect,forcedEffect2], chosenEffect:null, cardIndexes, selectedTargets:new Set() };
     this.renderAll();
   },
 
@@ -387,6 +390,8 @@ const ShopScene = {
       case 'number_up2':     targetIndexes.forEach(i=>{ if(deck[i]) deck[i].baseScore+=5; }); this.message = '基礎点+5×2枚'; return targetIndexes.map(i=>deck[i]).filter(Boolean);
       case 'number_up3':     targetIndexes.forEach(i=>{ if(deck[i]) deck[i].baseScore+=3; }); this.message = '基礎点+3×3枚'; return targetIndexes.map(i=>deck[i]).filter(Boolean);
       case 'base_up5':       targetIndexes.forEach(i=>{ if(deck[i]) deck[i].baseScore+=10; }); this.message = '基礎点+10'; return targetIndexes.map(i=>deck[i]).filter(Boolean);
+      // #9 特別セレクト全引き後の確定選択肢に追加
+      case 'base_up30':      targetIndexes.forEach(i=>{ if(deck[i]) deck[i].baseScore+=30; }); this.message = '基礎点+30'; return targetIndexes.map(i=>deck[i]).filter(Boolean);
       case 'symbol_change':  targetIndexes.forEach(i=>{ const c=deck[i]; if(!c) return; c.symbol=GlobalFunctions.randChoice(['Circle','Triangle','Square'].filter(s=>s!==c.symbol)); }); this.message = '記号変化'; return targetIndexes.map(i=>deck[i]).filter(Boolean);
       case 'cash_in': { const i=targetIndexes[0]; const c=deck[i]; if(!c) return []; const g=this.calcCashGain(c); GameState.currentDeck=deck.filter((_,idx)=>idx!==i); GameState.gold+=g; this._lastCashGain=g; this.message=`換金G+${g}`; return []; }
       case 'duplicate': { const i=targetIndexes[0]; const src=deck[i]; if(!src) return []; const clone={...src,id:'dup_'+Date.now()+'_'+Math.floor(Math.random()*100000)}; GameState.currentDeck.push(clone); this.message='複製した'; return [clone]; }
@@ -526,6 +531,9 @@ const ShopScene = {
   renderAll(){
     // #4 タップのたびに画面が一番上に戻る不具合を防ぐ：スクロール位置を保持
     const scrollY = window.scrollY;
+    // #1 カード変化アニメーション終了時などの再描画で、パック選択モーダル内のスクロール位置も保持する
+    const prevPickModal=document.getElementById('pick-modal-el');
+    const prevPickModalScrollTop=prevPickModal?prevPickModal.scrollTop:0;
     this.container.innerHTML = '';
     const el = document.createElement('div'); el.className = 'shop-screen';
     const r = GameState.lastReward;
@@ -596,7 +604,12 @@ const ShopScene = {
     el.appendChild(actions);
     this.container.appendChild(el);
     if(this.pickingCardPack) this.container.appendChild(this.renderCardPackModal());
-    if(this.pickingPack) this.container.appendChild(this.renderPickModal());
+    if(this.pickingPack){
+      const pickOverlay=this.renderPickModal();
+      this.container.appendChild(pickOverlay);
+      const newModal=pickOverlay.querySelector('.pack-modal');
+      if(newModal){ newModal.id='pick-modal-el'; newModal.scrollTop=prevPickModalScrollTop; }
+    }
     if(this.pickingRelicPack) this.container.appendChild(this.renderRelicPackModal());
     if(this.cardRevealPopup) this.container.appendChild(this.renderCardRevealPopup());
     window.scrollTo(0,scrollY);
