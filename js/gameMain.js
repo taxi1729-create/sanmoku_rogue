@@ -404,13 +404,13 @@ const GameMainScene = {
   applyThunder(){ let n=0; for(let i=0;i<this.board.length;i++) if(this.board[i]?.symbol==='Cross'){this.board[i]=null;n++;} if(n) this.addLog(`サンダー：×を${n}個除去`); },
 
   queueJammingEffect(jamming,cellIdx){
-    // #2 レリック「ジャミング増強」：ビンゴ阻害の効果を持つカードが発動（配置）した時、ビンゴ阻害自体の効果は変更せずそのまま残し、
+    // #2 レリック「ジャミング増強」：ビンゴ阻害の効果を持つカードが盤面に配置された時、ビンゴ阻害自体の効果は変更せずそのまま残し、
     //    追加でスタンを発動する（手札上限・点数加算の仕様は変更なし）
     if(jamming==='ビンゴ阻害'&&GameState.relics.some(r=>r.id==='jamming_boost')){
       const bonus=Math.round(GameState.targetScore*0.05);
       GameState.currentScore=Math.max(0,GameState.currentScore+bonus);
       this.effects.stunNextNpc=true;
-      this.addLog(`ジャミング増強：ビンゴ阻害が発動、スタンを追加付与し+${bonus}点（目標点数×0.05）`);
+      this.addLog(`ジャミング増強：ビンゴ阻害のカードが配置され、スタンを追加付与し+${bonus}点（目標点数×0.05）`);
     }
     switch(jamming){
       case 'スタン': this.effects.stunNextNpc=true; this.addLog('スタン：次のNPC行動を封じる'); break;
@@ -620,35 +620,39 @@ const GameMainScene = {
       const totalBase=cardScores.reduce((s,v)=>s+v,0)+correctionBase+relicBonus;
 
       let finalMult=baseMult+GameData.CORRECTION_MULTIPLIER;
+      // #1 演出用：補正倍率に効く、普段は非表示のレリック強化効果・パッシブ・性質変化・手札効果の内訳を記録しておく
+      const correctionMultParts=[];
       // #新規 セブンパッシブ1：ビンゴ時、7の倍数の基礎点を持つカード1枚につき補正倍率+77
       if(GameState.symbolPassiveTier.Seven>=1){
         const n7=r.cells.filter(c=>c&&c.baseScore%7===0).length;
-        if(n7>0) finalMult+=n7*77;
+        if(n7>0){ finalMult+=n7*77; correctionMultParts.push({label:'セブンパッシブ1',op:'+',val:n7*77}); }
       }
       if(!noRelic){
-        if(GameState.hasRelic('combo')&&this.prevRoundBingoSymbol&&this.prevRoundBingoSymbol!==r.sym){finalMult+=1.5;scoringRelics.add('combo');}
-        if(GameState.hasRelic('turn_boost')){finalMult*=Math.pow(1.01,this.turnInRound);scoringRelics.add('turn_boost');} // #1 1.1^n→1.01^nに修正
-        if(GameState.hasRelic('hand_boost')){finalMult+=GameState.hand.length*3;scoringRelics.add('hand_boost');} // #1 ビンゴ時、手札の数×3を補正倍率に加算
-        if(GameState.hasRelic('last_stand')&&GameState.round>=4){finalMult*=2;scoringRelics.add('last_stand');}
+        if(GameState.hasRelic('combo')&&this.prevRoundBingoSymbol&&this.prevRoundBingoSymbol!==r.sym){finalMult+=1.5;correctionMultParts.push({label:'コンボ',op:'+',val:1.5});scoringRelics.add('combo');}
+        if(GameState.hasRelic('turn_boost')){const f=Math.pow(1.01,this.turnInRound);finalMult*=f;correctionMultParts.push({label:'ターン強化',op:'×',val:f});scoringRelics.add('turn_boost');} // #1 1.1^n→1.01^nに修正
+        if(GameState.hasRelic('hand_boost')){const v=GameState.hand.length*3;finalMult+=v;correctionMultParts.push({label:'手札強化',op:'+',val:v});scoringRelics.add('hand_boost');} // #1 ビンゴ時、手札の数×3を補正倍率に加算
+        if(GameState.hasRelic('last_stand')&&GameState.round>=4){finalMult*=2;correctionMultParts.push({label:'背水の陣',op:'×',val:2});scoringRelics.add('last_stand');}
         GameState.relics.forEach(rel=>{
-          if(rel.relicEnhance==='ren_general'){finalMult*=1.1;scoringRelics.add(rel.id);}
-          if(rel.relicEnhance==='ren_only_one'&&GameState.relicCount()===1){finalMult+=20;scoringRelics.add(rel.id);}
-          if(rel.relicEnhance==='ren_grade'){const n=GameState.currentDeck.reduce((s,c)=>{let x=0;if(c.enhance)x++;if(c.jamming)x++;if(c.trait)x++;return s+x;},0);finalMult+=n;scoringRelics.add(rel.id);}
-          if(rel.relicEnhance==='ren_discard'){finalMult*=1.5;scoringRelics.add(rel.id);}
+          if(rel.relicEnhance==='ren_general'){finalMult*=1.1;correctionMultParts.push({label:'将軍(レリック強化)',op:'×',val:1.1});scoringRelics.add(rel.id);}
+          if(rel.relicEnhance==='ren_only_one'&&GameState.relicCount()===1){finalMult+=20;correctionMultParts.push({label:'オンリーワン',op:'+',val:20});scoringRelics.add(rel.id);}
+          if(rel.relicEnhance==='ren_grade'){const n=GameState.currentDeck.reduce((s,c)=>{let x=0;if(c.enhance)x++;if(c.jamming)x++;if(c.trait)x++;return s+x;},0);finalMult+=n;correctionMultParts.push({label:'グレードオール',op:'+',val:n});scoringRelics.add(rel.id);}
+          if(rel.relicEnhance==='ren_discard'){finalMult*=1.5;correctionMultParts.push({label:'ディスカード(レリック強化)',op:'×',val:1.5});scoringRelics.add(rel.id);}
         });
       }
       // 性質変化
       r.cells.forEach(cidx=>{
         const cell=this.board[cidx]; if(!cell?.card) return;
-        if(cell.card.trait==='指令官'&&this.turnInRound>=7&&this.turnInRound<=10) finalMult*=1.2;
+        if(cell.card.trait==='指令官'&&this.turnInRound>=7&&this.turnInRound<=10){finalMult*=1.2;correctionMultParts.push({label:'指令官',op:'×',val:1.2});}
         // #3 ミニマム：値を+nから+20nに変更（nは盤面最少記号の数）
-        if(cell.card.trait==='ミニマム'){const counts={};GameData.SYMBOLS.forEach(s=>{counts[s]=this.board.filter(c=>c&&c.symbol===s).length;});const minv=Math.min(...Object.values(counts).filter(v=>v>0));finalMult+=minv*20;}
+        if(cell.card.trait==='ミニマム'){const counts={};GameData.SYMBOLS.forEach(s=>{counts[s]=this.board.filter(c=>c&&c.symbol===s).length;});const minv=Math.min(...Object.values(counts).filter(v=>v>0));finalMult+=minv*20;correctionMultParts.push({label:'ミニマム',op:'+',val:minv*20});}
         // #3 マキシマム：値を+1から+10nに変更（nは盤面最多記号の数）
-        if(cell.card.trait==='マキシマム'){const counts={};GameData.SYMBOLS.forEach(s=>{counts[s]=this.board.filter(c=>c&&c.symbol===s).length;});const maxS=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];if(maxS&&maxS[0]===r.sym) finalMult+=maxS[1]*10;}
+        if(cell.card.trait==='マキシマム'){const counts={};GameData.SYMBOLS.forEach(s=>{counts[s]=this.board.filter(c=>c&&c.symbol===s).length;});const maxS=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];if(maxS&&maxS[0]===r.sym){finalMult+=maxS[1]*10;correctionMultParts.push({label:'マキシマム',op:'+',val:maxS[1]*10});}}
         if(cell.card.trait==='レリック特攻') correctionBase+=10*GameState.relicCount();
         if(cell.card.enhance==='連鎖'){const n=this.board.filter(c=>c&&c.card&&c.card.enhance==='連鎖').length;cell.baseScore+=30*n;}
       });
-      if(GameState.hand.some(c=>c.trait==='将軍')) finalMult*=1.1;
+      if(GameState.hand.some(c=>c.trait==='将軍')){finalMult*=1.1;correctionMultParts.push({label:'将軍(手札)',op:'×',val:1.1});}
+      // #1 演出用：「補正倍率」として実際に使われる合計値（定数＋上記の隠れた内訳すべて）
+      const correctionMultiplierTotal=finalMult-baseMult;
 
       // 4列補正はbaseMult計算済み（quadMultで1.5倍）、最終乗算補正
       // #1 演出用：最終乗算補正の内訳（普段は非表示の各要素）を記録しておく
@@ -704,7 +708,7 @@ const GameMainScene = {
       // #2 デバッグ用：計算式と各値の出所をログに表示
       const debugMsg=`[計算式] 基礎点=(カード基礎点[${cardScores.join('+')}]${cardScores.reduce((s,v)=>s+v,0)} + 補正基礎点(GameData.CORRECTION_BASE_SCORE)${correctionBase} + レリック補正(relicBonus)${relicBonus}) = ${totalBase} ／ 倍率=(ビンゴ倍率(GameData.BINGO_MULTIPLIER_BASE/quadMult)${baseMult} + 補正倍率(GameData.CORRECTION_MULTIPLIER)${GameData.CORRECTION_MULTIPLIER} + レリック加算) = ${Math.round(finalMult*100)/100} ／ 最終乗算補正(GameData.FINAL_MULTIPLIER×レリック)=${Math.round(finalMultiplier*100)/100} ／ 最終加算補正(GameData.FINAL_ADD+山札強化)=${finalAddTotal} ⇒ score=round(totalBase×倍率×最終乗算補正)+最終加算補正 = round(${totalBase}×${Math.round(finalMult*100)/100}×${Math.round(finalMultiplier*100)/100})+${finalAddTotal} = ${score}`;
       console.log('[ScoreCalc]',{symbol:r.sym,cardScores,correctionBase,relicBonus,totalBase,baseMult,correctionMultiplier:GameData.CORRECTION_MULTIPLIER,finalMult,finalMultiplierGlobal:GameData.FINAL_MULTIPLIER,finalMultiplier,finalAddGlobal:GameData.FINAL_ADD,finalAddTotal,score,activeRelics:GameState.relics.map(x=>x.id+(x.relicEnhance?('/'+x.relicEnhance):''))});
-      return {idx,symbol:r.sym,cells:win.cells,cardScores,totalBase,relicBonus,correctionBase,cardBaseSum:cardScores.reduce((s,v)=>s+v,0),correctionBaseTotal:correctionBase+relicBonus,mult:finalMult,pureBaseMult,lineFactor,correctionMultiplier:GameData.CORRECTION_MULTIPLIER,finalMultiplier,finalMultParts,finalAdd:finalAddTotal,finalAddParts,score,isQuad:win.isQuad,isPenta:win.isPenta,debugMsg};
+      return {idx,symbol:r.sym,cells:win.cells,cardScores,totalBase,relicBonus,correctionBase,cardBaseSum:cardScores.reduce((s,v)=>s+v,0),correctionBaseTotal:correctionBase+relicBonus,mult:finalMult,pureBaseMult,lineFactor,correctionMultiplier:correctionMultiplierTotal,correctionMultParts,finalMultiplier,finalMultParts,finalAdd:finalAddTotal,finalAddParts,score,isQuad:win.isQuad,isPenta:win.isPenta,debugMsg};
     };
 
     // #3 ホシパッシブ2：5列ビンゴを最優先で判定（内包する4列・3列窓は同時に消費済みにする）
@@ -779,9 +783,13 @@ const GameMainScene = {
     const baseBox=items[0];
     // 4. ビンゴ倍率表示
     await setItems([baseBox,boxData('ビンゴ倍率',fmtMult(b.pureBaseMult))],275);
-    // 5. 補正倍率を計算
-    await setItems([...items,boxData('補正倍率',fmtMult(b.correctionMultiplier))],275);
-    // 6. ビンゴ倍率と補正倍率も足し算のため、2つのブロックを1つに融合し「倍率」として表示する
+    // 5. 補正倍率(基本値)を計算
+    await setItems([...items,boxData('補正倍率',fmtMult(GameData.CORRECTION_MULTIPLIER))],275);
+    // 5b. #1 補正倍率に効く、レリック強化効果・パッシブ・性質変化・手札効果など普段は非表示の内訳を一度すべて見せる
+    for(const part of (b.correctionMultParts||[])){
+      await setItems([...items,boxData(part.label,part.op+fmtNum(part.val))],200);
+    }
+    // 6. ビンゴ倍率と補正倍率（内訳すべて含む）も足し算のため、1つに融合し「倍率」として表示する
     const combinedMult=b.pureBaseMult+b.correctionMultiplier;
     await setItems([baseBox,boxData('倍率',fmtMult(combinedMult),'scb-merged')],300);
     // 7. #1 基礎点×倍率を乗算した「得点」1マスに統合し、基礎点・倍率は非表示にする
@@ -1057,30 +1065,38 @@ const GameMainScene = {
           });
           let lb=cardScores.reduce((a,v)=>a+v,0)+correctionBase+relicBonus;
 
-          let finalMul=GameData.FINAL_MULTIPLIER;
+          // #3 予測計算の修正：実際のmakeResult()と同じ「倍率（baseMult+補正倍率の内訳すべて）」×「最終乗算補正」の
+          //    二段構成を正しく再現する（以前は両方を1つの掛け算にまとめてしまっており、実際の点数と乖離していた）
+          let correctionMultTotal=GameData.CORRECTION_MULTIPLIER;
+          // #新規 セブンパッシブ1：7の倍数の基礎点を持つカード1枚につき補正倍率+77
+          if(GameState.symbolPassiveTier.Seven>=1){ const n7=cells.filter(c=>c.baseScore%7===0).length; if(n7>0) correctionMultTotal+=n7*77; }
           if(!noRelic){
-            if(GameState.relics.some(r=>r.relicEnhance==='ren_double')) finalMul*=1.5;
-            if(GameState.relics.some(r=>r.relicEnhance==='ren_triple')) finalMul*=2;
-            if(GameState.relics.some(r=>r.relicEnhance==='ren_discard')) finalMul*=1.5;
-            if(GameState.hasRelic('combo')&&this.prevRoundBingoSymbol&&this.prevRoundBingoSymbol!==s) finalMul+=1.5;
-            if(GameState.hasRelic('turn_boost')) finalMul*=Math.pow(1.01,this.turnInRound);
-            if(GameState.hasRelic('hand_boost')) finalMul+=GameState.hand.length*3;
-            if(GameState.hasRelic('last_stand')&&GameState.round>=4) finalMul*=2;
+            if(GameState.hasRelic('combo')&&this.prevRoundBingoSymbol&&this.prevRoundBingoSymbol!==s) correctionMultTotal+=1.5;
+            if(GameState.hasRelic('turn_boost')) correctionMultTotal*=Math.pow(1.01,this.turnInRound);
+            if(GameState.hasRelic('hand_boost')) correctionMultTotal+=GameState.hand.length*3;
+            if(GameState.hasRelic('last_stand')&&GameState.round>=4) correctionMultTotal*=2;
             GameState.relics.forEach(rel=>{
-              if(rel.relicEnhance==='ren_general') finalMul*=1.1;
-              if(rel.relicEnhance==='ren_only_one'&&GameState.relicCount()===1) finalMul+=20;
-              if(rel.relicEnhance==='ren_grade'){ const n=GameState.currentDeck.reduce((acc,c)=>{let x=0;if(c.enhance)x++;if(c.jamming)x++;if(c.trait)x++;return acc+x;},0); finalMul+=n; }
+              if(rel.relicEnhance==='ren_general') correctionMultTotal*=1.1;
+              if(rel.relicEnhance==='ren_only_one'&&GameState.relicCount()===1) correctionMultTotal+=20;
+              if(rel.relicEnhance==='ren_grade'){ const n=GameState.currentDeck.reduce((acc,c)=>{let x=0;if(c.enhance)x++;if(c.jamming)x++;if(c.trait)x++;return acc+x;},0); correctionMultTotal+=n; }
+              if(rel.relicEnhance==='ren_discard') correctionMultTotal*=1.5;
             });
           }
           cells.forEach(c=>{
             if(!c.card) return;
-            if(c.card.trait==='指令官'&&this.turnInRound>=7&&this.turnInRound<=10) finalMul*=1.2;
-            if(c.card.trait==='ミニマム'){ const counts={}; GameData.SYMBOLS.forEach(sy=>{counts[sy]=this.board.filter(bc=>bc&&bc.symbol===sy).length;}); const minv=Math.min(...Object.values(counts).filter(v=>v>0)); finalMul+=minv*20; }
-            if(c.card.trait==='マキシマム'){ const counts={}; GameData.SYMBOLS.forEach(sy=>{counts[sy]=this.board.filter(bc=>bc&&bc.symbol===sy).length;}); const maxS=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]; if(maxS&&maxS[0]===s) finalMul+=maxS[1]*10; }
+            if(c.card.trait==='指令官'&&this.turnInRound>=7&&this.turnInRound<=10) correctionMultTotal*=1.2;
+            if(c.card.trait==='ミニマム'){ const counts={}; GameData.SYMBOLS.forEach(sy=>{counts[sy]=this.board.filter(bc=>bc&&bc.symbol===sy).length;}); const minv=Math.min(...Object.values(counts).filter(v=>v>0)); correctionMultTotal+=minv*20; }
+            if(c.card.trait==='マキシマム'){ const counts={}; GameData.SYMBOLS.forEach(sy=>{counts[sy]=this.board.filter(bc=>bc&&bc.symbol===sy).length;}); const maxS=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]; if(maxS&&maxS[0]===s) correctionMultTotal+=maxS[1]*10; }
           });
-          if(GameState.hand.some(c=>c.trait==='将軍')) finalMul*=1.1;
-          // #新規 セブンパッシブ1：7の倍数の基礎点を持つカード1枚につき補正倍率+77
-          if(GameState.symbolPassiveTier.Seven>=1){ const n7=cells.filter(c=>c.baseScore%7===0).length; if(n7>0) finalMul+=n7*77; }
+          if(GameState.hand.some(c=>c.trait==='将軍')) correctionMultTotal*=1.1;
+          const mult=baseMult+correctionMultTotal;
+
+          // #3 最終乗算補正：ren_double/ren_triple/サンカクパッシブ2/セブンパッシブ2のみ（倍率とは別の掛け算段階）
+          let finalMul=GameData.FINAL_MULTIPLIER;
+          if(!noRelic){
+            if(GameState.relics.some(r=>r.relicEnhance==='ren_double')) finalMul*=1.5;
+            if(GameState.relics.some(r=>r.relicEnhance==='ren_triple')) finalMul*=2;
+          }
           if(GameState.symbolPassiveTier.Triangle>=2) finalMul+=GameState.currentDeck.filter(c=>c.jamming).length*0.1;
           // #新規 セブンパッシブ2：フラグが立っていれば次のビンゴで最終乗算補正×7
           if(GameState.symbolPassiveTier.Seven>=2 && GameState.sevenPendingMultBoost) finalMul*=7;
@@ -1088,8 +1104,7 @@ const GameMainScene = {
           if(!noRelic&&GameState.relics.some(r=>r.relicEnhance==='ren_draw_pile')) finalAddTotal+=GameState.drawPile.length*100;
           // #新規 セブンパッシブ3：デッキ枚数が7の倍数の時、最終加算補正+目標点数の7%
           if(GameState.symbolPassiveTier.Seven>=3 && GameState.currentDeck.length%7===0) finalAddTotal+=Math.round(GameState.targetScore*0.07);
-          const m=baseMult+GameData.CORRECTION_MULTIPLIER;
-          total+=Math.round(lb*m*finalMul)+finalAddTotal;
+          total+=Math.round(lb*mult*finalMul)+finalAddTotal;
           any=true; return true;
         };
         // #10 5×5盤面の5列ビンゴにも対応

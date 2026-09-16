@@ -239,7 +239,7 @@ const GameData = {
     { id:'relic_boost', name:'レリック強化',     desc:'レリック所持数nに応じ、補正基礎点+5+8n' },
     { id:'paint', name:'ペイント',         desc:'ゲーム開始時、ランダムな記号を1つ選び、その記号の全カードに塗りつぶし(レリック)を付与。1ラウンドのターン数-8。売却・使用不可時は効果を除去' },
     { id:'turn_boost', name:'ターン強化',       desc:'ビンゴ時、経過ターン数nに応じて最終乗算補正×1.01^n' },
-    { id:'jamming_boost', name:'ジャミング増強',   desc:'ビンゴ阻害の効果を持つカードが発動（配置）した時、ビンゴ阻害自体の効果はそのまま残し、追加でスタンを発動する（発動時、現在の点数に目標点数×0.05を加算）。手札上限-3' },
+    { id:'jamming_boost', name:'ジャミング増強',   desc:'ビンゴ阻害の効果を持つカードが盤面に配置された時、ビンゴ阻害自体の効果はそのまま残し、追加でスタンを発動する（配置時、現在の点数に目標点数×0.05を加算）。手札上限-3' },
     { id:'empty_boost', name:'空きマス強化',     desc:'ビンゴ時、空きマス数nに応じ補正倍率+6n+5' },
     { id:'draw_boost', name:'ドロー強化',       desc:'ターン終了時カードを1枚ドロー' },
     { id:'last_stand', name:'背水の陣',         desc:'4ラウンド以降、最終乗算補正×2' },
@@ -312,9 +312,9 @@ const GameData = {
   },
 
   generateShopCard(){
-    // #3 ボス効果「バツ5000」が有効な場合、新しく生成されるバツカードにもきちんと反映されるよう、
-    //    バツもショップの通常カード生成の対象記号に含める
-    const symbol = GlobalFunctions.randChoice(['Circle', 'Triangle', 'Square', 'Cross']);
+    // #4 出現確率：マル・サンカク・シカクは各30%、バツは10%
+    const r=Math.random();
+    const symbol = r<0.3?'Circle':(r<0.6?'Triangle':(r<0.9?'Square':'Cross'));
     const crossBoss5000 = symbol==='Cross' && typeof GameMainScene!=='undefined' && GameMainScene.hasBossEffect && GameMainScene.hasBossEffect('cross5000');
     const baseScore = crossBoss5000 ? 5000 : GlobalFunctions.randInt(1, 50);
     let jamming = Math.random() < 0.5 ? GlobalFunctions.randChoice(Object.keys(this.JAMMING_DESC)) : null;
