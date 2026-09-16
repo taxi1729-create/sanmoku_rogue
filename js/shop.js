@@ -178,9 +178,11 @@ const ShopScene = {
   // #1 ドット（黄緑青）をカード基礎点の左に inline 表示
   // #2 ブルジョワは現在Gを受け取って動的表示
   // #6 数値強化も +15 を明示
-  cardScoreHtml(card, currentGold=0){
+  // #3 バツパッシブ2・サンカクパッシブ1などの実効値をUIに反映（gameMain.js版と同期）
+  cardScoreHtml(card, currentGold=0, boardBaseScore=null){
     const multiMap={'マルマルチ':'Circle','サンカクマルチ':'Triangle','シカクマルチ':'Square'};
     const ms=multiMap[card.enhance];
+    const baseForDisplay = boardBaseScore!=null ? boardBaseScore : card.baseScore;
 
     // 左側インラインドット
     let dotHtml='';
@@ -190,18 +192,27 @@ const ShopScene = {
     const dotsSpan=dotHtml?`<span class="score-dots">${dotHtml}</span>`:'';
 
     let bonusHtml='';
-    if(ms&&card.symbol===ms&&card.baseScore>card.number){
-      bonusHtml=`<span class="card-score-bonus">+${card.baseScore-card.number}</span>`;
+    const sqP3=card.symbol==='Square'&&GameState.symbolPassiveTier?.Square>=2;
+    if(ms&&card.symbol===ms&&baseForDisplay>card.number){
+      bonusHtml=`<span class="card-score-bonus">+${baseForDisplay-card.number}</span>`;
     } else if(card.enhance==='数値強化'){
-      bonusHtml=`<span class="card-score-bonus">+15</span>`;
+      bonusHtml=`<span class="card-score-bonus${sqP3?' passive-value':''}">+${15*(sqP3?2:1)}</span>`;
     } else if(card.enhance==='ブルジョワ'){
-      // #2 動的：現在G×4
-      const bonus=currentGold*4;
-      bonusHtml=`<span class="card-score-bonus gold-text">+${bonus}(×4G)</span>`;
+      const mulG=sqP3?8:4;
+      bonusHtml=`<span class="card-score-bonus gold-text${sqP3?' passive-value':''}">×${mulG}G</span>`;
     }
 
-    let scoreHtml=`<span class="card-number">${dotsSpan}${card.baseScore}${bonusHtml}</span>`;
-    if(card.enhance==='ドロー') scoreHtml+=`<span class="card-draw-label">draw1</span>`;
+    // #3 バツパッシブ2・サンカクパッシブ1など、パッシブでカード基礎点が変化する場合は青字で実効値を表示する
+    let displayScore=baseForDisplay, scoreIsPassive=(boardBaseScore!=null&&boardBaseScore!==card.baseScore);
+    if(card.symbol==='Cross'&&GameState.symbolPassiveTier.Cross>=2){ displayScore=GameState.currentDeck.length*3; scoreIsPassive=true; }
+    else if(card.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=1){
+      const total=GameState.currentDeck.length||1;
+      const n=GameState.currentDeck.filter(cc=>cc.symbol==='Triangle').length/total;
+      displayScore=Math.round(baseForDisplay*(1+n)); scoreIsPassive=true;
+    }
+    const numHtml=scoreIsPassive?`<span class="passive-value">${displayScore}</span>`:`${baseForDisplay}`;
+    let scoreHtml=`<span class="card-number">${dotsSpan}${numHtml}${bonusHtml}</span>`;
+    if(card.enhance==='ドロー') scoreHtml+=`<span class="card-draw-label${sqP3?' passive-value':''}">draw${sqP3?2:1}</span>`;
     return scoreHtml;
   },
 
