@@ -3,7 +3,7 @@
   --bg:#12141c; --panel:#1c2030; --panel-2:#242a3d;
   --accent:#7dd3fc; --accent-2:#f472b6;
   --text:#e7e9f0; --text-dim:#8b90a5;
-  --circle:#7dd3fc; --triangle:#facc15; --square:#4ade80; --cross:#f87171; --gold:#fbbf24;
+  --circle:#7dd3fc; --triangle:#4ade80; --square:#facc15; --cross:#f87171; --gold:#fbbf24; --success:#4ade80;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 html,body{margin:0;padding:0;width:100%;height:100%;background:radial-gradient(circle at 50% 0%,#1a1f30 0%,#0c0d14 70%);color:var(--text);font-family:'Noto Sans JP',sans-serif;overflow-x:hidden;overscroll-behavior:none;}
@@ -27,7 +27,7 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .map-path{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;}
 .stage-card{background:var(--panel);border-radius:14px;padding:16px;width:230px;border:1px solid #2b3150;display:flex;flex-direction:column;gap:8px;}
 .stage-card.locked{opacity:.35;}
-.stage-card.cleared{border-color:var(--square);}
+.stage-card.cleared{border-color:var(--success);}
 .stage-tag{font-size:10px;color:var(--text-dim);letter-spacing:.15em;text-transform:uppercase;}
 .stage-name{font-size:18px;font-weight:900;}
 .stage-goal{font-size:12px;color:var(--accent);}
@@ -47,7 +47,7 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .stat .value.sparkle{color:var(--gold);animation:sparkle .6s ease-in-out infinite alternate;}
 @keyframes sparkle{from{text-shadow:0 0 8px var(--gold);}to{text-shadow:0 0 20px #fff8d0,0 0 44px var(--gold);}}
 .progress-outer{width:100%;height:7px;background:#20243a;border-radius:4px;overflow:hidden;}
-.progress-inner{height:100%;background:linear-gradient(90deg,var(--accent),var(--square));transition:width .3s ease;}
+.progress-inner{height:100%;background:linear-gradient(90deg,var(--accent),var(--success));transition:width .3s ease;}
 .add-score-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;padding:5px 8px;background:#111624;border-radius:8px;font-size:11px;}
 .as-label{color:var(--text-dim);}
 .as-cards{font-weight:700;font-size:13px;font-family:'Space Mono',monospace;}
@@ -72,7 +72,7 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .cell-dots{position:absolute;left:4px;top:4px;display:flex;gap:2px;}
 .cell-dot{width:7px;height:7px;border-radius:50%;}
 .dot-enhance{background:var(--gold);}
-.dot-jamming{background:var(--square);}
+.dot-jamming{background:var(--success);}
 .dot-trait{background:var(--circle);}
 .score-badge{position:absolute;left:50%;top:-24px;transform:translateX(-50%);background:var(--gold);color:#1a1a1a;font-size:10px;font-weight:700;padding:2px 6px;border-radius:7px;white-space:nowrap;pointer-events:none;}
 .score-badge::after{content:'';position:absolute;left:50%;top:100%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--gold);}
@@ -106,7 +106,7 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .card-number{position:absolute;top:4px;right:5px;font-size:10px;font-weight:700;font-family:'Space Mono',monospace;color:var(--text-dim);}
 .card-score-bonus{font-size:8px;color:var(--gold);}
 .card-tag{font-size:8px;}
-.card-tag-jamming{color:var(--square);}
+.card-tag-jamming{color:var(--success);}
 .card-tag-enhance{color:var(--gold);}
 .card-tag-trait{color:var(--circle);}
 
@@ -157,7 +157,7 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 /* --- Result --- */
 .result-screen,.shop-stub{display:flex;flex-direction:column;align-items:center;gap:16px;margin-top:12vh;text-align:center;}
 .result-title{font-size:32px;font-weight:900;}
-.result-title.win{color:var(--square);}
+.result-title.win{color:var(--success);}
 .result-title.lose{color:var(--cross);}
 .gold-reveal-popup{background:var(--panel);border:1px solid #3a3050;border-radius:16px;padding:18px 26px;text-align:center;}
 .gr-label{font-size:11px;color:var(--text-dim);letter-spacing:.1em;}
@@ -351,7 +351,7 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .card-jamming-emoji{ font-size:13px; line-height:1; margin-top:2px; }
 
 /* --- ホバー吹き出し色 #4 --- */
-.desc-jamming{ color:var(--square); }
+.desc-jamming{ color:var(--success); }
 .desc-enhance{ color:var(--gold); }
 .desc-trait{ color:var(--circle); }
 .card-hover-tip span{ display:block; }
@@ -379,6 +379,10 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 
 /* --- #5 アップグレードモーダルのビンゴ倍率パネル --- */
 .modal-mult-panel{ margin-bottom:10px; }
+/* #7 ビンゴ倍率パネルと選択肢一覧を横並びにする */
+.pack-modal-top-row{ display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap; margin-bottom:10px; }
+.pack-modal-top-row .modal-mult-panel{ margin-bottom:0; flex-shrink:0; }
+.pack-modal-top-row .effect-choice-list{ flex:1; min-width:180px; max-width:none; margin:0; }
 .mult-legend-modal{ display:inline-block; background:rgba(0,0,0,.3); border-radius:8px; padding:6px 12px; font-size:11px; }
 .mult-legend-modal table{ border-collapse:collapse; }
 .mult-legend-modal th{ color:var(--text-dim); font-weight:400; padding:0 5px 2px; text-align:center; font-size:10px; }

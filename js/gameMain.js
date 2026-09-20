@@ -56,6 +56,12 @@ const GameMainScene = {
       this.addLog(`ホシパッシブ3：目標点数の30%（+${bonus}点）を開始時に加算`);
     }
     GameState.bingoCountThisStage=0;
+    // #6 ゲーム開始時：ボスステージクリア時と同様に、記号パッシブを3択（条件次第で4択）からランダムに1つ受け取れるようにする
+    if(!GameState.initialPassiveGranted){
+      GameState.initialPassiveGranted=true;
+      const picks=this.generatePassiveChoicePicks();
+      if(picks){ this.pendingPassiveChoice=picks; this.passiveModalOpen=true; this.passiveChoiceContext='start'; }
+    }
     this.startRound();
     TutorialOverlay.show('gameMain'); // #1 初回のみゲームメイン画面のチュートリアルを表示
   },
@@ -210,6 +216,8 @@ const GameMainScene = {
     this.effects.linkRestrict=null; this.effects.stunNextNpc=false;
     this.effects.confuseNextNpc=false; this.effects.redirectBan=null;
     this.effects.sealCell=null; this.effects.lureRestrict=false;
+    // #2 チェックパッシブ1：ラウンドごとにビンゴした記号の記録をリセット
+    this.bingoSymbolsThisRound=new Set(); this._checkTriforceGranted=false;
     if(GameState.hasRelic('charge')&&GameState.round>1&&this.prevRoundScore===GameState.currentScore){
       this.chargeActive=true; this.addLog('チャージ発動：補正基礎点+100');
     }
@@ -261,6 +269,19 @@ const GameMainScene = {
     }
     GameState.round++;
     this.startRound();
+  },
+
+  // #6 記号パッシブの3択（セブンパッシブ条件を満たせば4択）を生成する共通処理（ボスクリア時・ゲーム開始時の両方で使用）
+  generatePassiveChoicePicks(){
+    const candidateSymbols=GameData.PASSIVE_SYMBOLS.filter(s=>(GameState.symbolPassiveTier[s]||0)<3);
+    if(candidateSymbols.length===0) return null;
+    const picks=GlobalFunctions.shuffle(candidateSymbols.slice()).slice(0,3);
+    // #新規 セブンパッシブ：現在の点数の下1桁が7の時のみ、4つ目の選択肢として出現する
+    const sevenTier=GameState.symbolPassiveTier.Seven||0;
+    if(sevenTier<3 && Math.abs(GameState.currentScore)%10===7 && !picks.includes('Seven')){
+      picks.push('Seven');
+    }
+    return picks.map(s=>({symbol:s,nextTier:(GameState.symbolPassiveTier[s]||0)+1}));
   },
 
   finishStage(result){
@@ -316,16 +337,8 @@ const GameMainScene = {
       this.addLog(`クリア報酬：G+${rd.total}${rd.doubled?'（第6階層以降のため最終値を2倍）':''}${clearBonusMsg?'／'+clearBonusMsg:''}`);
       // #A ボスステージクリア時：記号パッシブを1つ選択
       if(this.stage.key==='boss'){
-        const candidateSymbols=GameData.PASSIVE_SYMBOLS.filter(s=>(GameState.symbolPassiveTier[s]||0)<3);
-        if(candidateSymbols.length>0){
-          const picks=GlobalFunctions.shuffle(candidateSymbols.slice()).slice(0,3);
-          // #新規 セブンパッシブ：現在の点数の下1桁が7の時のみ、4つ目の選択肢として出現する
-          const sevenTier=GameState.symbolPassiveTier.Seven||0;
-          if(sevenTier<3 && Math.abs(GameState.currentScore)%10===7 && !picks.includes('Seven')){
-            picks.push('Seven');
-          }
-          this.pendingPassiveChoice=picks.map(s=>({symbol:s,nextTier:(GameState.symbolPassiveTier[s]||0)+1}));
-        }
+        this.pendingPassiveChoice=this.generatePassiveChoicePicks();
+        this.passiveChoiceContext='boss'; // #6 選択後にショップへ進む通常フローと区別するためのコンテキスト
       }
       // #8 クリア時セーブ
       App.saveGame();
@@ -685,11 +698,14 @@ const GameMainScene = {
         finalAddParts.push({label:'セブンパッシブ3',op:'+',val:v});
       }
 
-      // #8 チェックパッシブ1：盤面にマル・サンカク・シカクが全て揃っていれば残りラウンド+1（旧マルパッシブ1から移設）
+      // #2 チェックパッシブ1：1ラウンド内でマル・サンカク・シカクのビンゴが全て発生した時、残りラウンド+1（一度きり）
       if(GameState.symbolPassiveTier.Check>=1){
-        const has=(s)=>this.board.some(c=>c&&c.symbol===s);
-        if(has('Circle')&&has('Triangle')&&has('Square')){
+        this.bingoSymbolsThisRound=this.bingoSymbolsThisRound||new Set();
+        this.bingoSymbolsThisRound.add(r.sym);
+        if(!this._checkTriforceGranted && ['Circle','Triangle','Square'].every(s=>this.bingoSymbolsThisRound.has(s))){
           this.stageBonusRounds=(this.stageBonusRounds||0)+1;
+          this._checkTriforceGranted=true;
+          this.addLog('チェックパッシブ1：マル・サンカク・シカクのビンゴが揃い、残りラウンド+1');
         }
       }
       // #8 チェックパッシブ3：このステージのビンゴ回数をカウント
@@ -753,11 +769,11 @@ const GameMainScene = {
   async showScoreStep(b){
     const before=GameState.currentScore, after=Math.max(0,before+b.score);
 
-    // #7 点数計算にかかる時間を半分に短縮
-    // 各セルを1枚ずつ0.2秒ポップ（同セルが複数ビンゴに属する場合、その分繰り返す）
+    // #1 点数計算の演出速度を1/2スピード（時間2倍）に変更し、計算過程を見やすくする
+    // 各セルを1枚ずつポップ（同セルが複数ビンゴに属する場合、その分繰り返す）
     for(const cellIdx of b.cells){
       this.scoringAnim={phase:0,cells:[],symbol:b.symbol,liveScore:before,before,score:b.score,reached:false,popCell:cellIdx};
-      this.renderAll(); await this.sleep(200);
+      this.renderAll(); await this.sleep(400);
     }
     this.scoringAnim.cells=b.cells;
     // デバッグログ：計算式と計算値の出所を表示
@@ -775,64 +791,64 @@ const GameMainScene = {
     const setItems=async(arr,ms)=>{ items=arr; this.scoreBoxes={items}; this.renderAll(); await this.sleep(ms); };
 
     // 1. カード基礎点を計算
-    await setItems([boxData('カード基礎点',fmt(b.cardBaseSum))],275);
+    await setItems([boxData('カード基礎点',fmt(b.cardBaseSum))],550);
     // 2. 補正基礎点を計算
-    await setItems([...items,boxData('補正基礎点',fmt(b.correctionBaseTotal))],275);
+    await setItems([...items,boxData('補正基礎点',fmt(b.correctionBaseTotal))],550);
     // 3. カード基礎点と補正基礎点は掛け算ではなく足し算のため、2つのブロックを1つに融合し「基礎点」として表示する
-    await setItems([boxData('基礎点',fmt(b.totalBase),'scb-merged')],250);
+    await setItems([boxData('基礎点',fmt(b.totalBase),'scb-merged')],500);
     const baseBox=items[0];
     // 4. ビンゴ倍率表示
-    await setItems([baseBox,boxData('ビンゴ倍率',fmtMult(b.pureBaseMult))],275);
+    await setItems([baseBox,boxData('ビンゴ倍率',fmtMult(b.pureBaseMult))],550);
     // 5. 補正倍率(基本値)を計算
-    await setItems([...items,boxData('補正倍率',fmtMult(GameData.CORRECTION_MULTIPLIER))],275);
+    await setItems([...items,boxData('補正倍率',fmtMult(GameData.CORRECTION_MULTIPLIER))],550);
     // 5b. #1 補正倍率に効く、レリック強化効果・パッシブ・性質変化・手札効果など普段は非表示の内訳を一度すべて見せる
     for(const part of (b.correctionMultParts||[])){
-      await setItems([...items,boxData(part.label,part.op+fmtNum(part.val))],200);
+      await setItems([...items,boxData(part.label,part.op+fmtNum(part.val))],400);
     }
     // 6. ビンゴ倍率と補正倍率（内訳すべて含む）も足し算のため、1つに融合し「倍率」として表示する
     const combinedMult=b.pureBaseMult+b.correctionMultiplier;
-    await setItems([baseBox,boxData('倍率',fmtMult(combinedMult),'scb-merged')],300);
+    await setItems([baseBox,boxData('倍率',fmtMult(combinedMult),'scb-merged')],600);
     // 7. #1 基礎点×倍率を乗算した「得点」1マスに統合し、基礎点・倍率は非表示にする
     let running=b.totalBase*combinedMult;
-    await setItems([boxData('得点',fmt(Math.round(running)),'scb-highlight scb-merged')],300);
+    await setItems([boxData('得点',fmt(Math.round(running)),'scb-highlight scb-merged')],600);
     // 8. ビンゴ列補正を表示
-    await setItems([...items,boxData(lineLabel,'×'+b.lineFactor)],250);
+    await setItems([...items,boxData(lineLabel,'×'+b.lineFactor)],500);
     // 9. 列補正を得点に乗算して統合する
     running*=b.lineFactor;
-    await setItems([boxData('得点',fmt(Math.round(running)),'scb-highlight scb-merged')],300);
+    await setItems([boxData('得点',fmt(Math.round(running)),'scb-highlight scb-merged')],600);
 
     // 10. #1 最終乗算補正：レリック強化効果や手札効果など普段非表示の内訳をすべて一度見せてから合算する
     const scoreBox=items[0];
     for(const part of (b.finalMultParts||[])){
-      await setItems([scoreBox,...items.slice(1),boxData(part.label,part.op+fmtNum(part.val))],220);
+      await setItems([scoreBox,...items.slice(1),boxData(part.label,part.op+fmtNum(part.val))],440);
     }
-    await setItems([scoreBox,boxData('最終乗算補正',fmtMult(b.finalMultiplier),'scb-merged')],300);
+    await setItems([scoreBox,boxData('最終乗算補正',fmtMult(b.finalMultiplier),'scb-merged')],600);
     // 11. 最終乗算補正を得点に乗算して統合する
     running*=b.finalMultiplier;
-    await setItems([boxData('得点',fmt(Math.round(running)),'scb-highlight scb-merged')],300);
+    await setItems([boxData('得点',fmt(Math.round(running)),'scb-highlight scb-merged')],600);
 
     // 12. #1 最終加算補正：同様に内訳をすべて見せてから合算する
     const scoreBox2=items[0];
     for(const part of (b.finalAddParts||[])){
-      await setItems([scoreBox2,...items.slice(1),boxData(part.label,part.op+fmtNum(part.val))],220);
+      await setItems([scoreBox2,...items.slice(1),boxData(part.label,part.op+fmtNum(part.val))],440);
     }
-    await setItems([scoreBox2,boxData('最終加算補正',fmt(b.finalAdd),'scb-merged')],300);
+    await setItems([scoreBox2,boxData('最終加算補正',fmt(b.finalAdd),'scb-merged')],600);
     // 13. 最終加算補正を得点に加算する（丸め誤差を避けるため最終的にb.scoreへ厳密一致させる）
-    await setItems([boxData('加算点数',fmtAdd(b.score),'scb-highlight'+(b.score<0?' negative':''))],350);
+    await setItems([boxData('加算点数',fmtAdd(b.score),'scb-highlight'+(b.score<0?' negative':''))],700);
 
-    // 14. #7 加算点数を現在の点数に加算：直接ジャンプさせず、1→5→7→10のように数字が段階的に上昇していく様子を見せる
+    // 14. 加算点数を現在の点数に加算：直接ジャンプさせず、1→5→7→10のように数字が段階的に上昇していく様子を見せる
     await this.animateScoreCountUp(before,after);
     this.scoringAnim.liveScore=GameState.currentScore; this.scoringAnim.reached=GameState.currentScore>=GameState.targetScore; this.scoringAnim.phase=8;
     this.addLog(`${GameData.SYMBOL_LABEL[b.symbol]}${lineLabel}ビンゴ！ ${GlobalFunctions.formatSigned(b.score)}（計${GlobalFunctions.formatScore(GameState.currentScore)}）`);
-    this.renderAll(); await this.sleep(550);
+    this.renderAll(); await this.sleep(1100);
     this.scoringAnim=null; this.scoreBoxes=null; this.renderAll();
   },
 
-  // #7 現在の点数を before→after へなめらかに段階上昇させる（最後は必ずafterに厳密一致させる）
+  // #1 現在の点数を before→after へなめらかに段階上昇させる（半分スピードに合わせ時間を2倍に。最後は必ずafterに厳密一致させる）
   async animateScoreCountUp(before,after){
     const diff=after-before;
     if(diff===0){ GameState.currentScore=after; this.renderAll(); return; }
-    const steps=4, totalMs=400;
+    const steps=4, totalMs=800;
     for(let i=1;i<=steps;i++){
       const t=i/steps;
       const eased=1-Math.pow(1-t,2); // 序盤を大きく、終盤を細かく動かす
@@ -882,7 +898,12 @@ const GameMainScene = {
       this.addLog('NPCはスタンした');
       this.turnInRound++;
       if(this.turnInRound>GameState.effectiveTurnsPerRound()){this.endRound();return;}
-      this.currentSide='player';this.renderAll();this.checkAutoSkip();return;
+      this.currentSide='player';
+      // #5 階層10：スタン解除後も5ターンごとの強制NPC番を正しく反映する（未反映だとプレイヤーが余分な1手を得てしまう不具合があった）
+      if(GameState.floor10SpecialBoss&&this.isForcedNpcTurn(this.turnInRound+1)) this.currentSide='npc';
+      this.renderAll();
+      if(this.currentSide==='npc') this.scheduleAIMove(); else this.checkAutoSkip();
+      return;
     }
 
     const ci=this.chooseAICell();
@@ -893,7 +914,12 @@ const GameMainScene = {
       this.addLog('NPCはスタンした（配置不可）');
       this.turnInRound++;
       if(this.turnInRound>GameState.effectiveTurnsPerRound()){this.endRound();return;}
-      this.currentSide='player';this.renderAll();this.checkAutoSkip();return;
+      this.currentSide='player';
+      // #5 階層10：スタン解除後も5ターンごとの強制NPC番を正しく反映する
+      if(GameState.floor10SpecialBoss&&this.isForcedNpcTurn(this.turnInRound+1)) this.currentSide='npc';
+      this.renderAll();
+      if(this.currentSide==='npc') this.scheduleAIMove(); else this.checkAutoSkip();
+      return;
     }
 
     if(ci===null){this.endRound();return;}
@@ -1288,6 +1314,20 @@ const GameMainScene = {
 
   // ===== Render =====
   renderAll(){
+    // #5 renderAll中の例外で画面が真っ暗（ブラックアウト）になるのを防ぐためのセーフティネット
+    try{
+      this._renderAllInner();
+    }catch(e){
+      console.error('renderAll error:', e);
+      this.container.innerHTML='';
+      const err=document.createElement('div'); err.style.cssText='padding:24px;text-align:center;color:#fff;';
+      err.innerHTML=`<div style="margin-bottom:14px;">画面の表示中にエラーが発生しました。<br>お手数ですがマップに戻ってください。</div><button id="err-back-btn">マップに戻る</button>`;
+      this.container.appendChild(err);
+      document.getElementById('err-back-btn').addEventListener('click',()=>{ App.showMapSelect(); });
+    }
+  },
+
+  _renderAllInner(){
     // #4 再描画のたびに画面が一番上へ戻る不具合を防ぐ：スクロール位置を保持
     const scrollY=window.scrollY;
     this.container.innerHTML='';
@@ -1989,6 +2029,14 @@ const GameMainScene = {
     this.addLog(`記号パッシブ習得：${GameData.SYMBOL_LABEL[cand.symbol]}${GameData.SYMBOL_PASSIVE_NAMES[cand.symbol]}Lv${cand.nextTier}`);
     this.pendingPassiveChoice=null;
     this.passiveModalOpen=false;
+    // #6 ゲーム開始時に選んだ場合はショップへ進まず、開始済みのラウンドをそのまま続ける
+    if(this.passiveChoiceContext==='start'){
+      this.passiveChoiceContext=null;
+      App.saveGame();
+      this.renderAll();
+      return;
+    }
+    this.passiveChoiceContext=null;
     // #1 パッシブ選択後、ショップへ進む
     App.saveGame();
     App.showShop();

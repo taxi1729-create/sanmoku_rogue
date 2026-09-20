@@ -14,6 +14,7 @@ const GameState = {
   bossRerollUsed:false, // #3 ホシパッシブ1：ボス効果リロールの使用済みフラグ
   finalShopDone:false, floor10SpecialBoss:false, // #6 階層10特殊構成
   gameMode:'normal', // #9 ゲームモード（normal=通常デッキ／tengame=テンゲーム）
+  initialPassiveGranted:false, // #6 ゲーム開始時パッシブ選択（3択）を既に提示したかどうか
 
   effectiveHandSize(){ return GameData.HAND_SIZE + this.handSizeBonus; },
   effectiveMaxRounds(){ return GameData.MAX_ROUNDS + this.roundsBonus; },
@@ -47,6 +48,7 @@ const GameState = {
 
   initNewGame(mode){
     this.gameMode = mode || this.gameMode || 'normal';
+    this.initialPassiveGranted=false; // #6 新規ゲーム開始時はリセットし、最初のステージ突入時にパッシブ3択を提示する
     this.currentDeck=GameData.buildDeckForMode(this.gameMode);
     this.gold=0; this.relics=[]; this.clearedStages=[];
     this.finalShopDone=false; // #6 階層10特殊構成の初回フラグをリセット
@@ -94,6 +96,7 @@ const GameState = {
       bossRerollUsed:this.bossRerollUsed,
       finalShopDone:this.finalShopDone,
       gameMode:this.gameMode,
+      initialPassiveGranted:this.initialPassiveGranted,
       multBase:{...GameData.BINGO_MULTIPLIER_BASE},
       corrBase:GameData.CORRECTION_BASE_SCORE,
       savedFloorStage: (this.currentStage?this.currentStage.key:''),
@@ -120,6 +123,7 @@ const GameState = {
     this.bossRerollUsed=d.bossRerollUsed||false;
     this.finalShopDone=d.finalShopDone||false;
     this.gameMode=d.gameMode||'normal';
+    this.initialPassiveGranted=d.initialPassiveGranted||false;
     if(d.multBase) Object.assign(GameData.BINGO_MULTIPLIER_BASE,d.multBase);
     if(d.corrBase!=null) GameData.CORRECTION_BASE_SCORE=d.corrBase;
   },

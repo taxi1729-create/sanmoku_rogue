@@ -846,7 +846,8 @@ const ShopScene = {
     modal.innerHTML = isExplosive
       ? `<h3>💥爆発通常アップグレード（残り選択回数：${p.picksRemaining}/3）</h3>`
       : '<h3>効果を選択してください</h3>';
-    // #5 ビンゴ倍率表示パネルをモーダル左側に追加
+    // #7 ビンゴ倍率表示パネルを選択肢一覧の左側に配置する（横並びのラッパーで囲む）
+    const topRow = document.createElement('div'); topRow.className='pack-modal-top-row';
     const multPanel = document.createElement('div'); multPanel.className='modal-mult-panel';
     const multRows = GameData.SYMBOLS.map(s=>{
       const base=GameData.BINGO_MULTIPLIER_BASE[s]+GameData.CORRECTION_MULTIPLIER;
@@ -855,7 +856,7 @@ const ShopScene = {
       return `<tr><td class="sym-${s}">${GameData.SYMBOL_LABEL[s]}</td><td>${f(base)}</td><td>${f(quad)}</td></tr>`;
     }).join('');
     multPanel.innerHTML=`<div class="mult-legend-modal"><b>ビンゴ倍率</b><table><tr><th></th><th>基礎</th><th>4列</th></tr>${multRows}</table></div>`;
-    modal.appendChild(multPanel);
+    topRow.appendChild(multPanel);
     const list = document.createElement('div'); list.className='effect-choice-list';
     p.effectPool.forEach(eff => {
       const item = document.createElement('div');
@@ -864,7 +865,8 @@ const ShopScene = {
       item.addEventListener('click', () => this.chooseEffect(eff));
       list.appendChild(item);
     });
-    modal.appendChild(list);
+    topRow.appendChild(list);
+    modal.appendChild(topRow);
     const eff = p.chosenEffect;
     const needsTarget = eff && eff.targetMax > 0;
     const hint = document.createElement('div'); hint.className='shop-message'; hint.style.margin='12px 0 8px';
