@@ -144,7 +144,11 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 
 /* --- Relic display --- */
 .relic-display-row{display:flex;gap:7px;flex-wrap:wrap;align-items:center;width:100%;padding:4px 0;}
-.relic-card{background:var(--panel);border:2px solid #3a2c6a;border-radius:9px;padding:6px 10px;min-width:75px;text-align:center;cursor:pointer;transition:transform .15s,border-color .15s;}
+.relic-card{position:relative;background:var(--panel);border:2px solid #3a2c6a;border-radius:9px;padding:6px 10px;min-width:75px;text-align:center;cursor:pointer;transition:transform .15s,border-color .15s;}
+/* #3 点数計算に関わった時だけ、レリック/パッシブの上に数値を吹き出しで表示する */
+.scoring-value-bubble{ position:absolute; left:50%; top:-26px; transform:translateX(-50%); background:var(--gold); color:#3a2c00; font-weight:900; font-size:11px; padding:2px 7px; border-radius:8px; white-space:nowrap; z-index:5; animation:scoringBubblePop .3s ease; }
+.scoring-value-bubble::after{ content:''; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%); border:5px solid transparent; border-top-color:var(--gold); }
+@keyframes scoringBubblePop{ 0%{ transform:translateX(-50%) scale(.4); opacity:0; } 100%{ transform:translateX(-50%) scale(1); opacity:1; } }
 .relic-card:hover{transform:translateY(-3px);border-color:#6a4ad4;}
 .relic-card.active{border-color:var(--gold);background:#1e1830;}
 .relic-card.bounce{animation:relicBounce .5s ease-in-out;}
@@ -605,7 +609,9 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 
 /* #A 記号パッシブ：常時表示バー＆詳細パネル */
 .passive-bar{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0;}
-.passive-icon{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 8px;border-radius:8px;background:rgba(0,0,0,.3);cursor:pointer;opacity:.5;min-width:36px;}
+.passive-icon{position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 8px;border-radius:8px;background:rgba(0,0,0,.3);cursor:pointer;opacity:.5;min-width:36px;}
+/* #3 パッシブも点数計算に関わった時にポップする */
+.passive-icon.bounce{animation:relicBounce .5s ease-in-out;}
 .passive-icon.active{opacity:1;box-shadow:0 0 6px rgba(251,191,36,.5);}
 .passive-icon .passive-sym{font-size:16px;font-weight:900;}
 .passive-icon .passive-tier{font-size:9px;color:var(--text-dim);}
@@ -771,6 +777,9 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .score-calc-box.scb-highlight{background:linear-gradient(135deg,#2a2440,#3a2f1a);border:1px solid var(--gold);}
 .score-calc-box.scb-highlight .scb-value{color:var(--gold);font-size:15px;}
 .score-calc-box.scb-highlight.negative .scb-value{color:#ff6b6b;}
+/* #2 点数計算の早送りボタン */
+.score-ff-btn{ display:block; margin:6px 0 4px auto; background:#1e1830; border:1px solid #6a4ad4; color:#cfc7ff; font-size:11px; padding:5px 10px; border-radius:8px; }
+.score-ff-btn.active{ opacity:.6; }
 /* #4 カード基礎点+補正基礎点、ビンゴ倍率+補正倍率のブロック融合演出（掛け算に見えないよう、2マス→1マスへ） */
 .score-calc-box.scb-merged{ background:linear-gradient(135deg,#241d3d,#3a2c6a); border:1px solid #8a6bd6; animation:scbMergePulse .6s ease; }
 .score-calc-box.scb-merged .scb-value{ color:#cbb8ff; }
