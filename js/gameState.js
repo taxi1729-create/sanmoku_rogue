@@ -16,11 +16,14 @@ const GameState = {
   gameMode:'normal', // #9 ゲームモード（normal=通常デッキ／tengame=テンゲーム）
   initialPassiveGranted:false, // #6 ゲーム開始時パッシブ選択（3択）を既に提示したかどうか
 
-  effectiveHandSize(){ return GameData.HAND_SIZE + this.handSizeBonus; },
+  // #8 シカクパッシブ1：手札上限+1
+  effectiveHandSize(){ return GameData.HAND_SIZE + this.handSizeBonus + (this.symbolPassiveTier.Square>=1?1:0); },
   effectiveMaxRounds(){ return GameData.MAX_ROUNDS + this.roundsBonus; },
   effectiveTurnsPerRound(){ return GameData.TURNS_PER_ROUND + this.turnsBonus; },
   effectiveMaxRelics(){ return GameData.MAX_RELICS + this.relicSlotBonus; },
   hasRelic(id){ return this.relics.some(r=>r.id===id); },
+  // #5 同一レリックを複数所持している場合、その所持数を返す（点数計算で所持数分の効果を反映するために使用）
+  relicCountOf(id){ return this.relics.filter(r=>r.id===id).length; },
   // #1(B) レリック所持数計算：ネガティブ=0枠、倍化=2枠、3倍化=3枠、通常=1枠
   slotsForRelic(relic){
     const ren=relic?.relicEnhance;

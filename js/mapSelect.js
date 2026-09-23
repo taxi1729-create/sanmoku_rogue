@@ -136,7 +136,16 @@ const MapSelectScene = {
           // 最高クリア記録更新
           if(GameState.currentFloor-1>GameState.maxClearedFloor){ GameState.maxClearedFloor=GameState.currentFloor-1; GameState.maxClearedStage='ボス'; }
           App.saveGame();
-          App.showMapSelect();
+          // #4 第10階層への移動時は、経由するレンダリングを1回挟まず直接最終ショップへ向かう
+          if(GameState.currentFloor>=10 && !GameState.finalShopDone){
+            GameState.finalShopDone=true;
+            GameState.gold+=10;
+            App.saveGame();
+            ShopScene.fixedFinalShop=true;
+            App.showShop();
+          }else{
+            App.showMapSelect();
+          }
         });
         const t=el.querySelector('#btn-back-title');
         if(t) t.addEventListener('click',()=>App.showTitle());

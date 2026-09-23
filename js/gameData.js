@@ -135,7 +135,7 @@ const GameData = {
         live(){ const n=GameState.bingoCountThisStage||0; return `このステージのビンゴ回数：${n}/3`; } },
     },
     Triangle: {
-      1: { name:'サンカク・レシオ', desc:'デッキ内のサンカクカード比率nを計算し、サンカクカードの基礎点に(1+n)を乗算する',
+      1: { name:'サンカク・レシオ', desc:'デッキ内のサンカクカード比率nを計算し、サンカクカードの基礎点に(1+n)を乗算する。また、ショップのリロールを解放する（未取得時はリロール不可）',
         live(){ const total=GameState.currentDeck.length||1; const n=GameState.currentDeck.filter(c=>c.symbol==='Triangle').length/total; return `サンカク比率n=${Math.round(n*100)/100} → サンカク基礎点×${Math.round((1+n)*100)/100}`; } },
       2: { name:'サンカク・レゾナンス', desc:'デッキ内のジャミング効果を持つカード1枚につき、最終補正倍率+0.1する',
         live(){ const n=GameState.currentDeck.filter(c=>c.jamming).length; return `ジャミング所持カード:${n}枚 → 最終補正倍率+${Math.round(n*0.1*100)/100}`; } },
@@ -143,7 +143,7 @@ const GameData = {
         live(){ return 'ジャミングカード使用の1ターン後に同じ効果を再付与'; } },
     },
     Square: {
-      1: { name:'シカク・ドロー', desc:'シカクカードをプレイした時、そのカード自身の基礎点+1を永続付与し、カードを1枚ドローする（ドローしたカードの基礎点にも+1）',
+      1: { name:'シカク・ドロー', desc:'シカクカードをプレイした時、そのカード自身の基礎点+1を永続付与し、カードを1枚ドローする（ドローしたカードの基礎点にも+1）。また、手札上限+1',
         live(){ return 'シカクカードプレイ時：自身の基礎点+1（永続）、ドロー+1枚（そのカードにも基礎点+1）'; } },
       2: { name:'シカク・アンプ', desc:'シカクカードの強化効果を強化する（シカクカードのみ有効）。数値強化・シカクマルチ・ハブ・連鎖・巨大化・肥大化・ブルジョワ・ドローは効果2倍、横拡張・縦拡張は4マスに、拡大は4×4マスに拡張される',
         live(){ return '対象の強化効果が強化される（数値・枚数2倍／拡張は4マス／拡大は4×4マス）'; } },
@@ -151,7 +151,7 @@ const GameData = {
         live(){ const n=GameState.currentDeck.filter(c=>c.symbol==='Square').length; return `対象のシカクカード：${n}枚（デッキ確認画面でタップして交換）`; } },
     },
     Cross: {
-      1: { name:'バツ・ミラー', desc:'一番高いビンゴ倍率を常にバツ倍率に反映し続ける',
+      1: { name:'バツ・ミラー', desc:'一番高いビンゴ倍率を常にバツ倍率に反映し続ける。また、ショップにバツカードが出現するようになる（未取得時は出現しない）',
         live(){ const max=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s])); return `現在の最大倍率:${Math.round(max*100)/100} → バツ倍率に反映`; } },
       2: { name:'バツ・スケール', desc:'バツの基礎点が常にデッキ枚数×3に変化する',
         live(){ const n=GameState.currentDeck.length; return `デッキ枚数:${n}枚 → バツ基礎点=${n*3}`; } },
@@ -312,9 +312,13 @@ const GameData = {
   },
 
   generateShopCard(){
-    // #4 出現確率：マル・サンカク・シカクは各30%、バツは10%
+    // #7 バツパッシブ1を取得するまでショップにバツカードは出現しない
+    const crossUnlocked = typeof GameState!=='undefined' && GameState.symbolPassiveTier?.Cross>=1;
+    // #4 出現確率：マル・サンカク・シカクは各30%、バツは10%（バツ未解放時はマル・サンカク・シカクの3等分＝各33.3%）
     const r=Math.random();
-    const symbol = r<0.3?'Circle':(r<0.6?'Triangle':(r<0.9?'Square':'Cross'));
+    let symbol;
+    if(!crossUnlocked) symbol = r<0.334?'Circle':(r<0.667?'Triangle':'Square');
+    else symbol = r<0.3?'Circle':(r<0.6?'Triangle':(r<0.9?'Square':'Cross'));
     const crossBoss5000 = symbol==='Cross' && typeof GameMainScene!=='undefined' && GameMainScene.hasBossEffect && GameMainScene.hasBossEffect('cross5000');
     const baseScore = crossBoss5000 ? 5000 : GlobalFunctions.randInt(1, 50);
     let jamming = Math.random() < 0.5 ? GlobalFunctions.randChoice(Object.keys(this.JAMMING_DESC)) : null;
