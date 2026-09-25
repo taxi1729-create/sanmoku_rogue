@@ -29,7 +29,8 @@ const ShopScene = {
     const fixedCardPack = [{ type:'card_pack', mystery:true }];
     const fixedUpgrade = [{ type:'pickup_upgrade' }];
     const randomSlots = [];
-    for(let i = 0; i < 8; i++) randomSlots.push({ type: GameData.pickWeightedType() });
+    // #3 ランダム商品の枠を8→4枠に変更
+    for(let i = 0; i < 4; i++) randomSlots.push({ type: GameData.pickWeightedType() });
     // #6 爆発通常アップグレード：通常の重み付き抽選とは別に、ショップ生成のたび20%の確率で1枠を確保して出現させる
     if(Math.random() < 0.2){
       const idx = Math.floor(Math.random()*randomSlots.length);
@@ -90,7 +91,8 @@ const ShopScene = {
 
   relicPrice(relic){ return GameState.shopPriceOf(GameData.SHOP_PRICES.relic + (relic.relicEnhance ? 3 : 0)); },
 
-  calcCashGain(card){ return 1 + (card.enhance ? 2 : 0) + (card.jamming ? 1 : 0) + ((card.trait&&card.trait!=='塗りつぶし(レリック)') ? 3 : 0); },
+  // #11 基礎点が50を超える場合+2、性質変化：ディスカードを所持している場合+5
+  calcCashGain(card){ return 1 + (card.enhance ? 2 : 0) + (card.jamming ? 1 : 0) + ((card.trait&&card.trait!=='塗りつぶし(レリック)') ? 3 : 0) + (card.baseScore>50 ? 2 : 0) + (card.trait==='ディスカード' ? 5 : 0); },
 
   // --- 共通カード表示ヘルパー（手札/盤面/ショップ共通） ---
 
@@ -204,7 +206,7 @@ const ShopScene = {
 
     // #3 バツパッシブ2・サンカクパッシブ1など、パッシブでカード基礎点が変化する場合は青字で実効値を表示する
     let displayScore=baseForDisplay, scoreIsPassive=(boardBaseScore!=null&&boardBaseScore!==card.baseScore);
-    if(card.symbol==='Cross'&&GameState.symbolPassiveTier.Cross>=2){ displayScore=GameState.currentDeck.length*3; scoreIsPassive=true; }
+    if(card.symbol==='Cross'&&GameState.symbolPassiveTier.Cross>=1){ displayScore=GameState.currentDeck.length*3; scoreIsPassive=true; }
     else if(card.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=1){
       const total=GameState.currentDeck.length||1;
       const n=GameState.currentDeck.filter(cc=>cc.symbol==='Triangle').length/total;
@@ -394,7 +396,7 @@ const ShopScene = {
     const bump = (sym, amt) => { GameData.BINGO_MULTIPLIER_BASE[sym] += amt; };
     switch(effectId){
       case 'circle_mult':    bump('Circle', 4);    this.message = '○ビンゴ倍率+4'; return [];
-      case 'cross_mult':     bump('Cross', 5);     this.message = '×ビンゴ倍率+5'; return [];
+      case 'cross_mult':     bump('Cross', 7);     this.message = '×ビンゴ倍率+7'; return [];
       case 'square_mult':    bump('Square', 4);    this.message = '□ビンゴ倍率+4'; return [];
       case 'triangle_mult':  bump('Triangle', 4);  this.message = '△ビンゴ倍率+4'; return [];
       case 'all_mult_up1':   GameData.SYMBOLS.forEach(s=>bump(s,1)); this.message = '全ビンゴ倍率+1'; return [];
@@ -505,7 +507,7 @@ const ShopScene = {
         { id:'circle_mult', name:'マルビンゴ+4', targetMin:0, targetMax:0, desc:'○のビンゴ倍率を+4する' },
         { id:'triangle_mult', name:'サンカクビンゴ+4', targetMin:0, targetMax:0, desc:'△のビンゴ倍率を+4する' },
         { id:'square_mult', name:'シカクビンゴ+4', targetMin:0, targetMax:0, desc:'□のビンゴ倍率を+4する' },
-        { id:'cross_mult', name:'バツビンゴ+5', targetMin:0, targetMax:0, desc:'×のビンゴ倍率を+5する' },
+        { id:'cross_mult', name:'バツビンゴ+7', targetMin:0, targetMax:0, desc:'×のビンゴ倍率を+7する' },
         { id:'all_mult_up1', name:'全ビンゴ+1', targetMin:0, targetMax:0, desc:'全記号のビンゴ倍率を+1する' },
       ];
       const pickedEffects = GlobalFunctions.shuffle(effects).slice(0, 3);

@@ -30,6 +30,9 @@ const GameState = {
     if(ren==='ren_negative') return 0;
     if(ren==='ren_triple') return 3;
     if(ren==='ren_double') return 2;
+    // #12 新規レリックの所持枠数（レリック強化効果を持つ場合は上のren判定が優先される）
+    if(relic?.id==='hobby_collect') return 3;
+    if(relic?.id==='pinnacle') return this.effectiveMaxRelics();
     return 1;
   },
   relicCount(){

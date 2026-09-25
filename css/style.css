@@ -117,6 +117,7 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .info-panel .info-title{font-weight:900;font-size:14px;}
 .info-desc{color:var(--text-dim);line-height:1.5;}
 .relic-info-panel{border:1px solid #6a4ad4;}
+.relic-live-value{color:var(--gold);font-weight:900;}
 .relic-enhance-desc{color:var(--gold)!important;}
 .sell-relic-btn{margin-top:8px;background:#3d1a1a;color:var(--cross);font-size:12px;padding:7px 12px;border-radius:8px;}
 .relic-reorder-row{display:flex;gap:8px;margin-top:8px;}

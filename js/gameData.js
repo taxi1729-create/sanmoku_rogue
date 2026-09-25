@@ -118,12 +118,18 @@ const GameData = {
   SYMBOL_PASSIVE_NAMES: { Circle:'マルパッシブ', Triangle:'サンカクパッシブ', Square:'シカクパッシブ', Cross:'バツパッシブ', Hoshi:'ホシパッシブ', Check:'チェックパッシブ', Seven:'セブンパッシブ' },
   SYMBOL_PASSIVES: {
     Circle: {
-      1: { name:'マル・ネガティブセット', desc:'ゲーム開始時、ランダムなマルカード3×n枚（n=マルビンゴ倍率/10、小数点切り捨て）に性質変化：ネガティブ(パッシブ)を付与する。既に性質変化があるカードには上書きしない（ただしペイントの塗りつぶしには上書きする）。ゲーム終了時にネガティブ(パッシブ)は取り除かれる。ショップ内での性質変化カードの出現確率が2倍になる',
-        live(){ const n=Math.floor((GameData.BINGO_MULTIPLIER_BASE.Circle||0)/10); return `対象枚数：3×${n}＝${3*n}枚（マル倍率${Math.round((GameData.BINGO_MULTIPLIER_BASE.Circle||0)*100)/100}より算出）`; } },
+      1: { name:'マル・ネガティブセット', desc:'ゲーム開始時、ランダムなマルカード1×n枚（n=マルビンゴ倍率/10、小数点切り捨て）に性質変化：ネガティブ(パッシブ)を付与する。既に性質変化があるカードには上書きしない（ただしペイントの塗りつぶしには上書きする）。ゲーム終了時にネガティブ(パッシブ)は取り除かれる。ショップ内での性質変化カードの出現確率が2倍になる',
+        live(){ const n=Math.floor((GameData.BINGO_MULTIPLIER_BASE.Circle||0)/10); return `対象枚数：1×${n}＝${n}枚（マル倍率${Math.round((GameData.BINGO_MULTIPLIER_BASE.Circle||0)*100)/100}より算出）`; } },
       2: { name:'マル・オンプレイ', desc:'マルカードをプレイした時、盤面にあるマルカードの数×マルビンゴ倍率×10点を現在の点数に加算する',
         live(){ const n=(typeof GameMainScene!=='undefined'&&GameMainScene.board)?GameMainScene.board.filter(c=>c&&c.symbol==='Circle').length:GameState.currentDeck.filter(c=>c.symbol==='Circle').length; const mult=GameData.BINGO_MULTIPLIER_BASE.Circle; return `現在の盤面のマル枚数:${n} × マル倍率(${Math.round(mult*100)/100}) × 10 = +${Math.round(n*mult*10)}点`; } },
-      3: { name:'マル・エスカレート', desc:'ステージクリア時、マルのビンゴ倍率を1.2倍(小数点切り上げ)する',
-        live(){ return `現在のマル倍率:${Math.round(GameData.BINGO_MULTIPLIER_BASE.Circle*100)/100} → クリア時 ${Math.ceil(GameData.BINGO_MULTIPLIER_BASE.Circle*1.2)}`; } },
+      3: { name:'マル・エスカレート', desc:'ステージクリア時、マル以外の3つのビンゴ倍率（バツはバツパッシブ適用後の実効値）を合算してマル倍率に加算する（合計が負の場合は加算しない）',
+        live(){
+          let crossEff=GameData.BINGO_MULTIPLIER_BASE.Cross;
+          if(GameState.symbolPassiveTier.Cross>=2) crossEff=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s]));
+          if(GameState.symbolPassiveTier.Cross>=3) crossEff*=4;
+          const sum=GameData.BINGO_MULTIPLIER_BASE.Triangle+GameData.BINGO_MULTIPLIER_BASE.Square+crossEff;
+          return `サンカク+シカク+バツ(実効)＝${Math.round(sum*100)/100} → クリア時マル倍率+${sum>0?Math.round(sum):0}`;
+        } },
     },
     // #8 チェックパッシブ（旧マルパッシブ1の効果を継承）
     Check: {
@@ -137,8 +143,8 @@ const GameData = {
     Triangle: {
       1: { name:'サンカク・レシオ', desc:'デッキ内のサンカクカード比率nを計算し、サンカクカードの基礎点に(1+n)を乗算する。また、ショップのリロールを解放する（未取得時はリロール不可）',
         live(){ const total=GameState.currentDeck.length||1; const n=GameState.currentDeck.filter(c=>c.symbol==='Triangle').length/total; return `サンカク比率n=${Math.round(n*100)/100} → サンカク基礎点×${Math.round((1+n)*100)/100}`; } },
-      2: { name:'サンカク・レゾナンス', desc:'デッキ内のジャミング効果を持つカード1枚につき、最終補正倍率+0.1する',
-        live(){ const n=GameState.currentDeck.filter(c=>c.jamming).length; return `ジャミング所持カード:${n}枚 → 最終補正倍率+${Math.round(n*0.1*100)/100}`; } },
+      2: { name:'サンカク・レゾナンス', desc:'デッキ内のサンカクカードでジャミング効果を持つもの1枚につき、最終補正倍率+0.1する',
+        live(){ const n=GameState.currentDeck.filter(c=>c.jamming&&c.symbol==='Triangle').length; return `サンカクのジャミング所持カード:${n}枚 → 最終補正倍率+${Math.round(n*0.1*100)/100}`; } },
       3: { name:'サンカク・エコー', desc:'サンカクカードのジャミング効果を使用した次のターンに、もう一度同じ効果をNPCに付与する',
         live(){ return 'ジャミングカード使用の1ターン後に同じ効果を再付与'; } },
     },
@@ -151,10 +157,10 @@ const GameData = {
         live(){ const n=GameState.currentDeck.filter(c=>c.symbol==='Square').length; return `対象のシカクカード：${n}枚（デッキ確認画面でタップして交換）`; } },
     },
     Cross: {
-      1: { name:'バツ・ミラー', desc:'一番高いビンゴ倍率を常にバツ倍率に反映し続ける。また、ショップにバツカードが出現するようになる（未取得時は出現しない）',
-        live(){ const max=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s])); return `現在の最大倍率:${Math.round(max*100)/100} → バツ倍率に反映`; } },
-      2: { name:'バツ・スケール', desc:'バツの基礎点が常にデッキ枚数×3に変化する',
+      1: { name:'バツ・スケール', desc:'バツの基礎点が常にデッキ枚数×3に変化する。また、ショップにバツカードが出現するようになる（未取得時は出現しない）',
         live(){ const n=GameState.currentDeck.length; return `デッキ枚数:${n}枚 → バツ基礎点=${n*3}`; } },
+      2: { name:'バツ・ミラー', desc:'一番高いビンゴ倍率を常にバツ倍率に反映し続ける',
+        live(){ const max=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s])); return `現在の最大倍率:${Math.round(max*100)/100} → バツ倍率に反映`; } },
       3: { name:'バツ・クアドラプル', desc:'点数計算時、現在のバツビンゴ倍率をさらに4倍して補正する',
         live(){ const max=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s])); return `バツ倍率(${Math.round(max*100)/100}) × 4 = ${Math.round(max*4*100)/100}`; } },
     },
@@ -203,6 +209,48 @@ const GameData = {
     { id:'ren_grade', name:'グレードオール', desc:'ビンゴ時補正倍率+n（n=デッキの強化/ジャミング/性質変化の総数）' },
   ],
 
+  // #8 レリックをタップした時に、現在の効果量を具体的な数値で表示する（例：リロール強化→補正基礎点:50）
+  getRelicLiveInfo(relic){
+    if(typeof GameState==='undefined') return null;
+    const gm=(typeof GameMainScene!=='undefined')?GameMainScene:null;
+    switch(relic.id){
+      case 'reroll_boost': return `補正基礎点:${GameState.rerollCount*10}`;
+      case 'bingo': return '補正基礎点:+30';
+      case 'charge': return (gm&&gm.chargeActive)?'補正基礎点:+100（発動中）':'補正基礎点:+100（未発動）';
+      case 'odd_boost': return '補正基礎点:+15（奇数加算時）';
+      case 'even_boost': return '補正基礎点:+15（偶数加算時）';
+      case 'circle_boost': return '補正基礎点:+60（マルビンゴ時）';
+      case 'triangle_boost': return '補正基礎点:+60（サンカクビンゴ時）';
+      case 'square_boost': return '補正基礎点:+60（シカクビンゴ時）';
+      case 'relic_boost': { const n=GameState.relicCount(); return `補正基礎点:+${5+8*n}`; }
+      case 'empty_boost': { const ec=(gm&&gm.board)?gm.board.filter(c=>!c).length:0; return `補正倍率:+${6*ec+5}`; }
+      case 'combo': return '補正倍率:+1.5（直前と異なる記号でビンゴ時）';
+      case 'turn_boost': { const t=gm?(gm.turnInRound||1):1; return `最終乗算補正:×${Math.round(Math.pow(1.01,t)*100)/100}`; }
+      case 'hand_boost': return `補正倍率:+${GameState.hand.length*3}`;
+      case 'last_stand': return GameState.round>=4?'最終乗算補正:×2（発動中）':'最終乗算補正:×2（4ラウンド以降で発動）';
+      case 'double': return '最終乗算補正:×1.5（同ターン2ビンゴ以上で発動）';
+      case 'gold_boost': return 'クリア報酬:G+3';
+      case 'round_boost': return `最終加算補正:+${1000*GameState.round}（ラウンド終了時）`;
+      case 'base_boost': return '最終加算補正:+2000（取得時に反映済み）';
+      case 'jamming_boost': return `点数:+${Math.round(GameState.targetScore*0.05)}（ビンゴ阻害カード配置時）`;
+    }
+    switch(relic.relicEnhance){
+      case 'ren_circle': return `補正基礎点:+${GameState.currentDeck.filter(c=>c.symbol==='Circle').length}`;
+      case 'ren_triangle': return `補正基礎点:+${GameState.currentDeck.filter(c=>c.symbol==='Triangle').length}`;
+      case 'ren_square': return `補正基礎点:+${GameState.currentDeck.filter(c=>c.symbol==='Square').length}`;
+      case 'ren_disc_pile': return `補正基礎点:+${GameState.discardPile.length}`;
+      case 'ren_grade': { const n=GameState.currentDeck.reduce((s,c)=>{let x=0;if(c.enhance)x++;if(c.jamming)x++;if(c.trait)x++;return s+x;},0); return `補正倍率:+${n}`; }
+      case 'ren_only_one': return GameState.relicCount()===1?'補正倍率:+20（発動中）':'補正倍率:+20（レリック1個所持時のみ）';
+      case 'ren_general': return '最終乗算補正:×1.1';
+      case 'ren_double': return '最終乗算補正:×1.5';
+      case 'ren_triple': return '最終乗算補正:×2';
+      case 'ren_draw_pile': return `最終加算補正:+${GameState.drawPile.length*100}`;
+      case 'ren_discard': return '最終乗算補正:×1.5';
+      case 'ren_gold': return 'クリア報酬:G+1';
+    }
+    return null;
+  },
+
   RELIC_IMG: {
     'bingo':'image/relic/r000.png',
     'charge':'image/relic/r001.png',
@@ -248,6 +296,16 @@ const GameData = {
     { id:'reroll_boost', name:'リロール強化',     desc:'ビンゴ時、残りリロール回数n×10を補正基礎点に加算' },
     { id:'hand_boost', name:'手札強化',         desc:'ビンゴ時、手札の数×3を補正倍率に加算' },
     { id:'gold_boost', name:'G獲得',            desc:'ステージクリア時、追加でG+3を得る' },
+    // #12 新規レリック9種
+    { id:'all_bingo_gain', name:'オールビンゴ獲得', desc:'ステージクリア時、マル・サンカク・シカク・バツすべてのビンゴ倍率+2する' },
+    { id:'num_boost3', name:'数値強化3取得',     desc:'ステージクリア時、デッキ内のランダムなカード1枚の基礎点+15する' },
+    { id:'hobby_collect', name:'趣味レリック集め', desc:'このレリックはレリック所持3個分になる。ステージクリア時、レリックパックを獲得する' },
+    { id:'passive_unneeded', name:'パッシブ不要理論', desc:'最終乗算補正にmを加算する。m=(4.5-n)（nは所持している記号パッシブの種類数）。mが0未満の場合は加算しない' },
+    { id:'ten_stage', name:'テンステージ',       desc:'ビンゴ時、加算される基礎点が10の倍数のカード1枚につき補正基礎点+30' },
+    { id:'joker', name:'ジョーカー',            desc:'このレリックを売却した時、デッキからランダムなカードを1枚選び、基礎点+10した上で記号をマル・サンカク・シカク・バツのいずれかランダムに変更する' },
+    { id:'gambling_addict', name:'ギャンブル依存症', desc:'カード強化効果「ギャンブル」の効果量が、常に+50か-50のどちらかのみになる' },
+    { id:'big_explosion', name:'大爆発',         desc:'ステージクリア時、所持G が10G以上（レリック強化「ブラックカード」所持時は5G以上）ならその分を消費し、爆発通常アップグレードをもう1パック追加で獲得する' },
+    { id:'pinnacle', name:'極みの境地',          desc:'このレリックはレリック所持数上限分の大きさを持つ（実質1個しか所持できない）。補正基礎点+150、補正倍率+150' },
   ],
 
   BOSS_EFFECT_POOL: [
@@ -341,7 +399,7 @@ const GameData = {
 
   NORMAL_SELECT_POOL: [
     { id:'circle_mult', name:'🟡マルビンゴ強化',    desc:'○のビンゴ倍率を+4する',              targetMin:0, targetMax:0 },
-    { id:'cross_mult', name:'🟡バツビンゴ強化',    desc:'×のビンゴ倍率を+5する',              targetMin:0, targetMax:0 },
+    { id:'cross_mult', name:'🟡バツビンゴ強化',    desc:'×のビンゴ倍率を+7する',              targetMin:0, targetMax:0 },
     { id:'square_mult', name:'🟡シカクビンゴ強化',  desc:'□のビンゴ倍率を+4する',              targetMin:0, targetMax:0 },
     { id:'triangle_mult', name:'🟡サンカクビンゴ強化',desc:'△のビンゴ倍率を+4する',              targetMin:0, targetMax:0 },
     { id:'number_up2', name:'🟡数値上昇',          desc:'カードを2枚選択し、それぞれ基礎点+5', targetMin:2, targetMax:2 },

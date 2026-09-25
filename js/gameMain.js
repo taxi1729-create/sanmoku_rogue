@@ -41,12 +41,12 @@ const GameMainScene = {
     this.applyRelicInitEffects();
     this.stageBonusRounds=0;
     this.pendingDelayedJamming=[];
-    // #8 マルパッシブ1：ゲーム開始時、ランダムなマルカード3×n枚（n=マルビンゴ倍率/10 切り捨て）にネガティブ(パッシブ)を付与する
+    // #4 マルパッシブ1：ゲーム開始時、ランダムなマルカード1×n枚（n=マルビンゴ倍率/10 切り捨て）にネガティブ(パッシブ)を付与する
     //    （既存の性質変化は上書きしない。ただしペイントの塗りつぶしは上書きする）。Lv1/Lv2入れ替えによりLv1条件に変更
     this._circleNegCards=null;
     if(GameState.symbolPassiveTier.Circle>=1){
       const n=Math.floor((GameData.BINGO_MULTIPLIER_BASE.Circle||0)/10);
-      const count=3*n;
+      const count=1*n;
       const candidates=GameState.currentDeck.filter(c=>c.symbol==='Circle'&&(!c.trait||c.trait==='塗りつぶし(レリック)'||c.trait==='塗りつぶし'));
       const targets=GlobalFunctions.shuffle(candidates.slice()).slice(0,count);
       targets.forEach(c=>{ c.trait='ネガティブ(パッシブ)'; });
@@ -60,11 +60,10 @@ const GameMainScene = {
       this.addLog(`ホシパッシブ3：目標点数の30%（+${bonus}点）を開始時に加算`);
     }
     GameState.bingoCountThisStage=0;
-    // #6 ゲーム開始時：ボスステージクリア時と同様に、記号パッシブを3択（条件次第で4択）からランダムに1つ受け取れるようにする
+    // #1 ゲーム開始時のパッシブ選択は廃止し、代わりに？カードパックを1パック無料で獲得できるようにする
     if(!GameState.initialPassiveGranted){
       GameState.initialPassiveGranted=true;
-      const picks=this.generatePassiveChoicePicks();
-      if(picks){ this.pendingPassiveChoice=picks; this.passiveModalOpen=true; this.passiveChoiceContext='start'; }
+      this.pendingInitialCardPack=[GameData.generateShopCard(),GameData.generateShopCard()];
     }
     this.startRound();
     TutorialOverlay.show('gameMain'); // #1 初回のみゲームメイン画面のチュートリアルを表示
@@ -296,6 +295,32 @@ const GameMainScene = {
     return picks.map(s=>({symbol:s,nextTier:(GameState.symbolPassiveTier[s]||0)+1}));
   },
 
+  // #1 ゲーム開始時の無料？カードパック（2枚から1枚選択）
+  renderInitialCardPackModal(){
+    if(!this.pendingInitialCardPack) return null;
+    const overlay=document.createElement('div'); overlay.className='pack-modal-overlay';
+    const modal=document.createElement('div'); modal.className='pack-modal';
+    modal.innerHTML='<h3>🎴？カードパック（無料）</h3><div class="slot-desc" style="margin-bottom:10px;">2枚から1枚選んで獲得しましょう</div>';
+    const grid=document.createElement('div'); grid.className='pack-card-grid';
+    this.pendingInitialCardPack.forEach(card=>{
+      const wrap=document.createElement('div'); wrap.className='card-pick-wrap';
+      const el=document.createElement('div'); el.className='card'+(card.trait?' trait-'+card.trait.replace(/[()]/g,''):'');
+      el.innerHTML=`${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card,GameState.gold)}`;
+      el.addEventListener('click',()=>this.pickInitialCardPack(card));
+      wrap.appendChild(el); grid.appendChild(wrap);
+    });
+    modal.appendChild(grid);
+    overlay.appendChild(modal);
+    return overlay;
+  },
+  pickInitialCardPack(card){
+    GameState.currentDeck.push(card);
+    GlobalFunctions.recordCard(card);
+    this.addLog(`？カードパック：${GameData.SYMBOL_LABEL[card.symbol]}（基礎点${card.baseScore}）を獲得`);
+    this.pendingInitialCardPack=null;
+    this.renderAll();
+  },
+
   finishStage(result){
     // #3 ゲームスコア最高得点を記録
     GlobalFunctions.saveHighScoreIfBetter(GameState.currentScore);
@@ -318,11 +343,57 @@ const GameMainScene = {
     this.stageBonusRounds=0;
     if(result==='win'){
       if(this.stage&&!GameState.clearedStages.includes(this.stage.key)) GameState.clearedStages.push(this.stage.key);
-      // #1 マルパッシブ3：ステージクリア時マルのビンゴ倍率を1.2倍(切り上げ)（1.5倍から変更）
+      // #5 マルパッシブ3：ステージクリア時、マル以外の3つのビンゴ倍率（バツはバツパッシブ適用後の実効値）を合算して加算する（合計が負の場合は加算しない）
       if(GameState.symbolPassiveTier.Circle>=3){
         const before=GameData.BINGO_MULTIPLIER_BASE.Circle;
-        GameData.BINGO_MULTIPLIER_BASE.Circle=Math.ceil(before*1.2);
-        this.addLog(`マルパッシブ：マル倍率 ${Math.round(before*100)/100}→${GameData.BINGO_MULTIPLIER_BASE.Circle}`);
+        let crossEff=GameData.BINGO_MULTIPLIER_BASE.Cross;
+        if(GameState.symbolPassiveTier.Cross>=2) crossEff=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s]));
+        if(GameState.symbolPassiveTier.Cross>=3) crossEff*=4;
+        const sum=GameData.BINGO_MULTIPLIER_BASE.Triangle+GameData.BINGO_MULTIPLIER_BASE.Square+crossEff;
+        if(sum>0){
+          GameData.BINGO_MULTIPLIER_BASE.Circle=before+Math.round(sum);
+          this.addLog(`マルパッシブ：マル倍率 ${Math.round(before*100)/100}→${GameData.BINGO_MULTIPLIER_BASE.Circle}（サンカク+シカク+バツ実効値の合計+${Math.round(sum)}）`);
+        }
+      }
+      // #12 レリック「オールビンゴ獲得」：ステージクリア時、全記号のビンゴ倍率+2
+      const cAllBingo=GameState.relicCountOf('all_bingo_gain');
+      if(cAllBingo>0){
+        GameData.SYMBOLS.forEach(s=>{GameData.BINGO_MULTIPLIER_BASE[s]+=2*cAllBingo;});
+        this.addLog(`オールビンゴ獲得：全記号のビンゴ倍率+${2*cAllBingo}`);
+      }
+      // #12 レリック「数値強化3取得」：ステージクリア時、デッキ内のランダムなカード1枚の基礎点+15
+      const cNumBoost=GameState.relicCountOf('num_boost3');
+      if(cNumBoost>0 && GameState.currentDeck.length>0){
+        for(let i=0;i<cNumBoost;i++){ const card=GlobalFunctions.randChoice(GameState.currentDeck); card.baseScore+=15; }
+        this.addLog(`数値強化3取得：ランダムなカード${cNumBoost}枚の基礎点+15`);
+      }
+      // #12 レリック「趣味レリック集め」：ステージクリア時、レリックを1つ獲得（レリックパック相当）
+      const cHobby=GameState.relicCountOf('hobby_collect');
+      if(cHobby>0){
+        for(let i=0;i<cHobby;i++){
+          const relic=ShopScene.pickRelic();
+          if(relic && GameState.canAddRelic(relic)){
+            GameState.relics.push(relic);
+            ShopScene.applyRelicGrantEffect(relic);
+            GlobalFunctions.recordRelic(relic.id);
+            this.addLog(`趣味レリック集め：レリック「${relic.name}」を獲得`);
+          }
+        }
+      }
+      // #12 レリック「大爆発」：所持Gが閾値以上ならその分を消費し、爆発通常アップグレードをもう1パック獲得（ショップに向かう場合のみ）
+      if(GameState.currentFloor<10){
+        const cBigExplosion=GameState.relicCountOf('big_explosion');
+        if(cBigExplosion>0){
+          const hasBlack=GameState.relics.some(r=>r.relicEnhance==='ren_black');
+          const threshold=hasBlack?5:10;
+          for(let i=0;i<cBigExplosion;i++){
+            if(GameState.gold>=threshold && GameState.currentDeck.length>0){
+              GameState.gold-=threshold;
+              ShopScene.pickingPack=ShopScene.buildExplosiveUpgradePack(null);
+              this.addLog(`大爆発：${threshold}G消費して爆発通常アップグレードを追加取得`);
+            }
+          }
+        }
       }
       // #12 最高クリア記録更新
       const stageOrder=['common','high','boss'];
@@ -331,10 +402,11 @@ const GameMainScene = {
       const prevScore=(GameState.maxClearedFloor||0)*3+(stageOrder.indexOf(GameState.maxClearedStage||''));
       if(floorScore>prevScore){
         GameState.maxClearedFloor=GameState.currentFloor; GameState.maxClearedStage=this.stage.name;
-        // #6 自身の最高到達時のデッキ・レリックを保存し、タイトルで確認できるようにする
+        // #6/#10 自身の最高到達時のデッキ・レリック・パッシブ・所持金・最終スコアを保存し、タイトルで確認できるようにする
         GlobalFunctions.saveBestRunIfBetter(floorScore,{
           floor:GameState.currentFloor, stageName:this.stage.name,
           deck:GameState.currentDeck, relics:GameState.relics, savedAt:Date.now(),
+          passives:{...GameState.symbolPassiveTier}, gold:GameState.gold, score:GameState.currentScore,
         });
       }
       // #4 階層10（最終決戦）クリア時はショップにも戻らないため、報酬・パッシブ選択はどちらも不要
@@ -410,9 +482,11 @@ const GameMainScene = {
     }
     GameState.hand.push(card);
     // #4 ギャンブル：手札に来るたび-50〜+50のランダムな値を基礎点に加算（前回分はリセットしてから再抽選）
+    // #12 レリック「ギャンブル依存症」：効果量が常に+50か-50のどちらかのみになる
     if(card.enhance==='ギャンブル'){
       if(card._gambleDelta) card.baseScore-=card._gambleDelta;
-      const delta=Math.round(Math.random()*100-50);
+      const addicted=GameState.hasRelic('gambling_addict');
+      const delta=addicted?(Math.random()<0.5?50:-50):Math.round(Math.random()*100-50);
       card.baseScore+=delta;
       card._gambleDelta=delta;
     }
@@ -612,7 +686,7 @@ const GameMainScene = {
       const perCellScore=(c,ci)=>{
         let v=c.baseScore;
         if(c.card?._passiveScoreAdd) v+=c.card._passiveScoreAdd;
-        if(c.symbol==='Cross'&&GameState.symbolPassiveTier.Cross>=2) v=GameState.currentDeck.length*3;
+        if(c.symbol==='Cross'&&GameState.symbolPassiveTier.Cross>=1) v=GameState.currentDeck.length*3;
         if(c.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=1){
           const total=GameState.currentDeck.length||1;
           const n=GameState.currentDeck.filter(cc=>cc.symbol==='Triangle').length/total;
@@ -625,8 +699,8 @@ const GameMainScene = {
         return v;
       };
       const cardScores=win.cells.map((ci,i)=>perCellScore(r.cells[i],ci));
-      // #A バツパッシブ3：一番高いビンゴ倍率をバツ倍率に反映
-      if(r.sym==='Cross'&&GameState.symbolPassiveTier.Cross>=1){
+      // #6 バツパッシブ1/2入れ替えにより、ミラー効果はLv2条件に変更
+      if(r.sym==='Cross'&&GameState.symbolPassiveTier.Cross>=2){
         baseMult=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s]));
         pureBaseMult=baseMult;
       }
@@ -666,6 +740,12 @@ const GameMainScene = {
           if(ren==='ren_disc_pile'){const v=GameState.discardPile.length;relicBonus+=v;markBaseRelic(rel.id,v);}
           if(ren==='ren_discard'){markRelic(rel.id,0);}
         });
+        // #12 レリック「テンステージ」：加算される基礎点が10の倍数のカード1枚につき補正基礎点+30
+        const cTen=GameState.relicCountOf('ten_stage');
+        if(cTen>0){ const n10=cardScores.filter(sc=>sc%10===0).length; if(n10>0){const v=n10*30*cTen;relicBonus+=v;markBaseRelic('ten_stage',v);} }
+        // #12 レリック「極みの境地」：補正基礎点+150
+        const cPinnacle=GameState.relicCountOf('pinnacle');
+        if(cPinnacle>0){const v=150*cPinnacle;relicBonus+=v;markBaseRelic('pinnacle',v);}
       }
       const totalBase=cardScores.reduce((s,v)=>s+v,0)+correctionBase+relicBonus;
 
@@ -687,6 +767,9 @@ const GameMainScene = {
         if(cHand>0){const v=GameState.hand.length*3*cHand;finalMult+=v;correctionMultParts.push({label:'手札強化',op:'+',val:v,id:'hand_boost'});markRelic('hand_boost',v);} // #1 ビンゴ時、手札の数×3を補正倍率に加算
         const cLastStand=GameState.relicCountOf('last_stand');
         if(cLastStand>0&&GameState.round>=4){const f=Math.pow(2,cLastStand);finalMult*=f;correctionMultParts.push({label:'背水の陣',op:'×',val:f,id:'last_stand'});markRelic('last_stand',f);}
+        // #12 レリック「極みの境地」：補正倍率+150
+        const cPinnacle2=GameState.relicCountOf('pinnacle');
+        if(cPinnacle2>0){const v=150*cPinnacle2;finalMult+=v;correctionMultParts.push({label:'極みの境地',op:'+',val:v,id:'pinnacle'});markRelic('pinnacle',v);}
         GameState.relics.forEach(rel=>{
           if(rel.relicEnhance==='ren_general'){finalMult*=1.1;correctionMultParts.push({label:'将軍(レリック強化)',op:'×',val:1.1,id:rel.id});markRelic(rel.id,1.1);}
           if(rel.relicEnhance==='ren_only_one'&&GameState.relicCount()===1){finalMult+=20;correctionMultParts.push({label:'オンリーワン',op:'+',val:20,id:rel.id});markRelic(rel.id,20);}
@@ -718,10 +801,17 @@ const GameMainScene = {
         // #5 同じ強化（ren_double/ren_triple）を持つレリックが複数ある場合、それぞれ個別に効果を重ねる
         GameState.relics.filter(r=>r.relicEnhance==='ren_double').forEach(rel=>{finalMultiplier*=1.5;finalMultParts.push({label:'ダブル',op:'×',val:1.5,id:rel.id});markRelic(rel.id,1.5);});
         GameState.relics.filter(r=>r.relicEnhance==='ren_triple').forEach(rel=>{finalMultiplier*=2;finalMultParts.push({label:'トリプル',op:'×',val:2,id:rel.id});markRelic(rel.id,2);});
+        // #12 レリック「パッシブ不要理論」：最終乗算補正にm=max(0,4.5-n)を加算（n=所持している記号パッシブの種類数）
+        const cPassiveUnneeded=GameState.relicCountOf('passive_unneeded');
+        if(cPassiveUnneeded>0){
+          const n=Object.values(GameState.symbolPassiveTier).filter(t=>t>0).length;
+          const m=Math.max(0,4.5-n);
+          if(m>0){ const v=m*cPassiveUnneeded; finalMultiplier+=v; finalMultParts.push({label:'パッシブ不要理論',op:'+',val:v,id:'passive_unneeded'}); markRelic('passive_unneeded',v); }
+        }
       }
-      // #A サンカクパッシブ2：デッキ内ジャミング所持カード1枚につき最終補正倍率+0.1
+      // #7 サンカクパッシブ2：デッキ内のサンカクカードでジャミング所持のもの1枚につき最終補正倍率+0.1（対象をデッキ全体からサンカクカードに変更）
       if(GameState.symbolPassiveTier.Triangle>=2){
-        const n=GameState.currentDeck.filter(c=>c.jamming).length;
+        const n=GameState.currentDeck.filter(c=>c.jamming&&c.symbol==='Triangle').length;
         if(n>0){finalMultiplier+=n*0.1;finalMultParts.push({label:'サンカクパッシブ2',op:'+',val:n*0.1,sym:'Triangle'});markPassive('Triangle',n*0.1);}
       }
       // #新規 セブンパッシブ2：前回の節目で立てたフラグを消費し、今回のビンゴの最終乗算補正×7
@@ -1129,7 +1219,7 @@ const GameMainScene = {
           const sqP3=GameState.symbolPassiveTier.Square>=2;
           const perCellScore=(c)=>{
             let v=c.baseScore;
-            if(c.symbol==='Cross'&&GameState.symbolPassiveTier.Cross>=2) v=GameState.currentDeck.length*3;
+            if(c.symbol==='Cross'&&GameState.symbolPassiveTier.Cross>=1) v=GameState.currentDeck.length*3;
             if(c.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=1){
               const total=GameState.currentDeck.length||1;
               const n=GameState.currentDeck.filter(cc=>cc.symbol==='Triangle').length/total;
@@ -1140,7 +1230,7 @@ const GameMainScene = {
           };
           const cardScores=cells.map(c=>perCellScore(c));
           let baseMult=multObj[s];
-          if(s==='Cross'&&GameState.symbolPassiveTier.Cross>=1) baseMult=Math.max(...GameData.SYMBOLS.map(sy=>GameData.BINGO_MULTIPLIER_BASE[sy]));
+          if(s==='Cross'&&GameState.symbolPassiveTier.Cross>=2) baseMult=Math.max(...GameData.SYMBOLS.map(sy=>GameData.BINGO_MULTIPLIER_BASE[sy]));
           if(s==='Cross'&&GameState.symbolPassiveTier.Cross>=3) baseMult*=4;
           let correctionBase=GameData.CORRECTION_BASE_SCORE;
           let relicBonus=relicFlatBonus;
@@ -1212,7 +1302,7 @@ const GameMainScene = {
             GameState.relics.filter(r=>r.relicEnhance==='ren_double').forEach(()=>{finalMul*=1.5;});
             GameState.relics.filter(r=>r.relicEnhance==='ren_triple').forEach(()=>{finalMul*=2;});
           }
-          if(GameState.symbolPassiveTier.Triangle>=2) finalMul+=GameState.currentDeck.filter(c=>c.jamming).length*0.1;
+          if(GameState.symbolPassiveTier.Triangle>=2) finalMul+=GameState.currentDeck.filter(c=>c.jamming&&c.symbol==='Triangle').length*0.1;
           // #新規 セブンパッシブ2：フラグが立っていれば次のビンゴで最終乗算補正×7
           if(GameState.symbolPassiveTier.Seven>=2 && GameState.sevenPendingMultBoost) finalMul*=7;
           let finalAddTotal=GameData.FINAL_ADD;
@@ -1400,6 +1490,16 @@ const GameMainScene = {
     switch(relic.id){
       case 'round_boost': break; // #7
       case 'reroll_boost': break; // #7
+      // #12 レリック「ジョーカー」：売却時、デッキからランダムなカードを1枚選び基礎点+10・記号をランダムに変更する
+      case 'joker': {
+        if(GameState.currentDeck.length>0){
+          const card=GlobalFunctions.randChoice(GameState.currentDeck);
+          card.baseScore+=10;
+          card.symbol=GlobalFunctions.randChoice(['Circle','Triangle','Square','Cross']);
+          this.addLog(`ジョーカー：${GameData.SYMBOL_LABEL[card.symbol]}カード1枚の基礎点+10・記号変更`);
+        }
+        break;
+      }
       case 'hand_boost': break; // #1
       case 'paint': this.removePaintRelic(); GameState.turnsBonus+=8; break; // #10 ターン変動-8に修正
       case 'jamming_boost': GameState.handSizeBonus+=3; break; // #7 手札上限-3の解除
@@ -1469,6 +1569,8 @@ const GameMainScene = {
     // #1 報酬画面／パッシブ選択はゲームメイン画面の上にオーバーレイ表示する（両方同時に出ても良いよう独立したifにする）
     if(this.resultState) this.container.appendChild(this.renderResult());
     if(this.pendingPassiveChoice && this.passiveModalOpen) this.container.appendChild(this.renderPassiveChoiceModal());
+    // #1 ゲーム開始時の無料？カードパック
+    if(this.pendingInitialCardPack) this.container.appendChild(this.renderInitialCardPackModal());
     window.scrollTo(0,scrollY);
   },
 
@@ -1621,7 +1723,7 @@ const GameMainScene = {
 
     // #4 パッシブ効果でカード基礎点が変化する場合、青字で実効値を表示する
     let displayScore=baseForDisplay, scoreIsPassive=(boardBaseScore!=null&&boardBaseScore!==card.baseScore);
-    if(card.symbol==='Cross'&&GameState.symbolPassiveTier.Cross>=2){ displayScore=GameState.currentDeck.length*3; scoreIsPassive=true; }
+    if(card.symbol==='Cross'&&GameState.symbolPassiveTier.Cross>=1){ displayScore=GameState.currentDeck.length*3; scoreIsPassive=true; }
     else if(card.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=1){
       const total=GameState.currentDeck.length||1;
       const n=GameState.currentDeck.filter(cc=>cc.symbol==='Triangle').length/total;
@@ -1948,7 +2050,9 @@ const GameMainScene = {
     panel.addEventListener('click',(e)=>e.stopPropagation());
     const ren=GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance);
     let sellPrice=1; if(relic.relicEnhance==='ren_discard_sell') sellPrice=Math.floor(GameState.currentDeck.length/2); else if(ren) sellPrice+=2;
-    panel.innerHTML=`<div class="info-title">${relic.name}</div><div class="info-desc">${relic.desc}</div>${ren?`<div class="info-desc relic-enhance-desc">【${ren.name}】${ren.desc}</div>`:''}<div class="relic-reorder-row"><button class="relic-move-btn" ${idx<=0?'disabled':''}>◀ 左へ</button><button class="relic-move-btn" ${idx>=GameState.relics.length-1?'disabled':''}>右へ ▶</button></div><button class="sell-relic-btn">売却（${sellPrice}G）</button>`;
+    // #8 タップ時、レリックの現在の効果量を数値で表示する（レリック強化効果が優先）
+    const liveInfo=GameData.getRelicLiveInfo(relic);
+    panel.innerHTML=`<div class="info-title">${relic.name}</div><div class="info-desc">${relic.desc}</div>${ren?`<div class="info-desc relic-enhance-desc">【${ren.name}】${ren.desc}</div>`:''}${liveInfo?`<div class="info-desc relic-live-value">${liveInfo}</div>`:''}<div class="relic-reorder-row"><button class="relic-move-btn" ${idx<=0?'disabled':''}>◀ 左へ</button><button class="relic-move-btn" ${idx>=GameState.relics.length-1?'disabled':''}>右へ ▶</button></div><button class="sell-relic-btn">売却（${sellPrice}G）</button>`;
     const moveBtns=panel.querySelectorAll('.relic-move-btn');
     moveBtns[0].addEventListener('click',()=>{ if(GameState.moveRelic(idx,-1)){ this.activeRelicId=idx-1; this.renderAll(); } });
     moveBtns[1].addEventListener('click',()=>{ if(GameState.moveRelic(idx,1)){ this.activeRelicId=idx+1; this.renderAll(); } });

@@ -145,6 +145,12 @@ const App = {
     }else{
       const d=new Date(b.savedAt); const ds=d.toLocaleString('ja-JP');
       html+=`<div class="title-record">第${b.floor}階層 ${b.stageName} 到達時（${ds}）</div>`;
+      // #10 最高到達時の所持金・最終スコア・所持パッシブも掲載する
+      html+=`<div class="title-record">所持金：${b.gold!=null?b.gold+'G':'-'} ／ 最終スコア：${b.score!=null?GlobalFunctions.formatScore(b.score):'-'}</div>`;
+      if(b.passives){
+        const passiveEntries=Object.entries(b.passives).filter(([sym,tier])=>tier>0);
+        html+=`<div class="gallery-section"><h3>パッシブ</h3><div class="gallery-desc">${passiveEntries.length>0?passiveEntries.map(([sym,tier])=>`${GameData.SYMBOL_LABEL[sym]||sym}${GameData.SYMBOL_PASSIVE_NAMES[sym]||''}Lv${tier}`).join('　'):'なし'}</div></div>`;
+      }
       html+=`<div class="gallery-section"><h3>レリック（${(b.relics||[]).length}件）</h3><div class="gallery-list">`;
       (b.relics||[]).forEach(r=>{
         const ren=r.relicEnhance?GameData.RELIC_ENHANCE_POOL.find(x=>x.id===r.relicEnhance):null;
