@@ -220,6 +220,8 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .card-reveal-toast{ position:fixed; top:50%; right:8px; transform:translateY(-50%); z-index:70; pointer-events:none; max-width:180px; }
 .card-reveal-toast .card-reveal-popup{ pointer-events:auto; padding:14px 12px; box-shadow:0 6px 22px rgba(0,0,0,.5); }
 .card-reveal-toast .pack-card-grid{ max-height:none; }
+/* #3 カード変化中に他の操作があった場合、変化中のカードと枠を50%の不透明度にする */
+.card-reveal-toast.interrupted .card-reveal-popup{ opacity:.5; transition:opacity .2s ease; }
 .card.reveal-glow{box-shadow:0 0 18px rgba(251,191,36,.6);border-color:var(--gold);}
 /* #5 アップグレード演出：カードは位置を変えず、横向きに一回転して変化後の姿を見せる */
 .flip-card-wrap{ width:66px; height:104px; perspective:900px; }

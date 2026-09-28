@@ -315,9 +315,55 @@ const GameMainScene = {
   },
   pickInitialCardPack(card){
     GameState.currentDeck.push(card);
+    // #5 initStage()の時点で山札は既にシャッフル済みのため、デッキに追加するだけでは今回のステージで引けない。
+    //    このステージの山札にも直接追加し、実際に反映されるようにする
+    GameState.drawPile.push(card);
     GlobalFunctions.recordCard(card);
     this.addLog(`？カードパック：${GameData.SYMBOL_LABEL[card.symbol]}（基礎点${card.baseScore}）を獲得`);
     this.pendingInitialCardPack=null;
+    this.renderAll();
+  },
+
+  // #9 レリック「ジョーカー」：売却後にデッキから好きなカードを1枚選ばせ、基礎点+10・記号をランダムに変更する
+  renderJokerPickModal(){
+    if(!this.pendingJokerPick) return null;
+    const overlay=document.createElement('div'); overlay.className='pack-modal-overlay';
+    const modal=document.createElement('div'); modal.className='pack-modal pack-modal-wide';
+    // 2段階：①好きなカードを選ぶ → ②記号を選ぶ
+    if(this.jokerSelectedCard){
+      const c=this.jokerSelectedCard;
+      modal.innerHTML='<h3>🃏ジョーカー：カードの記号を選んでください</h3><div class="slot-desc" style="margin-bottom:10px;">選んだカードは基礎点+10され、選んだ記号に変わります</div>';
+      const prev=document.createElement('div'); prev.style.cssText='display:flex;justify-content:center;margin-bottom:12px;';
+      const pel=document.createElement('div'); pel.className='card'+(c.trait?' trait-'+c.trait.replace(/[()]/g,''):'');
+      pel.innerHTML=`${this.cardTagsHtml(c)}${this.cardSymbolHtml(c)}${this.cardScoreHtml(c,GameState.gold)}`;
+      prev.appendChild(pel); modal.appendChild(prev);
+      const row=document.createElement('div'); row.className='pack-modal-actions';
+      ['Circle','Triangle','Square','Cross'].forEach(sym=>{
+        const btn=document.createElement('button'); btn.className=`sym-${sym}`; btn.style.fontSize='22px'; btn.textContent=GameData.SYMBOL_LABEL[sym];
+        btn.addEventListener('click',()=>this.applyJokerPick(c,sym));
+        row.appendChild(btn);
+      });
+      modal.appendChild(row);
+    }else{
+      modal.innerHTML='<h3>🃏ジョーカー：好きなカードを1枚選んでください</h3><div class="slot-desc" style="margin-bottom:10px;">選んだカードは基礎点+10され、記号を選び直せます</div>';
+      const grid=document.createElement('div'); grid.className='pack-card-grid'; grid.style.maxHeight='55vh'; grid.style.overflowY='auto';
+      GameState.currentDeck.forEach(card=>{
+        const wrap=document.createElement('div'); wrap.className='card-pick-wrap';
+        const el=document.createElement('div'); el.className='card'+(card.trait?' trait-'+card.trait.replace(/[()]/g,''):'');
+        el.innerHTML=`${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card,GameState.gold)}`;
+        el.addEventListener('click',()=>{ this.jokerSelectedCard=card; this.renderAll(); });
+        wrap.appendChild(el); grid.appendChild(wrap);
+      });
+      modal.appendChild(grid);
+    }
+    overlay.appendChild(modal);
+    return overlay;
+  },
+  applyJokerPick(card,sym){
+    card.baseScore+=10;
+    card.symbol=sym;
+    this.addLog(`ジョーカー：選んだカードの基礎点+10、記号が${GameData.SYMBOL_LABEL[sym]}に変化`);
+    this.pendingJokerPick=null; this.jokerSelectedCard=null;
     this.renderAll();
   },
 
@@ -355,11 +401,11 @@ const GameMainScene = {
           this.addLog(`マルパッシブ：マル倍率 ${Math.round(before*100)/100}→${GameData.BINGO_MULTIPLIER_BASE.Circle}（サンカク+シカク+バツ実効値の合計+${Math.round(sum)}）`);
         }
       }
-      // #12 レリック「オールビンゴ獲得」：ステージクリア時、全記号のビンゴ倍率+2
+      // #10 レリック「オールビンゴ獲得」：ステージクリア時、全記号のビンゴ倍率+1
       const cAllBingo=GameState.relicCountOf('all_bingo_gain');
       if(cAllBingo>0){
-        GameData.SYMBOLS.forEach(s=>{GameData.BINGO_MULTIPLIER_BASE[s]+=2*cAllBingo;});
-        this.addLog(`オールビンゴ獲得：全記号のビンゴ倍率+${2*cAllBingo}`);
+        GameData.SYMBOLS.forEach(s=>{GameData.BINGO_MULTIPLIER_BASE[s]+=1*cAllBingo;});
+        this.addLog(`オールビンゴ獲得：全記号のビンゴ倍率+${1*cAllBingo}`);
       }
       // #12 レリック「数値強化3取得」：ステージクリア時、デッキ内のランダムなカード1枚の基礎点+15
       const cNumBoost=GameState.relicCountOf('num_boost3');
@@ -496,8 +542,8 @@ const GameMainScene = {
     return card;
   },
 
-  // #7 サンカクパッシブ1を取得するまでリロールは解放されない
-  enterRerollMode(){ if(this.currentSide!=='player'||this.resultState||GameState.rerollCount<=0||GameState.symbolPassiveTier.Triangle<1) return; this.rerollMode=true; this.rerollSelected=new Set(); this.selectedCardId=null; this.renderAll(); },
+  // #4 手札のリロールはサンカクパッシブと無関係（解放対象はショップの品揃え更新）
+  enterRerollMode(){ if(this.currentSide!=='player'||this.resultState||GameState.rerollCount<=0) return; this.rerollMode=true; this.rerollSelected=new Set(); this.selectedCardId=null; this.renderAll(); },
   cancelReroll(){ this.rerollMode=false; this.rerollSelected=new Set(); this.renderAll(); },
   toggleRerollCard(id){ if(this.rerollSelected.has(id)) this.rerollSelected.delete(id); else this.rerollSelected.add(id); this.renderAll(); },
   confirmReroll(){
@@ -597,13 +643,7 @@ const GameMainScene = {
     setTimeout(()=>{ if(this.justPlacedCell===cellIdx){ this.justPlacedCell=null; this.renderAll(); } },550);
     if(card) GameState.hand=GameState.hand.filter(c=>c.id!==card.id);
     if(card?.jamming==='サンダー') this.applyThunder();
-    this.board.forEach(cell=>{
-      if(!cell?.card) return;
-      const sqP1c=cell.card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=2; // #1 シカクパッシブ3はシカクカードのみ有効
-      if(cell.card.enhance==='巨大化') cell.baseScore+=3*(sqP1c?2:1);
-      // #2 肥大化：カード基礎点/2×対象ビンゴ倍率
-      if(cell.card.enhance==='肥大化'){const a=Math.round((cell.card.baseScore/2)*GameData.BINGO_MULTIPLIER_BASE[cell.symbol]*(sqP1c?2:1));GameState.currentScore=Math.max(0,GameState.currentScore+a);}
-    });
+    // #1 巨大化・肥大化：ターン消費のたびに発動する（配置のたびではなく）。applyPerTurnEnhances()側に移設
     // #9/#8 マルパッシブ2：マルカードをプレイした時、盤面のマル枚数×マル倍率×10点を加算（Lv1/Lv2入れ替えによりLv2条件に変更）
     if(card&&card.symbol==='Circle'&&owner==='player'&&GameState.symbolPassiveTier.Circle>=2){
       const n=this.board.filter(c=>c&&c.symbol==='Circle').length;
@@ -621,13 +661,14 @@ const GameMainScene = {
     const newBingos = isExtending1 ? [] : this.detectNewBingos();
     if(isExtending1){ this.extendActive=true; this.addLog('エクステンド：このターンはビンゴ判定を行わない'); }
     else if(this.extendActive && owner==='player'){ this.extendActive=false; }
-    if(!isNeg) this.turnInRound++;
+    if(!isNeg){ this.turnInRound++; this.applyPerTurnEnhances(); }
     if(card?.jamming) this.queueJammingEffect(card.jamming,cellIdx);
     // #A サンカクパッシブ1：ジャミング使用の次のターンにもう一度同じ効果を付与
     if(card?.jamming&&card?.symbol==='Triangle'&&owner==='player'&&GameState.symbolPassiveTier.Triangle>=3){ // #4 サンカクカードのみ有効
       (this.pendingDelayedJamming=this.pendingDelayedJamming||[]).push({jamming:card.jamming,cellIdx,afterTurns:1});
     }
-    { const n=GameState.relics.filter(r=>r.id==='draw_boost').length; for(let i=0;i<n&&GameState.hand.length<GameState.effectiveHandSize();i++) this.drawOne(); }
+    // #8 ドロー強化：ネガティブカード配置時は発動させず、ターンが4の倍数になった時のみ発動する
+    if(!isNeg && this.turnInRound%4===0){ const n=GameState.relics.filter(r=>r.id==='draw_boost').length; for(let i=0;i<n&&GameState.hand.length<GameState.effectiveHandSize();i++) this.drawOne(); }
     this.selectedCardId=null; this.boardInfoCell=null; this.activeRelicId=null; this.expandPending=null; this.paintPending=null;
     this.renderAll();
     if(newBingos.length>0) await this.playScoreSequence(newBingos);
@@ -1024,6 +1065,17 @@ const GameMainScene = {
     }
   },
 
+  // #1 巨大化・肥大化：ターンが1つ進むたびに発動する（配置のたびではなく、スタン・スキップでターンが進んだ時も含む）
+  applyPerTurnEnhances(){
+    this.board.forEach(cell=>{
+      if(!cell?.card) return;
+      const sqP1c=cell.card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=2; // シカクパッシブ3はシカクカードのみ有効
+      if(cell.card.enhance==='巨大化') cell.baseScore+=3*(sqP1c?2:1);
+      // 肥大化：カード基礎点/2×対象ビンゴ倍率
+      if(cell.card.enhance==='肥大化'){const a=Math.round((cell.card.baseScore/2)*GameData.BINGO_MULTIPLIER_BASE[cell.symbol]*(sqP1c?2:1));GameState.currentScore=Math.max(0,GameState.currentScore+a);}
+    });
+  },
+
   // #4 スキップ実装：手札が無い、または盤面にこれ以上置ける場所が無い場合、自動的にスキップ（ターン消費）として扱う
   hasAnyValidPlacement(){
     if(GameState.hand.length===0) return false;
@@ -1038,6 +1090,20 @@ const GameMainScene = {
     const reason=GameState.hand.length===0?'手札がない':'盤面に置ける場所がない';
     this.addLog(`スキップ：${reason}ためターンを消費しました`);
     this.turnInRound++;
+    this.applyPerTurnEnhances();
+    if(this.turnInRound>GameState.effectiveTurnsPerRound()){ this.renderAll(); await this.sleep(300); this.endRound(); return; }
+    this.currentSide='npc';
+    if(GameState.floor10SpecialBoss&&this.isForcedNpcTurn(this.turnInRound+1)) this.currentSide='npc';
+    this.renderAll();
+    if(this.currentSide==='npc') this.scheduleAIMove();
+  },
+
+  // #7 ターンスキップボタン：プレイヤーが任意にそのターンを終了できるようにする
+  async manualSkipTurn(){
+    if(this.currentSide!=='player'||this.resultState||this.rerollMode) return;
+    this.addLog('スキップ：プレイヤーがターンをスキップしました');
+    this.turnInRound++;
+    this.applyPerTurnEnhances();
     if(this.turnInRound>GameState.effectiveTurnsPerRound()){ this.renderAll(); await this.sleep(300); this.endRound(); return; }
     this.currentSide='npc';
     if(GameState.floor10SpecialBoss&&this.isForcedNpcTurn(this.turnInRound+1)) this.currentSide='npc';
@@ -1063,6 +1129,7 @@ const GameMainScene = {
       this.effects.stunNextNpc=false;
       this.addLog('NPCはスタンした');
       this.turnInRound++;
+      this.applyPerTurnEnhances();
       if(this.turnInRound>GameState.effectiveTurnsPerRound()){this.endRound();return;}
       this.currentSide='player';
       // #5 階層10：スタン解除後も5ターンごとの強制NPC番を正しく反映する（未反映だとプレイヤーが余分な1手を得てしまう不具合があった）
@@ -1079,6 +1146,7 @@ const GameMainScene = {
       this.effects.stunNextNpc=false;
       this.addLog('NPCはスタンした（配置不可）');
       this.turnInRound++;
+      this.applyPerTurnEnhances();
       if(this.turnInRound>GameState.effectiveTurnsPerRound()){this.endRound();return;}
       this.currentSide='player';
       // #5 階層10：スタン解除後も5ターンごとの強制NPC番を正しく反映する
@@ -1423,13 +1491,7 @@ const GameMainScene = {
     if(card.jamming==='サンダー') this.applyThunder();
     const breakActive=this.isBreakActive()||card?.jamming==='ブレイク'; // #3
     const isNeg=card.trait==='ネガティブ'||card.trait==='ネガティブ(パッシブ)';
-    this.board.forEach(cell=>{
-      if(!cell?.card) return;
-      const sqP1c=cell.card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=2; // #1 シカクパッシブ3はシカクカードのみ有効
-      if(cell.card.enhance==='巨大化') cell.baseScore+=3*(sqP1c?2:1);
-      // #2 肥大化：カード基礎点/2×対象ビンゴ倍率
-      if(cell.card.enhance==='肥大化'){const a=Math.round((cell.card.baseScore/2)*GameData.BINGO_MULTIPLIER_BASE[cell.symbol]*(sqP1c?2:1));GameState.currentScore=Math.max(0,GameState.currentScore+a);}
-    });
+    // #1 巨大化・肥大化：ターン消費のたびに発動する（配置のたびではなく）。applyPerTurnEnhances()側に移設
     // #9/#8 マルパッシブ2：マルカードをプレイした時、盤面のマル枚数×マル倍率×10点を加算（Lv1/Lv2入れ替えによりLv2条件に変更）
     if(card.symbol==='Circle'&&GameState.symbolPassiveTier.Circle>=2){
       const n=this.board.filter(c=>c&&c.symbol==='Circle').length;
@@ -1447,13 +1509,14 @@ const GameMainScene = {
     const newBingos = isExtending2 ? [] : this.detectNewBingos();
     if(isExtending2){ this.extendActive=true; this.addLog('エクステンド：このターンはビンゴ判定を行わない'); }
     else if(this.extendActive){ this.extendActive=false; }
-    if(!isNeg) this.turnInRound++;
+    if(!isNeg){ this.turnInRound++; this.applyPerTurnEnhances(); }
     if(card.jamming) this.queueJammingEffect(card.jamming,mainCi);
     // #A サンカクパッシブ1
     if(card.jamming&&card.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=3){ // #4 サンカクカードのみ有効
       (this.pendingDelayedJamming=this.pendingDelayedJamming||[]).push({jamming:card.jamming,cellIdx:mainCi,afterTurns:1});
     }
-    { const n=GameState.relics.filter(r=>r.id==='draw_boost').length; for(let i=0;i<n&&GameState.hand.length<GameState.effectiveHandSize();i++) this.drawOne(); }
+    // #8 ドロー強化：ネガティブカード配置時は発動させず、ターンが4の倍数になった時のみ発動する
+    if(!isNeg && this.turnInRound%4===0){ const n=GameState.relics.filter(r=>r.id==='draw_boost').length; for(let i=0;i<n&&GameState.hand.length<GameState.effectiveHandSize();i++) this.drawOne(); }
     this.selectedCardId=null; this.boardInfoCell=null; this.activeRelicId=null; this.expandPending=null; this.paintPending=null;
     this.renderAll();
     if(newBingos.length>0) await this.playScoreSequence(newBingos);
@@ -1490,14 +1553,9 @@ const GameMainScene = {
     switch(relic.id){
       case 'round_boost': break; // #7
       case 'reroll_boost': break; // #7
-      // #12 レリック「ジョーカー」：売却時、デッキからランダムなカードを1枚選び基礎点+10・記号をランダムに変更する
+      // #9 レリック「ジョーカー」：売却時、デッキから好きなカードを1枚プレイヤーが選ぶ（基礎点+10・記号ランダム変更は選択後に適用）
       case 'joker': {
-        if(GameState.currentDeck.length>0){
-          const card=GlobalFunctions.randChoice(GameState.currentDeck);
-          card.baseScore+=10;
-          card.symbol=GlobalFunctions.randChoice(['Circle','Triangle','Square','Cross']);
-          this.addLog(`ジョーカー：${GameData.SYMBOL_LABEL[card.symbol]}カード1枚の基礎点+10・記号変更`);
-        }
+        if(GameState.currentDeck.length>0) this.pendingJokerPick=true;
         break;
       }
       case 'hand_boost': break; // #1
@@ -1571,6 +1629,8 @@ const GameMainScene = {
     if(this.pendingPassiveChoice && this.passiveModalOpen) this.container.appendChild(this.renderPassiveChoiceModal());
     // #1 ゲーム開始時の無料？カードパック
     if(this.pendingInitialCardPack) this.container.appendChild(this.renderInitialCardPackModal());
+    // #9 レリック「ジョーカー」売却後のカード選択
+    if(this.pendingJokerPick) this.container.appendChild(this.renderJokerPickModal());
     window.scrollTo(0,scrollY);
   },
 
@@ -2067,9 +2127,9 @@ const GameMainScene = {
       const okBtn=document.createElement('button');okBtn.textContent=`確定（${this.rerollSelected.size}枚）`;okBtn.disabled=this.rerollSelected.size===0;okBtn.addEventListener('click',()=>this.confirmReroll());controls.appendChild(okBtn);
       const cancelBtn=document.createElement('button');cancelBtn.textContent='キャンセル';cancelBtn.addEventListener('click',()=>this.cancelReroll());controls.appendChild(cancelBtn);
     }else{
-      // #7 サンカクパッシブ1を取得するまでリロールは解放されない
-      const rerollLocked=GameState.symbolPassiveTier.Triangle<1;
-      const rBtn=document.createElement('button');rBtn.textContent=rerollLocked?'♻️🔒':`♻️(${GameState.rerollCount})`;rBtn.disabled=rerollLocked||GameState.rerollCount<=0||this.currentSide!=='player'||this.hasBossEffect('reroll_limit');rBtn.addEventListener('click',()=>this.enterRerollMode());controls.appendChild(rBtn);
+      const rBtn=document.createElement('button');rBtn.textContent=`♻️(${GameState.rerollCount})`;rBtn.disabled=GameState.rerollCount<=0||this.currentSide!=='player'||this.hasBossEffect('reroll_limit');rBtn.addEventListener('click',()=>this.enterRerollMode());controls.appendChild(rBtn);
+      // #7 ターンスキップボタン
+      const skipBtn=document.createElement('button');skipBtn.textContent='⏭️スキップ';skipBtn.disabled=this.currentSide!=='player';skipBtn.addEventListener('click',()=>this.manualSkipTurn());controls.appendChild(skipBtn);
     }
     // #4 デッキ/山札/捨て札/廃棄札確認ボタン（上画面に配置。今後のアプデでpng画像に置き換え予定のため一旦絵文字表記）
     const deckBtn=document.createElement('button'); deckBtn.textContent=`⭕️(${GameState.currentDeck.length})`; deckBtn.addEventListener('click',()=>this.showDeckModal('deck')); controls.appendChild(deckBtn);

@@ -141,7 +141,7 @@ const GameData = {
         live(){ const n=GameState.bingoCountThisStage||0; return `このステージのビンゴ回数：${n}/3`; } },
     },
     Triangle: {
-      1: { name:'サンカク・レシオ', desc:'デッキ内のサンカクカード比率nを計算し、サンカクカードの基礎点に(1+n)を乗算する。また、ショップのリロールを解放する（未取得時はリロール不可）',
+      1: { name:'サンカク・レシオ', desc:'デッキ内のサンカクカード比率nを計算し、サンカクカードの基礎点に(1+n)を乗算する。また、ショップの品揃え更新を解放する（未取得時は更新不可）',
         live(){ const total=GameState.currentDeck.length||1; const n=GameState.currentDeck.filter(c=>c.symbol==='Triangle').length/total; return `サンカク比率n=${Math.round(n*100)/100} → サンカク基礎点×${Math.round((1+n)*100)/100}`; } },
       2: { name:'サンカク・レゾナンス', desc:'デッキ内のサンカクカードでジャミング効果を持つもの1枚につき、最終補正倍率+0.1する',
         live(){ const n=GameState.currentDeck.filter(c=>c.jamming&&c.symbol==='Triangle').length; return `サンカクのジャミング所持カード:${n}枚 → 最終補正倍率+${Math.round(n*0.1*100)/100}`; } },
@@ -289,7 +289,7 @@ const GameData = {
     { id:'turn_boost', name:'ターン強化',       desc:'ビンゴ時、経過ターン数nに応じて最終乗算補正×1.01^n' },
     { id:'jamming_boost', name:'ジャミング増強',   desc:'ビンゴ阻害の効果を持つカードが盤面に配置された時、ビンゴ阻害自体の効果はそのまま残し、追加でスタンを発動する（配置時、現在の点数に目標点数×0.05を加算）。手札上限-3' },
     { id:'empty_boost', name:'空きマス強化',     desc:'ビンゴ時、空きマス数nに応じ補正倍率+6n+5' },
-    { id:'draw_boost', name:'ドロー強化',       desc:'ターン終了時カードを1枚ドロー' },
+    { id:'draw_boost', name:'ドロー強化',       desc:'ターン数が4の倍数になった時、カードを1枚ドローする（ネガティブカード配置時は発動しない）' },
     { id:'last_stand', name:'背水の陣',         desc:'4ラウンド以降、最終乗算補正×2' },
     { id:'base_boost', name:'補正基礎点強化',   desc:'最終加算補正+2000' },
     { id:'round_boost', name:'ラウンド強化',     desc:'ラウンド終了時、最終加算補正+1000×n（n=現在ラウンド）' },
@@ -297,12 +297,12 @@ const GameData = {
     { id:'hand_boost', name:'手札強化',         desc:'ビンゴ時、手札の数×3を補正倍率に加算' },
     { id:'gold_boost', name:'G獲得',            desc:'ステージクリア時、追加でG+3を得る' },
     // #12 新規レリック9種
-    { id:'all_bingo_gain', name:'オールビンゴ獲得', desc:'ステージクリア時、マル・サンカク・シカク・バツすべてのビンゴ倍率+2する' },
+    { id:'all_bingo_gain', name:'オールビンゴ獲得', desc:'ステージクリア時、マル・サンカク・シカク・バツすべてのビンゴ倍率+1する' },
     { id:'num_boost3', name:'数値強化3取得',     desc:'ステージクリア時、デッキ内のランダムなカード1枚の基礎点+15する' },
     { id:'hobby_collect', name:'趣味レリック集め', desc:'このレリックはレリック所持3個分になる。ステージクリア時、レリックパックを獲得する' },
     { id:'passive_unneeded', name:'パッシブ不要理論', desc:'最終乗算補正にmを加算する。m=(4.5-n)（nは所持している記号パッシブの種類数）。mが0未満の場合は加算しない' },
     { id:'ten_stage', name:'テンステージ',       desc:'ビンゴ時、加算される基礎点が10の倍数のカード1枚につき補正基礎点+30' },
-    { id:'joker', name:'ジョーカー',            desc:'このレリックを売却した時、デッキからランダムなカードを1枚選び、基礎点+10した上で記号をマル・サンカク・シカク・バツのいずれかランダムに変更する' },
+    { id:'joker', name:'ジョーカー',            desc:'このレリックを売却した時、デッキから好きなカードを1枚選び、基礎点+10した上で記号をマル・サンカク・シカク・バツの中から好きなものに変更する' },
     { id:'gambling_addict', name:'ギャンブル依存症', desc:'カード強化効果「ギャンブル」の効果量が、常に+50か-50のどちらかのみになる' },
     { id:'big_explosion', name:'大爆発',         desc:'ステージクリア時、所持G が10G以上（レリック強化「ブラックカード」所持時は5G以上）ならその分を消費し、爆発通常アップグレードをもう1パック追加で獲得する' },
     { id:'pinnacle', name:'極みの境地',          desc:'このレリックはレリック所持数上限分の大きさを持つ（実質1個しか所持できない）。補正基礎点+150、補正倍率+150' },
@@ -428,7 +428,7 @@ const GameData = {
   BOARD_SIZE: 4,
   TURNS_PER_ROUND: 16,
   MAX_ROUNDS: 4,
-  HAND_SIZE: 9,
+  HAND_SIZE: 7, // #6 初期手札を7枚に変更
   MAX_RESERVE: 2,
   INITIAL_REROLL: 5,
 

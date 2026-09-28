@@ -366,13 +366,14 @@ const ShopScene = {
     if(p.slotType === 'special') GameState.usedSpecialEffectIds.push(effectId);
     // #2 カード変化ポップアップは画面右に非ブロッキング表示するだけで、以降の操作を待たせない（自分自身のタイマーで消える）
     if(affected?.length > 0 || effectId==='cash_in'){
+      if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup();
       const revealToken = {};
       this._activeRevealToken = revealToken;
       this.cardRevealPopup = { cards: affected, effectId, before: beforeSnapshots, cashGain: this._lastCashGain };
       this._lastCashGain = null;
       setTimeout(() => {
         // 後から出た別のポップアップを誤って消さないよう、また既にショップを離れていたら何もしない
-        if(this._activeRevealToken === revealToken && this.offers){ this.cardRevealPopup = null; this.renderAll(); }
+        if(this._activeRevealToken === revealToken && this.offers){ if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup(); this.cardRevealPopup = null; this.renderAll(); }
       }, 2200);
     }
     // #6 爆発通常アップグレード：選択済みの効果を候補から取り除き、残りの選択肢の中からのみ続けて選べるようにする（新規補充はしない）
@@ -536,9 +537,10 @@ const ShopScene = {
     this.renderAll();
   },
 
-  rerollOffers(){ const price=GameState.shopPriceOf(GameData.SHOP_PRICES.reroll); if(GameState.gold<price) return; GameState.gold-=price; this.offers=this.generateOffers(); this.message='品揃えを更新した'; this.renderAll(); },
+  // #4 サンカクパッシブ1を取得するまでショップの品揃え更新は解放されない
+  rerollOffers(){ const price=GameState.shopPriceOf(GameData.SHOP_PRICES.reroll); if(GameState.gold<price||GameState.symbolPassiveTier.Triangle<1) return; GameState.gold-=price; this.offers=this.generateOffers(); this.message='品揃えを更新した'; this.renderAll(); },
 
-  leaveShop(){ this.offers=null; this.fixedFinalShop=false; this.pickingPack=null; this.pickingCardPack=null; this.cardRevealPopup=null; this.message=null; this.activeRelicId=null; GameState.lastReward=null; App.showMapSelect(); },
+  leaveShop(){ if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup(); this.offers=null; this.fixedFinalShop=false; this.pickingPack=null; this.pickingCardPack=null; this.cardRevealPopup=null; this.message=null; this.activeRelicId=null; GameState.lastReward=null; App.showMapSelect(); },
 
   // ===== Render =====
   renderAll(){
@@ -611,7 +613,9 @@ const ShopScene = {
     const actions = document.createElement('div'); actions.className='shop-actions';
     if(!this.fixedFinalShop){
       // #6 最終ショップ（階層10）は品揃え更新不可
-      const rerollBtn = document.createElement('button'); rerollBtn.textContent=`品揃え更新（${GameState.shopPriceOf(GameData.SHOP_PRICES.reroll)}G）`; rerollBtn.disabled=GameState.gold<GameState.shopPriceOf(GameData.SHOP_PRICES.reroll); rerollBtn.addEventListener('click',()=>this.rerollOffers()); actions.appendChild(rerollBtn);
+      // #4 サンカクパッシブ1を取得するまでロック
+      const rerollLocked=GameState.symbolPassiveTier.Triangle<1;
+      const rerollBtn = document.createElement('button'); rerollBtn.textContent=rerollLocked?'品揃え更新🔒':`品揃え更新（${GameState.shopPriceOf(GameData.SHOP_PRICES.reroll)}G）`; rerollBtn.disabled=rerollLocked||GameState.gold<GameState.shopPriceOf(GameData.SHOP_PRICES.reroll); rerollBtn.addEventListener('click',()=>this.rerollOffers()); actions.appendChild(rerollBtn);
     }
     const backBtn = document.createElement('button'); backBtn.textContent='マップに戻る'; backBtn.addEventListener('click',()=>this.leaveShop()); actions.appendChild(backBtn);
     el.appendChild(actions);
@@ -625,6 +629,8 @@ const ShopScene = {
     }
     if(this.pickingRelicPack) this.container.appendChild(this.renderRelicPackModal());
     if(this.cardRevealPopup) this.container.appendChild(this.renderCardRevealPopup());
+    // #9 レリック「ジョーカー」をショップで売却した場合も、その場でカードを選べるようにする
+    if(typeof GameMainScene!=='undefined' && GameMainScene.pendingJokerPick) this.container.appendChild(this.renderJokerPickModalForShop());
     window.scrollTo(0,scrollY);
   },
 
@@ -839,6 +845,46 @@ const ShopScene = {
     overlay.appendChild(modal); return overlay;
   },
 
+  // #9 レリック「ジョーカー」をショップで売却した場合の、ショップ画面用カード選択モーダル
+  renderJokerPickModalForShop(){
+    const overlay=document.createElement('div'); overlay.className='pack-modal-overlay';
+    const modal=document.createElement('div'); modal.className='pack-modal pack-modal-wide';
+    const gm=GameMainScene;
+    if(gm.jokerSelectedCard){
+      const c=gm.jokerSelectedCard;
+      modal.innerHTML='<h3>🃏ジョーカー：カードの記号を選んでください</h3><div class="slot-desc" style="margin-bottom:10px;">選んだカードは基礎点+10され、選んだ記号に変わります</div>';
+      const prev=document.createElement('div'); prev.style.cssText='display:flex;justify-content:center;margin-bottom:12px;';
+      const pel=document.createElement('div'); pel.className='card'+(c.trait?' trait-'+c.trait.replace(/[()]/g,''):'');
+      pel.innerHTML=`${this.cardTagsHtml(c)}${this.cardSymbolHtml(c)}${this.cardScoreHtml(c,GameState.gold)}`;
+      prev.appendChild(pel); modal.appendChild(prev);
+      const row=document.createElement('div'); row.className='pack-modal-actions';
+      ['Circle','Triangle','Square','Cross'].forEach(sym=>{
+        const btn=document.createElement('button'); btn.className=`sym-${sym}`; btn.style.fontSize='22px'; btn.textContent=GameData.SYMBOL_LABEL[sym];
+        btn.addEventListener('click',()=>{
+          c.baseScore+=10; c.symbol=sym;
+          gm.pendingJokerPick=null; gm.jokerSelectedCard=null;
+          this.message=`ジョーカー：選んだカードの基礎点+10、記号が${GameData.SYMBOL_LABEL[sym]}に変化`;
+          this.renderAll();
+        });
+        row.appendChild(btn);
+      });
+      modal.appendChild(row);
+    }else{
+      modal.innerHTML='<h3>🃏ジョーカー：好きなカードを1枚選んでください</h3><div class="slot-desc" style="margin-bottom:10px;">選んだカードは基礎点+10され、記号を選び直せます</div>';
+      const grid=document.createElement('div'); grid.className='pack-card-grid'; grid.style.maxHeight='55vh'; grid.style.overflowY='auto';
+      GameState.currentDeck.forEach(card=>{
+        const wrap=document.createElement('div'); wrap.className='card-pick-wrap';
+        const el=document.createElement('div'); el.className='card'+(card.trait?' trait-'+card.trait.replace(/[()]/g,''):'');
+        el.innerHTML=`${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card,GameState.gold)}`;
+        el.addEventListener('click',()=>{ gm.jokerSelectedCard=card; this.renderAll(); });
+        wrap.appendChild(el); grid.appendChild(wrap);
+      });
+      modal.appendChild(grid);
+    }
+    overlay.appendChild(modal);
+    return overlay;
+  },
+
   // #7 アップグレードパックのカードUIを修正
   renderPickModal(){
     const p = this.pickingPack;
@@ -911,8 +957,24 @@ const ShopScene = {
   renderCardRevealPopup(){
     // #7 画面右側に非ブロッキングで表示し、裏のショップ操作と並行して見られるようにする
     const overlay = document.createElement('div'); overlay.className='card-reveal-toast';
-    const box = document.createElement('div'); box.className='card-reveal-popup';
     const p = this.cardRevealPopup;
+    // #3 ポップ表示後に、プレイヤーがスクロールや他のアイテムのタップなど画面操作をしている間は、変化中のカードと枠を50%の不透明度にする
+    if(p.interrupted) overlay.classList.add('interrupted');
+    if(!p._listening){
+      p._listening=true;
+      const markInterrupted=(e)=>{
+        // ポップアップ自身へのタップは「他の操作」に含めない
+        if(e&&e.type==='pointerdown'&&e.target&&e.target.closest&&e.target.closest('.card-reveal-toast')) return;
+        p.interrupted=true;
+        const el=document.querySelector('.card-reveal-toast');
+        if(el) el.classList.add('interrupted');
+      };
+      window.addEventListener('scroll',markInterrupted,{passive:true,capture:true});
+      document.addEventListener('pointerdown',markInterrupted,true);
+      // ポップアップが消えたらリスナーを外す
+      p._cleanup=()=>{ window.removeEventListener('scroll',markInterrupted,true); document.removeEventListener('pointerdown',markInterrupted,true); };
+    }
+    const box = document.createElement('div'); box.className='card-reveal-popup';
     const effectId = p.effectId;
     const before = p.before || [];
     const grid = document.createElement('div'); grid.className='pack-card-grid';

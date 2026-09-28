@@ -77,6 +77,7 @@ const GameState = {
     this.currentScore=0; this.round=1; this.turn=1;
     this.rerollCount=GameData.INITIAL_REROLL+this.rerollBonus;
     this.hand=[]; this.reserve=[]; this.discardPile=[];
+    this.discardedPile=[]; // #2 廃棄札はステージ（ゲーム）終了時に空にする（蓄積を防ぐ）
     this.drawPile=GlobalFunctions.shuffle(this.currentDeck);
     // #4 トップスピード：ゲーム開始時、このカードをデッキの一番上（＝配列の末尾＝最初に引かれる位置）に配置する
     const topSpeedCards=this.drawPile.filter(c=>c.enhance==='トップスピード');
