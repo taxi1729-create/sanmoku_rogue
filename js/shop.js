@@ -388,9 +388,21 @@ const ShopScene = {
         return;
       }
     }
-    this.pickingPack = null; this.renderAll();
+    this.pickingPack = null; this.advancePackQueue(); this.renderAll();
   },
-  skipPack(){ this.message = 'スキップした'; this.pickingPack = null; this.renderAll(); },
+  // #12 レリック効果（大爆発）などで待機しているパックを、現在のパックが終わった後に順番に開く
+  packQueue:[],
+  advancePackQueue(){
+    while(this.packQueue&&this.packQueue.length>0){
+      const item=this.packQueue.shift();
+      if(GameState.currentDeck.length===0) continue;
+      const pk=this.buildExplosiveUpgradePack(null); pk.relicTrigger=item.relic;
+      this.pickingPack=pk; this.message=`レリック効果が発動：${item.relic}`;
+      return true;
+    }
+    return false;
+  },
+  skipPack(){ this.message = 'スキップした'; this.pickingPack = null; this.advancePackQueue(); this.renderAll(); },
 
   applyEffect(effectId, targetIndexes){
     const deck = GameState.currentDeck;
@@ -540,7 +552,7 @@ const ShopScene = {
   // #4 サンカクパッシブ1を取得するまでショップの品揃え更新は解放されない
   rerollOffers(){ const price=GameState.shopPriceOf(GameData.SHOP_PRICES.reroll); if(GameState.gold<price||GameState.symbolPassiveTier.Triangle<1) return; GameState.gold-=price; this.offers=this.generateOffers(); this.message='品揃えを更新した'; this.renderAll(); },
 
-  leaveShop(){ if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup(); this.offers=null; this.fixedFinalShop=false; this.pickingPack=null; this.pickingCardPack=null; this.cardRevealPopup=null; this.message=null; this.activeRelicId=null; GameState.lastReward=null; App.showMapSelect(); },
+  leaveShop(){ this.packQueue=[]; this.packBreakdownOpen=false; this.packBreakdownSelected=null; if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup(); this.offers=null; this.fixedFinalShop=false; this.pickingPack=null; this.pickingCardPack=null; this.cardRevealPopup=null; this.message=null; this.activeRelicId=null; GameState.lastReward=null; App.showMapSelect(); },
 
   // ===== Render =====
   renderAll(){
@@ -555,13 +567,16 @@ const ShopScene = {
     let rewardText = '';
     if(r){ const b=r.breakdown; rewardText = b ? `${r.stageName}を${r.type==='skip'?'スキップ':'クリア'}：基本6 ＋ 残りラウンド${b.roundBonus} ＋ 残りリロール${b.rerollBonus} ＋ レリック${b.relicBonus} ＋ カード${b.cardBonus}${b.doubled?'（2倍済）':''} ＝ G+${r.gold}${r.extra?`／追加報酬：${r.extra}`:''}` : `${r.stageName}：G+${r.gold}${r.extra?`／追加報酬：${r.extra}`:''}`; }
     const header = document.createElement('div'); header.className='shop-header';
-    header.innerHTML = `<h2>ショップ</h2>${rewardText?`<div class="shop-reward">${rewardText}</div>`:''}<div class="shop-gold">所持G：${GameState.gold}</div>${this.message?`<div class="shop-message">${this.message}</div>`:''}`;
+    // #13 ショップ文字列のすぐ下の報酬内訳は不要。デッキ確認・マップ一覧・所持Gを直下に並べる
+    header.innerHTML = `<h2>ショップ</h2>`;
     // #2 ショップ画面でデッキ・マップ一覧を確認できるようにする
     const shopViewBtns = document.createElement('div'); shopViewBtns.style.cssText='display:flex;gap:8px;justify-content:center;margin-top:6px;';
     const deckBtn2 = document.createElement('button'); deckBtn2.textContent=`デッキ確認(${GameState.currentDeck.length})`; deckBtn2.addEventListener('click',()=>GameMainScene.showDeckModal('deck'));
     const mapBtn2 = document.createElement('button'); mapBtn2.textContent='マップ一覧'; mapBtn2.addEventListener('click',()=>GameMainScene.showDeckModal('map'));
-    shopViewBtns.appendChild(deckBtn2); shopViewBtns.appendChild(mapBtn2);
+    const goldSpan = document.createElement('div'); goldSpan.className='shop-gold'; goldSpan.style.cssText='align-self:center;margin:0 0 0 6px;'; goldSpan.textContent=`所持G：${GameState.gold}`;
+    shopViewBtns.appendChild(deckBtn2); shopViewBtns.appendChild(mapBtn2); shopViewBtns.appendChild(goldSpan);
     header.appendChild(shopViewBtns);
+    if(this.message){ const m=document.createElement('div'); m.className='shop-message'; m.textContent=this.message; header.appendChild(m); }
     el.appendChild(header);
 
     // #4 ショップ内レリック表示（ゲームプレイ中と同様のカード表示＋売却）
@@ -611,6 +626,8 @@ const ShopScene = {
 
 
     const actions = document.createElement('div'); actions.className='shop-actions';
+    // #19 パック内訳ボタン（品揃え更新の左）
+    const breakdownBtn = document.createElement('button'); breakdownBtn.textContent='📦パック内訳'; breakdownBtn.addEventListener('click',()=>{ this.packBreakdownOpen=true; this.packBreakdownSelected=null; this.renderAll(); }); actions.appendChild(breakdownBtn);
     if(!this.fixedFinalShop){
       // #6 最終ショップ（階層10）は品揃え更新不可
       // #4 サンカクパッシブ1を取得するまでロック
@@ -620,6 +637,8 @@ const ShopScene = {
     const backBtn = document.createElement('button'); backBtn.textContent='マップに戻る'; backBtn.addEventListener('click',()=>this.leaveShop()); actions.appendChild(backBtn);
     el.appendChild(actions);
     this.container.appendChild(el);
+    // #19 パック内訳モーダル
+    if(this.packBreakdownOpen) this.container.appendChild(this.renderPackBreakdownModal());
     if(this.pickingCardPack) this.container.appendChild(this.renderCardPackModal());
     if(this.pickingPack){
       const pickOverlay=this.renderPickModal();
@@ -845,6 +864,33 @@ const ShopScene = {
     overlay.appendChild(modal); return overlay;
   },
 
+  // #19 パック内訳一覧・詳細モーダル
+  renderPackBreakdownModal(){
+    const overlay=document.createElement('div'); overlay.className='pack-modal-overlay';
+    overlay.addEventListener('click',(e)=>{ if(e.target===overlay){ this.packBreakdownOpen=false; this.packBreakdownSelected=null; this.renderAll(); } });
+    const modal=document.createElement('div'); modal.className='pack-modal';
+    modal.addEventListener('click',(e)=>e.stopPropagation());
+    modal.innerHTML='<h3>📦パック内訳</h3><div class="slot-desc" style="margin-bottom:10px;">パックをタップすると中身の確率を表示します</div>';
+    const list=document.createElement('div'); list.className='pack-breakdown-list';
+    GameData.PACK_LIST.forEach(p=>{
+      const btn=document.createElement('button'); btn.className='pack-breakdown-item'+(this.packBreakdownSelected===p.id?' active':'');
+      btn.textContent=p.label;
+      btn.addEventListener('click',()=>{ this.packBreakdownSelected=(this.packBreakdownSelected===p.id)?null:p.id; this.renderAll(); });
+      list.appendChild(btn);
+      if(this.packBreakdownSelected===p.id){
+        const bubble=document.createElement('div'); bubble.className='pack-breakdown-bubble';
+        bubble.innerHTML=GameData.getPackBreakdown(p.id).map(l=>`<div>${l}</div>`).join('');
+        list.appendChild(bubble);
+      }
+    });
+    modal.appendChild(list);
+    const closeBtn=document.createElement('button'); closeBtn.textContent='閉じる'; closeBtn.style.marginTop='12px';
+    closeBtn.addEventListener('click',()=>{ this.packBreakdownOpen=false; this.packBreakdownSelected=null; this.renderAll(); });
+    modal.appendChild(closeBtn);
+    overlay.appendChild(modal);
+    return overlay;
+  },
+
   // #9 レリック「ジョーカー」をショップで売却した場合の、ショップ画面用カード選択モーダル
   renderJokerPickModalForShop(){
     const overlay=document.createElement('div'); overlay.className='pack-modal-overlay';
@@ -891,9 +937,10 @@ const ShopScene = {
     const overlay = document.createElement('div'); overlay.className='pack-modal-overlay';
     const modal = document.createElement('div'); modal.className='pack-modal pack-modal-wide';
     const isExplosive = p.slotType === 'normal_explosive';
-    modal.innerHTML = isExplosive
+    const relicBanner = p.relicTrigger ? `<div class="relic-trigger-banner">🔴レリック効果が発動：${p.relicTrigger}</div>` : '';
+    modal.innerHTML = relicBanner + (isExplosive
       ? `<h3>💥爆発通常アップグレード（残り選択回数：${p.picksRemaining}/3）</h3>`
-      : '<h3>効果を選択してください</h3>';
+      : '<h3>効果を選択してください</h3>');
     // #7 ビンゴ倍率表示パネルを選択肢一覧の左側に配置する（横並びのラッパーで囲む）
     const topRow = document.createElement('div'); topRow.className='pack-modal-top-row';
     const multPanel = document.createElement('div'); multPanel.className='modal-mult-panel';

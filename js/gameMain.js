@@ -367,6 +367,32 @@ const GameMainScene = {
     this.renderAll();
   },
 
+  // #11 レリック等によるカード変化を、ショップと同様に画面右側へ非ブロッキング表示する（横回転で変化後を見せる）
+  showCardChangeToast(list){
+    const token={}; this._toastToken=token;
+    this.cardChangeToast=list.slice(0,4);
+    setTimeout(()=>{
+      if(this._toastToken===token){ this.cardChangeToast=null; const el=document.querySelector('.game-change-toast'); if(el) el.remove(); }
+    },2600);
+  },
+  renderCardChangeToast(){
+    if(!this.cardChangeToast||this.cardChangeToast.length===0) return null;
+    const outer=document.createElement('div'); outer.className='card-reveal-toast game-change-toast';
+    const box=document.createElement('div'); box.className='card-reveal-popup';
+    box.innerHTML='<div class="gr-label">カードが更新されました</div>';
+    const grid=document.createElement('div'); grid.className='pack-card-grid';
+    this.cardChangeToast.forEach(({before,after})=>{
+      const flip=document.createElement('div'); flip.className='flip-card-wrap';
+      const cls=(c)=>'card'+(c.trait?' trait-'+c.trait.replace(/[()]/g,''):'');
+      flip.innerHTML=`<div class="flip-card-inner">
+        <div class="flip-card-face flip-card-front"><div class="${cls(before)}">${this.cardTagsHtml(before)}${this.cardSymbolHtml(before)}${this.cardScoreHtml(before,GameState.gold)}</div></div>
+        <div class="flip-card-face flip-card-back"><div class="${cls(after)} reveal-glow">${this.cardTagsHtml(after)}${this.cardSymbolHtml(after)}${this.cardScoreHtml(after,GameState.gold)}</div></div>
+      </div>`;
+      grid.appendChild(flip);
+    });
+    box.appendChild(grid); outer.appendChild(box); return outer;
+  },
+
   finishStage(result){
     // #3 ゲームスコア最高得点を記録
     GlobalFunctions.saveHighScoreIfBetter(GameState.currentScore);
@@ -407,11 +433,13 @@ const GameMainScene = {
         GameData.SYMBOLS.forEach(s=>{GameData.BINGO_MULTIPLIER_BASE[s]+=1*cAllBingo;});
         this.addLog(`オールビンゴ獲得：全記号のビンゴ倍率+${1*cAllBingo}`);
       }
-      // #12 レリック「数値強化3取得」：ステージクリア時、デッキ内のランダムなカード1枚の基礎点+15
+      // #11 レリック「数値強化1獲得」：ステージクリア時、デッキ内のランダムなカード1枚の基礎点+10（変化はショップ同様に画面右側へ表示）
       const cNumBoost=GameState.relicCountOf('num_boost3');
       if(cNumBoost>0 && GameState.currentDeck.length>0){
-        for(let i=0;i<cNumBoost;i++){ const card=GlobalFunctions.randChoice(GameState.currentDeck); card.baseScore+=15; }
-        this.addLog(`数値強化3取得：ランダムなカード${cNumBoost}枚の基礎点+15`);
+        const changed=[];
+        for(let i=0;i<cNumBoost;i++){ const card=GlobalFunctions.randChoice(GameState.currentDeck); const before={...card}; card.baseScore+=10; changed.push({before,after:card}); }
+        this.addLog(`数値強化1獲得：ランダムなカード${cNumBoost}枚の基礎点+10`);
+        this.showCardChangeToast(changed);
       }
       // #12 レリック「趣味レリック集め」：ステージクリア時、レリックを1つ獲得（レリックパック相当）
       const cHobby=GameState.relicCountOf('hobby_collect');
@@ -423,21 +451,6 @@ const GameMainScene = {
             ShopScene.applyRelicGrantEffect(relic);
             GlobalFunctions.recordRelic(relic.id);
             this.addLog(`趣味レリック集め：レリック「${relic.name}」を獲得`);
-          }
-        }
-      }
-      // #12 レリック「大爆発」：所持Gが閾値以上ならその分を消費し、爆発通常アップグレードをもう1パック獲得（ショップに向かう場合のみ）
-      if(GameState.currentFloor<10){
-        const cBigExplosion=GameState.relicCountOf('big_explosion');
-        if(cBigExplosion>0){
-          const hasBlack=GameState.relics.some(r=>r.relicEnhance==='ren_black');
-          const threshold=hasBlack?5:10;
-          for(let i=0;i<cBigExplosion;i++){
-            if(GameState.gold>=threshold && GameState.currentDeck.length>0){
-              GameState.gold-=threshold;
-              ShopScene.pickingPack=ShopScene.buildExplosiveUpgradePack(null);
-              this.addLog(`大爆発：${threshold}G消費して爆発通常アップグレードを追加取得`);
-            }
           }
         }
       }
@@ -464,6 +477,25 @@ const GameMainScene = {
         if(GameState.currentDeck.length>0 && GameData.pickClearBonusType()==='normal_explosive_upgrade'){
           ShopScene.pickingPack = ShopScene.buildExplosiveUpgradePack(null);
           clearBonusMsg='💥爆発通常アップグレード：ショップで5つから最大3つまで選択できます';
+        }
+        // #12 レリック「大爆発」：クリア報酬のG獲得後、所持Gが規定数以上ならその分を消費し、
+        //     クリア報酬の爆発アップグレードが終わった後に「レリック効果が発動」と共に追加で1パック獲得する
+        ShopScene.packQueue=[];
+        const cBigExplosion=GameState.relicCountOf('big_explosion');
+        if(cBigExplosion>0 && !this.hasBossEffect('no_relic')){
+          const hasBlack=GameState.relics.some(r=>r.relicEnhance==='ren_black');
+          const threshold=hasBlack?5:10;
+          for(let i=0;i<cBigExplosion;i++){
+            if(GameState.gold>=threshold && GameState.currentDeck.length>0){
+              GameState.gold-=threshold;
+              ShopScene.packQueue.push({relic:'大爆発'});
+              this.addLog(`レリック効果が発動：大爆発（${threshold}G消費して爆発通常アップグレードを追加取得）`);
+            }
+          }
+          if(ShopScene.packQueue.length>0){
+            clearBonusMsg=(clearBonusMsg?clearBonusMsg+'／':'')+`レリック効果が発動：大爆発（爆発通常アップグレード+${ShopScene.packQueue.length}）`;
+            if(!ShopScene.pickingPack) ShopScene.advancePackQueue();
+          }
         }
         GameState.lastReward={type:'clear',stageName:this.stage.name,gold:rd.total,breakdown:rd,debugLog:this.logs?this.logs.slice(-30):[],extra:clearBonusMsg};
         this.addLog(`クリア報酬：G+${rd.total}${rd.doubled?'（第6階層以降のため最終値を2倍）':''}${clearBonusMsg?'／'+clearBonusMsg:''}`);
@@ -1323,6 +1355,10 @@ const GameMainScene = {
               if(ren==='ren_square') relicBonus+=GameState.currentDeck.filter(c=>c.symbol==='Square').length;
               if(ren==='ren_disc_pile') relicBonus+=GameState.discardPile.length;
             });
+            // #15 レリック「テンステージ」「極みの境地」を予測にも反映する
+            const cTenP=GameState.relicCountOf('ten_stage');
+            if(cTenP>0){ const n10=cardScores.filter(sc=>sc%10===0).length; relicBonus+=n10*30*cTenP; }
+            relicBonus+=150*GameState.relicCountOf('pinnacle');
           }
           // 性質変化（盤面上の既存カード・配置予定カードの両方を対象に、実際の点数計算と同じ範囲＝当該ビンゴ列のみを見る）
           cells.forEach(c=>{
@@ -1353,6 +1389,8 @@ const GameMainScene = {
               if(rel.relicEnhance==='ren_grade'){ const n=GameState.currentDeck.reduce((acc,c)=>{let x=0;if(c.enhance)x++;if(c.jamming)x++;if(c.trait)x++;return acc+x;},0); correctionMultTotal+=n; }
               if(rel.relicEnhance==='ren_discard') correctionMultTotal*=1.5;
             });
+            // #15 レリック「極みの境地」の補正倍率+150も予測に反映する
+            correctionMultTotal+=150*GameState.relicCountOf('pinnacle');
           }
           cells.forEach(c=>{
             if(!c.card) return;
@@ -1369,12 +1407,15 @@ const GameMainScene = {
             // #5 同じ強化を持つレリックが複数ある場合、それぞれ個別に効果を重ねる
             GameState.relics.filter(r=>r.relicEnhance==='ren_double').forEach(()=>{finalMul*=1.5;});
             GameState.relics.filter(r=>r.relicEnhance==='ren_triple').forEach(()=>{finalMul*=2;});
+            // #15 レリック「パッシブ不要理論」を予測にも反映する
+            const cPassiveUnneededP=GameState.relicCountOf('passive_unneeded');
+            if(cPassiveUnneededP>0){ const n=Object.values(GameState.symbolPassiveTier).filter(t=>t>0).length; const m=Math.max(0,4.5-n); if(m>0) finalMul+=m*cPassiveUnneededP; }
           }
           if(GameState.symbolPassiveTier.Triangle>=2) finalMul+=GameState.currentDeck.filter(c=>c.jamming&&c.symbol==='Triangle').length*0.1;
           // #新規 セブンパッシブ2：フラグが立っていれば次のビンゴで最終乗算補正×7
           if(GameState.symbolPassiveTier.Seven>=2 && GameState.sevenPendingMultBoost) finalMul*=7;
           let finalAddTotal=GameData.FINAL_ADD;
-          if(!noRelic&&GameState.relics.some(r=>r.relicEnhance==='ren_draw_pile')) finalAddTotal+=GameState.drawPile.length*100;
+          if(!noRelic) finalAddTotal+=GameState.drawPile.length*100*GameState.relics.filter(r=>r.relicEnhance==='ren_draw_pile').length;
           // #新規 セブンパッシブ3：デッキ枚数が7の倍数の時、最終加算補正+目標点数の7%
           if(GameState.symbolPassiveTier.Seven>=3 && GameState.currentDeck.length%7===0) finalAddTotal+=Math.round(GameState.targetScore*0.07);
           total+=Math.round(lb*mult*finalMul)+finalAddTotal;
@@ -1629,6 +1670,8 @@ const GameMainScene = {
     if(this.pendingPassiveChoice && this.passiveModalOpen) this.container.appendChild(this.renderPassiveChoiceModal());
     // #1 ゲーム開始時の無料？カードパック
     if(this.pendingInitialCardPack) this.container.appendChild(this.renderInitialCardPackModal());
+    // #11 カード変化トースト（画面右側）
+    if(this.cardChangeToast) this.container.appendChild(this.renderCardChangeToast());
     // #9 レリック「ジョーカー」売却後のカード選択
     if(this.pendingJokerPick) this.container.appendChild(this.renderJokerPickModal());
     window.scrollTo(0,scrollY);
@@ -1646,7 +1689,8 @@ const GameMainScene = {
     const roundBox=document.createElement('div'); roundBox.className='round-big-stat';
     roundBox.innerHTML=`<div class="label">ラウンド</div><div class="round-big-value">${GameState.round}<span class="round-big-max">/${GameState.effectiveMaxRounds()+(this.stageBonusRounds||0)}</span></div>`;
     topRow.appendChild(roundBox);
-    const stats=[['ステージ',this.stage.name],['G',GameState.gold]];
+    // #16 ステージ欄は削除。ラウンドとGを隣り合わせ、その右にパッシブを配置する
+    const stats=[['G',GameState.gold]];
     for(const [label,val] of stats){const d=document.createElement('div');d.className='stat';d.innerHTML=`<div class="label">${label}</div><div class="value">${val}</div>`;topRow.appendChild(d);}
     // #4 パッシブ一覧をラウンド・ステージと同じ行の右側に配置する
     const passiveBar=this.renderPassiveBar(); passiveBar.style.marginLeft='auto';
@@ -2288,8 +2332,21 @@ const GameMainScene = {
       grid.appendChild(wrap);
     });
     box.appendChild(grid);
+    // #14 スキップも表示する
+    const skipBtn=document.createElement('button'); skipBtn.className='passive-skip-btn'; skipBtn.textContent='スキップ';
+    skipBtn.addEventListener('click',()=>this.skipPassiveChoice());
+    box.appendChild(skipBtn);
     el.appendChild(box);
     return el;
+  },
+  skipPassiveChoice(){
+    this.addLog('記号パッシブ選択：スキップした');
+    this.pendingPassiveChoice=null;
+    this.passiveModalOpen=false;
+    if(this.passiveChoiceContext==='start'){ this.passiveChoiceContext=null; App.saveGame(); this.renderAll(); return; }
+    this.passiveChoiceContext=null;
+    App.saveGame();
+    App.showShop();
   },
   choosePassive(idx){
     const cand=this.pendingPassiveChoice[idx]; if(!cand) return;

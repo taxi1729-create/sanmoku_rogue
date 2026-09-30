@@ -251,6 +251,49 @@ const GameData = {
     return null;
   },
 
+  // #19 パック内訳表示：各パックの中身の確率を一覧化する
+  PACK_LIST: [
+    { id:'card_pack', label:'？カードパック' },
+    { id:'normal_upgrade', label:'通常アップグレード' },
+    { id:'normal_explosive_upgrade', label:'爆発通常アップグレード' },
+    { id:'special_upgrade', label:'特別アップグレード' },
+    { id:'card_focus', label:'カードフォーカスパック' },
+    { id:'dream_card', label:'ドリームカードパック' },
+    { id:'jamming_pack', label:'ジャミングカードパック' },
+    { id:'relic_pack', label:'レリックパック' },
+    { id:'enhance_pack', label:'強化カードパック' },
+  ],
+  getPackBreakdown(packId){
+    const poolPacks=['normal_upgrade','normal_explosive_upgrade'];
+    if(poolPacks.includes(packId)){
+      const rareItems=this.NORMAL_SELECT_POOL.filter(e=>e.rarity);
+      const normalItems=this.NORMAL_SELECT_POOL.filter(e=>!e.rarity);
+      const rareSum=rareItems.reduce((s,e)=>s+e.rarity,0);
+      const normalEach=normalItems.length>0?(1-rareSum)/normalItems.length:0;
+      const lines=normalItems.map(e=>`${e.name}：${Math.round(normalEach*1000)/10}%`);
+      rareItems.forEach(e=>lines.push(`${e.name}：${Math.round(e.rarity*1000)/10}%（レア枠）`));
+      return lines;
+    }
+    if(packId==='special_upgrade'){
+      const pool=this.SPECIAL_SELECT_POOL; if(!pool||pool.length===0) return ['（現在選択可能な効果なし）'];
+      const each=100/pool.length;
+      return pool.map(e=>`${e.name}：${Math.round(each*10)/10}%`);
+    }
+    if(packId==='card_pack'||packId==='card_focus'||packId==='enhance_pack'){
+      return ['マル：30%','サンカク：30%','シカク：30%','バツ：10%（バツパッシブ1未取得時は出現しない、その場合はマル・サンカク・シカクが均等）','付与効果（強化/ジャミング/性質変化）はランダムに付加'];
+    }
+    if(packId==='jamming_pack'){
+      return ['マル：30%','サンカク：30%','シカク：30%','バツ：10%（バツパッシブ1未取得時は出現しない）','ジャミング効果はランダムな1種が必ず付与される'];
+    }
+    if(packId==='dream_card'){
+      return ['基礎点120〜150のカードが1枚（強化・ジャミング・性質変化のすべてが付与された状態）'];
+    }
+    if(packId==='relic_pack'){
+      return ['未所持のレリックから重み付きでランダムに3つ提示（レア度が高いほど出現率は低い）'];
+    }
+    return ['（内訳情報なし）'];
+  },
+
   RELIC_IMG: {
     'bingo':'image/relic/r000.png',
     'charge':'image/relic/r001.png',
@@ -298,7 +341,7 @@ const GameData = {
     { id:'gold_boost', name:'G獲得',            desc:'ステージクリア時、追加でG+3を得る' },
     // #12 新規レリック9種
     { id:'all_bingo_gain', name:'オールビンゴ獲得', desc:'ステージクリア時、マル・サンカク・シカク・バツすべてのビンゴ倍率+1する' },
-    { id:'num_boost3', name:'数値強化3取得',     desc:'ステージクリア時、デッキ内のランダムなカード1枚の基礎点+15する' },
+    { id:'num_boost3', name:'数値強化1獲得',     desc:'ステージクリア時、デッキ内のランダムなカード1枚の基礎点+10する' },
     { id:'hobby_collect', name:'趣味レリック集め', desc:'このレリックはレリック所持3個分になる。ステージクリア時、レリックパックを獲得する' },
     { id:'passive_unneeded', name:'パッシブ不要理論', desc:'最終乗算補正にmを加算する。m=(4.5-n)（nは所持している記号パッシブの種類数）。mが0未満の場合は加算しない' },
     { id:'ten_stage', name:'テンステージ',       desc:'ビンゴ時、加算される基礎点が10の倍数のカード1枚につき補正基礎点+30' },
@@ -407,12 +450,14 @@ const GameData = {
     { id:'base_up5', name:'🟡基礎点上昇1',       desc:'カードを1枚選択し、基礎点+10する',    targetMin:1, targetMax:1 },
     { id:'symbol_change', name:'🟡記号変化',          desc:'カードを最大3枚選択し記号をランダム変化', targetMin:1, targetMax:3 },
     { id:'cash_in', name:'🟡換金',              desc:'カードを1枚取り除きG獲得（強化数に応じた金額）', targetMin:1, targetMax:1 },
-    { id:'duplicate', name:'🟡複製',              desc:'カードを1枚選択し複製',               targetMin:1, targetMax:1 },
+    // #18 複製をレア枠に変更（🔵表記・出現率5%）
+    { id:'duplicate', name:'🔵複製',              desc:'カードを1枚選択し複製',               targetMin:1, targetMax:1, rarity:0.05 },
     { id:'grant_enhance', name:'🟡カード強化付与',    desc:'カードを1枚選択しランダムなカード強化を付与', targetMin:1, targetMax:1 },
     { id:'grant_jamming', name:'🟢ジャミング効果付与',desc:'カードを1枚選択しランダムなジャミングを付与', targetMin:1, targetMax:1 },
     { id:'all_mult_up1', name:'🟡オールビンゴ強化',  desc:'全記号のビンゴ倍率を+1する',          targetMin:0, targetMax:0 },
     // #8: 1%で性質変化付与
-    { id:'grant_trait_rare', name:'🔵性質変化付与',     desc:'カードを1枚選択しランダムな性質変化を付与（レア）', targetMin:1, targetMax:1, rarity:0.01 },
+    // #18 性質変化のレア枠出現率を3%に変更
+    { id:'grant_trait_rare', name:'🔵性質変化付与',     desc:'カードを1枚選択しランダムな性質変化を付与（レア）', targetMin:1, targetMax:1, rarity:0.03 },
   ],
   SPECIAL_SELECT_POOL: [
     { id:'grant_trait', name:'🔵性質変化効果付与',  desc:'カードを1枚選択しランダムな性質変化を付与', targetMin:1, targetMax:1 },

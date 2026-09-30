@@ -211,6 +211,9 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .effect-choice-item{background:var(--panel-2);border:1px solid #2b3150;border-radius:9px;padding:10px 12px;text-align:left;cursor:pointer;transition:border-color .12s,transform .12s;}
 .effect-choice-item:hover{border-color:var(--gold);transform:translateX(2px);}
 .effect-choice-item.chosen{border-color:var(--gold);background:#2c2410;}
+/* #17 タイトルより文字を2サイズ小さくする */
+.effect-choice-item .slot-title{font-size:14px;font-weight:700;}
+.effect-choice-item .slot-desc{font-size:10px;color:var(--text-dim);line-height:1.4;margin-top:3px;}
 .pack-modal-actions{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
 .card-pick-wrap{display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;width:140px;}
 .card-pick-wrap .card:hover{transform:translateY(-6px);border-color:var(--gold);}
@@ -798,3 +801,13 @@ button:disabled{opacity:.35;cursor:not-allowed;}
   .scb-value{font-size:11px;}
   .score-calc-box.scb-highlight .scb-value{font-size:13px;}
 }
+
+.relic-trigger-banner{background:linear-gradient(90deg,#3a2c6a,#6a4ad4);color:#fff;font-weight:900;font-size:12px;padding:5px 10px;border-radius:8px;margin-bottom:8px;animation:scoringBubblePop .3s ease;}
+
+.passive-skip-btn{display:block;margin:10px auto 0;background:var(--panel);border:1px solid #3a2c6a;color:#cfc7ff;font-size:12px;padding:7px 16px;border-radius:8px;}
+/* #19 パック内訳一覧・吹き出し */
+.pack-breakdown-list{display:flex;flex-direction:column;gap:8px;text-align:left;}
+.pack-breakdown-item{background:var(--panel-2);border:1px solid #2b3150;border-radius:9px;padding:9px 12px;text-align:left;font-size:13px;color:var(--text);}
+.pack-breakdown-item.active{border-color:var(--gold);background:#2c2410;}
+.pack-breakdown-bubble{position:relative;background:#111624;border:1px solid #6a4ad4;border-radius:9px;padding:8px 12px;margin:-2px 0 4px 12px;font-size:11px;line-height:1.6;}
+.pack-breakdown-bubble::before{content:'';position:absolute;top:-7px;left:16px;border:6px solid transparent;border-bottom-color:#6a4ad4;}
