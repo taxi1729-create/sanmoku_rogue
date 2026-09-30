@@ -6,6 +6,18 @@ const GameData = {
   // #1 シカクを7倍に修正
   // #1 初期ビンゴ倍率：マル・サンカク・シカクをすべて10倍に変更
   BINGO_MULTIPLIER_BASE: { Circle:10, Triangle:10, Square:10, Cross:-30 },
+  // ビンゴ倍率の変化表示（右枠）用：スナップショットと差分HTML
+  snapshotMult(){ return {...this.BINGO_MULTIPLIER_BASE}; },
+  multChanged(before){ return this.SYMBOLS.some(s=>before[s]!==this.BINGO_MULTIPLIER_BASE[s]); },
+  multChangeHtml(before){
+    const f=v=>Math.round(v*100)/100;
+    const rows=this.SYMBOLS.map(s=>{
+      const a=before[s], b=this.BINGO_MULTIPLIER_BASE[s], d=b-a;
+      const cls=d>0?'mc-up':(d<0?'mc-down':'mc-same');
+      return `<tr class="${cls}"><td class="sym-${s}">${this.SYMBOL_LABEL[s]}</td><td>${f(a)}</td><td>→</td><td class="mc-after">${f(b)}</td><td class="mc-diff">${d===0?'':(d>0?'+':'')+f(d)}</td></tr>`;
+    }).join('');
+    return `<div class="gr-label">ビンゴ倍率が変化しました</div><table class="mult-change-table">${rows}</table>`;
+  },
   BINGO_MULTIPLIER_BASE_ORIGINAL: { Circle:10, Triangle:10, Square:10, Cross:-30 },
   QUAD_MULTIPLIER_FACTOR: 1.5,
   // #3 ホシパッシブLv2用：5列ビンゴは3列ビンゴの倍率の2倍
@@ -71,7 +83,7 @@ const GameData = {
     '加重':         '付与時、デッキ内の同じ記号を持つカードの枚数×0.5をカード基礎点に加算（即時加算）',
     'ギャンブル':   '手札に来るたび、カード基礎点に-50〜+50のランダムな値を加算。捨て札に行く、またはゲーム終了時にリセットされる',
     'トップスピード':'カード基礎点+5（付与時に即時加算）。ゲーム開始時、このカードをデッキの一番上に配置する',
-    '重ね掛け':     '盤面に置かれている、このカードと同じ記号のカードの上に上書き配置できる。上書きされたカードの基礎点のみ、このカードの基礎点に加算される',
+    '重ね掛け':     '盤面に置かれている、このカードと同じ記号のカードの上に上書き配置できる。上書きされたカードの基礎点のみ、このカードの基礎点に加算される。ただし、盤面上の重ね掛けが付与されているカードの上には載せられない',
   },
   ENHANCE_NAME_POOL: ['数値強化','拡大','横拡張','縦拡張','マルマルチ','サンカクマルチ','シカクマルチ','バツマルチ','ハブ','連鎖','オールマルチ','巨大化','肥大化','ブルジョワ','ドロー','エクステンド','加重','ギャンブル','トップスピード','重ね掛け'],
 
@@ -86,17 +98,20 @@ const GameData = {
     'ミニマム':     'ビンゴ時、盤面最少記号の数n×20を補正倍率に加算',
     'マキシマム':   'ビンゴ時、最多記号とビンゴ記号が同じなら、盤面最多記号の数n×10を補正倍率に加算',
     '将軍':         'ビンゴ時、手札にある場合最終乗算補正×1.1',
-    '保留':         'ラウンド終了時、捨て札にならず保留される',
+    '保留':         'ラウンド終了時に手札にある場合、捨て札にならず次のラウンドの手札に残る（盤面に置いた場合は手札に戻らない）。残ったカードは次のラウンドの手札上限に数えない',
     '竜頭蛇尾':     'ゲーム開始時カード基礎点+300（上限）。手札に来るたびに-100（最初の手札では-100しない）。補正が0になったら性質変化は解除される',
   },
   TRAIT_NAME_POOL: ['塗りつぶし','指令官','ネガティブ','ディスカード','レリック特攻','ミニマム','マキシマム','将軍','保留','竜頭蛇尾'],
 
-  applyGrantSideEffects(card, gold=0){
+  // #21 which：'enhance'=強化効果の付与時のみ／'trait'=性質変化の付与時のみ／'all'=カード生成時（既存の効果を二重に適用しないため）
+  applyGrantSideEffects(card, gold=0, which='all'){
+    const doE = which==='all'||which==='enhance', doT = which==='all'||which==='trait';
     // #1 シカクパッシブ3：シカクカードのみ対象の強化効果（数値強化・ブルジョワ・マルチ系）の数値を2倍にする
     const sqP3 = (typeof GameState!=='undefined') && GameState.symbolPassiveTier?.Square>=2 && card.symbol==='Square';
     const mul = sqP3?2:1;
+    if(doT && card.trait === '竜頭蛇尾') card.baseScore += 300;
+    if(!doE) return;
     if(card.enhance === '数値強化') card.baseScore += 15*mul;
-    if(card.trait === '竜頭蛇尾') card.baseScore += 300;
     if(card.enhance === 'ブルジョワ') card.baseScore += 4*mul * gold;
     const multiMap = { 'マルマルチ':'Circle', 'サンカクマルチ':'Triangle', 'シカクマルチ':'Square', 'バツマルチ':'Cross' };
     const matched = multiMap[card.enhance];
@@ -110,6 +125,12 @@ const GameData = {
     }
     // #4 トップスピード：カード基礎点+5（付与時に即時加算。デッキ先頭配置は別途ステージ開始時に処理）
     if(card.enhance === 'トップスピード') card.baseScore += 5;
+  },
+
+  // #21 付与効果の抽選：対象カードに現在付与されている効果以外から選ぶ
+  pickDifferent(pool, current){
+    const cand = pool.filter(x=>x!==current);
+    return GlobalFunctions.randChoice(cand.length>0?cand:pool);
   },
 
   // #A 記号パッシブ（ボスクリアごとに1つ選択・3段階）
@@ -133,12 +154,14 @@ const GameData = {
     },
     // #8 チェックパッシブ（旧マルパッシブ1の効果を継承）
     Check: {
-      1: { name:'チェック・トライフォース', desc:'1ラウンド内でマル・サンカク・シカクのビンゴが全て発生した場合、残りラウンドを1追加する（1ラウンドにつき1回）',
-        live(){ const n=(typeof GameMainScene!=='undefined'&&GameMainScene.bingoSymbolsThisRound)?GameMainScene.bingoSymbolsThisRound.size:0; return `このラウンドでビンゴした記号の種類：${n}/3`; } },
+      // #19 チェックパッシブ1：ビンゴした記号の種類が2種類以上の時、最終乗算補正+(種類数-1)
+      1: { name:'チェック・バラエティ', desc:'ビンゴ時、このラウンドでビンゴした記号の種類（同時ビンゴを含む）が2種類以上の時、最終乗算補正+n（n=ビンゴした記号の種類の数-1）',
+        live(){ const n=(typeof GameMainScene!=='undefined'&&GameMainScene.bingoSymbolsThisRound)?GameMainScene.bingoSymbolsThisRound.size:0; return `このラウンドでビンゴした記号の種類：${n}種類 → 最終乗算補正+${Math.max(0,n-1)}`; } },
       2: { name:'チェック・コーナー', desc:'ゲーム開始時、盤面の4隅にマル・シカク・サンカクのいずれかランダムな記号（基礎点100）と、ランダムなマルチ強化（マルマルチ/シカクマルチ/サンカクマルチ/オールマルチ）が付いたカードを配置する',
         live(){ return '盤面4隅に基礎点100・オールマルチのマルカードを配置'; } },
-      3: { name:'チェック・エンデュランス', desc:'ゲーム中、3回ビンゴするまでラウンドが終了しない',
-        live(){ const n=GameState.bingoCountThisStage||0; return `このステージのビンゴ回数：${n}/3`; } },
+      // #20 チェックパッシブ3：同じ記号のビンゴが2回目になるまで、盤面がエクステンド状態（ビンゴしてもラウンドが終了しない）
+      3: { name:'チェック・エクステンド', desc:'各ラウンド、同じ記号のビンゴが2回目になるまで盤面がカード強化「エクステンド」が付与された状態になる（ビンゴしてもラウンドが終了しない。ビンゴの点数計算は通常通り行われる）。同じ記号のビンゴが2回目になった時点で解除され、そのビンゴでラウンドが終了する',
+        live(){ const gm=(typeof GameMainScene!=='undefined')?GameMainScene:null; const cnt=(gm&&gm.bingoSymbolCountThisRound)||{}; const mx=Math.max(0,...Object.values(cnt)); return (gm&&gm.isCheckExtendActive&&gm.isCheckExtendActive())?`エクステンド状態：有効（同じ記号のビンゴ最大${mx}/2回）`:'エクステンド状態：このラウンドは解除済み'; } },
     },
     Triangle: {
       1: { name:'サンカク・レシオ', desc:'デッキ内のサンカクカード比率nを計算し、サンカクカードの基礎点に(1+n)を乗算する。また、ショップの品揃え更新を解放する（未取得時は更新不可）',
@@ -149,7 +172,8 @@ const GameData = {
         live(){ return 'ジャミングカード使用の1ターン後に同じ効果を再付与'; } },
     },
     Square: {
-      1: { name:'シカク・ドロー', desc:'シカクカードをプレイした時、そのカード自身の基礎点+1を永続付与し、カードを1枚ドローする（ドローしたカードの基礎点にも+1）。また、手札上限+1',
+      // #13 手札上限+1の代わりに、ショップでのパック購入時の選択可能カード枚数+1
+      1: { name:'シカク・ドロー', desc:'シカクカードをプレイした時、そのカード自身の基礎点+1を永続付与し、カードを1枚ドローする（ドローしたカードの基礎点にも+1）。また、ショップでパック購入時の選択可能カード枚数+1',
         live(){ return 'シカクカードプレイ時：自身の基礎点+1（永続）、ドロー+1枚（そのカードにも基礎点+1）'; } },
       2: { name:'シカク・アンプ', desc:'シカクカードの強化効果を強化する（シカクカードのみ有効）。数値強化・シカクマルチ・ハブ・連鎖・巨大化・肥大化・ブルジョワ・ドローは効果2倍、横拡張・縦拡張は4マスに、拡大は4×4マスに拡張される',
         live(){ return '対象の強化効果が強化される（数値・枚数2倍／拡張は4マス／拡大は4×4マス）'; } },
@@ -157,8 +181,9 @@ const GameData = {
         live(){ const n=GameState.currentDeck.filter(c=>c.symbol==='Square').length; return `対象のシカクカード：${n}枚（デッキ確認画面でタップして交換）`; } },
     },
     Cross: {
-      1: { name:'バツ・スケール', desc:'バツの基礎点が常にデッキ枚数×3に変化する。また、ショップにバツカードが出現するようになる（未取得時は出現しない）',
-        live(){ const n=GameState.currentDeck.length; return `デッキ枚数:${n}枚 → バツ基礎点=${n*3}`; } },
+      // #2 NPCのバツのカード基礎点のみに制限
+      1: { name:'バツ・スケール', desc:'NPCのバツのカード基礎点が常にデッキ枚数×3に変化する（プレイヤーのバツカードには影響しない）。また、ショップにバツカードが出現するようになる（未取得時は出現しない）',
+        live(){ const n=GameState.currentDeck.length; return `デッキ枚数:${n}枚 → NPCのバツ基礎点=${n*3}`; } },
       2: { name:'バツ・ミラー', desc:'一番高いビンゴ倍率を常にバツ倍率に反映し続ける',
         live(){ const max=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s])); return `現在の最大倍率:${Math.round(max*100)/100} → バツ倍率に反映`; } },
       3: { name:'バツ・クアドラプル', desc:'点数計算時、現在のバツビンゴ倍率をさらに4倍して補正する',
@@ -195,7 +220,7 @@ const GameData = {
     { id:'ren_negative', name:'ネガティブ',    desc:'このレリックは所持数に加算されない' },
     { id:'ren_discard_sell', name:'ディスカード', desc:'売却時デッキ枚数/2（切捨て）Gを得る' },
     { id:'ren_general', name:'将軍',          desc:'ビンゴ時、最終乗算補正×1.1' },
-    { id:'ren_all_link', name:'オールリンク',  desc:'NPCは常時リンク状態（前ターン隣接のみ配置可）' },
+    { id:'ren_all_link', name:'オールリンク',  desc:'プレイヤーが配置するカードに常にジャミング効果「リンク」が付与されている状態になる（他のジャミング効果と重複する）' },
     { id:'ren_gold', name:'G獲得',         desc:'ステージクリア時追加で1G得る' },
     { id:'ren_draw', name:'ドロー強化',    desc:'ラウンド終了時カードを1枚ドロー' },
     { id:'ren_double', name:'倍化',          desc:'2個分とカウント。最終乗算補正×1.5' },
@@ -242,6 +267,8 @@ const GameData = {
       case 'ren_grade': { const n=GameState.currentDeck.reduce((s,c)=>{let x=0;if(c.enhance)x++;if(c.jamming)x++;if(c.trait)x++;return s+x;},0); return `補正倍率:+${n}`; }
       case 'ren_only_one': return GameState.relicCount()===1?'補正倍率:+20（発動中）':'補正倍率:+20（レリック1個所持時のみ）';
       case 'ren_general': return '最終乗算補正:×1.1';
+      case 'ren_pair': return GameState.relics.filter(x=>x.id===relic.id).length>=2?'カード基礎点:+40（発動中）':'カード基礎点:+40（同じレリックを2つ以上所持時のみ）';
+      case 'ren_npc': return '補正基礎点:×5（NPCは2回行動）';
       case 'ren_double': return '最終乗算補正:×1.5';
       case 'ren_triple': return '最終乗算補正:×2';
       case 'ren_draw_pile': return `最終加算補正:+${GameState.drawPile.length*100}`;
@@ -342,7 +369,7 @@ const GameData = {
     // #12 新規レリック9種
     { id:'all_bingo_gain', name:'オールビンゴ獲得', desc:'ステージクリア時、マル・サンカク・シカク・バツすべてのビンゴ倍率+1する' },
     { id:'num_boost3', name:'数値強化1獲得',     desc:'ステージクリア時、デッキ内のランダムなカード1枚の基礎点+10する' },
-    { id:'hobby_collect', name:'趣味レリック集め', desc:'このレリックはレリック所持3個分になる。ステージクリア時、レリックパックを獲得する' },
+    { id:'hobby_collect', name:'趣味レリック集め', desc:'このレリックはレリック所持3個分になる。ステージクリア時、クリア報酬の爆発アップグレードの前にレリックパックを1つ無料で手に入れる' },
     { id:'passive_unneeded', name:'パッシブ不要理論', desc:'最終乗算補正にmを加算する。m=(4.5-n)（nは所持している記号パッシブの種類数）。mが0未満の場合は加算しない' },
     { id:'ten_stage', name:'テンステージ',       desc:'ビンゴ時、加算される基礎点が10の倍数のカード1枚につき補正基礎点+30' },
     { id:'joker', name:'ジョーカー',            desc:'このレリックを売却した時、デッキから好きなカードを1枚選び、基礎点+10した上で記号をマル・サンカク・シカク・バツの中から好きなものに変更する' },
@@ -352,7 +379,7 @@ const GameData = {
   ],
 
   BOSS_EFFECT_POOL: [
-    { id:'cross5000', name:'バツ5000',         desc:'×のカード基礎点が5000点になる' },
+    { id:'cross5000', name:'バツ5000',         desc:'NPCの×のカード基礎点が5000点になる' },
     { id:'block_cells', name:'マス妨害',          desc:'盤面の4つのランダムなマスが使用不可になる' },
     { id:'quad_only', name:'４ビンゴ',          desc:'お互い4列でないとビンゴできない' },
     { id:'blackout', name:'ブラックアウト',    desc:'手札は記号が？で隠れる。カード強化のみ確認可。盤面に出したら表示される' },
@@ -412,7 +439,8 @@ const GameData = {
     return pool[pool.length-1].id;
   },
 
-  generateShopCard(){
+  // forced：強化/ジャミング/性質変化を指定して生成する（強化カードパック等。副次効果を二重にかけないよう生成時に指定する）
+  generateShopCard(forced={}){
     // #7 バツパッシブ1を取得するまでショップにバツカードは出現しない
     const crossUnlocked = typeof GameState!=='undefined' && GameState.symbolPassiveTier?.Cross>=1;
     // #4 出現確率：マル・サンカク・シカクは各30%、バツは10%（バツ未解放時はマル・サンカク・シカクの3等分＝各33.3%）
@@ -420,21 +448,24 @@ const GameData = {
     let symbol;
     if(!crossUnlocked) symbol = r<0.334?'Circle':(r<0.667?'Triangle':'Square');
     else symbol = r<0.3?'Circle':(r<0.6?'Triangle':(r<0.9?'Square':'Cross'));
-    const crossBoss5000 = symbol==='Cross' && typeof GameMainScene!=='undefined' && GameMainScene.hasBossEffect && GameMainScene.hasBossEffect('cross5000');
-    const baseScore = crossBoss5000 ? 5000 : GlobalFunctions.randInt(1, 50);
+    // #3 ボス効果「バツ5000」はNPCのバツのみ対象のため、ショップ生成カードには影響させない
+    const baseScore = GlobalFunctions.randInt(1, 50);
     let jamming = Math.random() < 0.5 ? GlobalFunctions.randChoice(Object.keys(this.JAMMING_DESC)) : null;
     let enhance = Math.random() < 0.2 ? GlobalFunctions.randChoice(this.ENHANCE_NAME_POOL) : null;
     // #8 マルパッシブ2：ショップ内での性質変化カードの出現確率を2倍にする
     let traitChance=0.05;
     if(typeof GameState!=='undefined' && GameState.symbolPassiveTier?.Circle>=2) traitChance*=2;
     let trait = Math.random() < traitChance ? GlobalFunctions.randChoice(this.TRAIT_NAME_POOL) : null;
+    if(forced.enhance!==undefined) enhance=forced.enhance;
+    if(forced.jamming!==undefined) jamming=forced.jamming;
+    if(forced.trait!==undefined) trait=forced.trait;
     const card = { id:'shopcard_'+Date.now()+'_'+Math.floor(Math.random()*100000), symbol, number:baseScore, baseScore, jamming, enhance, trait };
     this.applyGrantSideEffects(card, (typeof GameState!=='undefined')?GameState.gold:0); // #1 生成時に現在Gを正しく反映
     return card;
   },
 
   SHOP_PRICES: { relic:5, cardPack:2, normalUpgrade:3, specialUpgrade:10, reroll:1,
-                 cardFocus:6, bingoFocus:4, dreamCard:20, pickupUpgrade:3, pickupRelic:8,
+                 cardFocus:6, bingoFocus:4, dreamCard:20, pickupUpgrade:3,
                  // #9 新商品価格（各4G）
                  enhancePack:4, jammingPack:4, relicPack:4,
                  // #6 爆発通常アップグレード
@@ -442,7 +473,7 @@ const GameData = {
 
   NORMAL_SELECT_POOL: [
     { id:'circle_mult', name:'🟡マルビンゴ強化',    desc:'○のビンゴ倍率を+4する',              targetMin:0, targetMax:0 },
-    { id:'cross_mult', name:'🟡バツビンゴ強化',    desc:'×のビンゴ倍率を+7する',              targetMin:0, targetMax:0 },
+    { id:'cross_mult', name:'🟡バツビンゴ強化',    desc:'×のビンゴ倍率を+6する',              targetMin:0, targetMax:0 },
     { id:'square_mult', name:'🟡シカクビンゴ強化',  desc:'□のビンゴ倍率を+4する',              targetMin:0, targetMax:0 },
     { id:'triangle_mult', name:'🟡サンカクビンゴ強化',desc:'△のビンゴ倍率を+4する',              targetMin:0, targetMax:0 },
     { id:'number_up2', name:'🟡数値上昇',          desc:'カードを2枚選択し、それぞれ基礎点+5', targetMin:2, targetMax:2 },
@@ -467,13 +498,18 @@ const GameData = {
     // #11: 4ターン増加
     { id:'turn_up4', name:'🔵ターン増加',         desc:'1ラウンドのターン数が4増加する',   targetMin:0, targetMax:0 },
     { id:'relic_slot_up1', name:'🔵レリック所持数増加', desc:'レリック所持数上限が1増加する',    targetMin:0, targetMax:0 },
+    // #14 パック購入時の選択可能カード枚数+2
+    { id:'pack_card_up2', name:'🔵パック選択枚数増加', desc:'パック購入時の選択可能カード枚数が2枚増加する', targetMin:0, targetMax:0 },
     // #29: 全引き後確定性質変化付与は applyEffect 側で処理
   ],
 
   BOARD_SIZE: 4,
   TURNS_PER_ROUND: 16,
   MAX_ROUNDS: 4,
-  HAND_SIZE: 7, // #6 初期手札を7枚に変更
+  HAND_SIZE: 8, // #12 手札上限を8枚に変更
+  // #11 パック購入時に選択できるカードの枚数（通常7枚／爆発アップグレード9枚）
+  PACK_CARD_COUNT: 7,
+  EXPLOSIVE_PACK_CARD_COUNT: 9,
   MAX_RESERVE: 2,
   INITIAL_REROLL: 5,
 
@@ -521,8 +557,9 @@ const GameData = {
     return modeId==='tengame' ? this.buildTenGameDeck() : this.buildInitialDeck();
   },
 
-  CLEAR_REWARD_BASE: { common:3, high:5, boss:8 },
-  SKIP_REWARD_BASE:  { common:2, high:3 },
+  // #7/#8 報酬G計算式の基本G
+  CLEAR_REWARD_BASE_G: 3,
+  SKIP_REWARD_BASE_G: 4,
 
   // #12 多階層
   buildFloorStages(floor){

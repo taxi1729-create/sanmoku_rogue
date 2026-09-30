@@ -3,6 +3,7 @@ const GameState = {
   targetScore:0, currentScore:0, relics:[], gold:0, round:1, turn:1, currentStage:null,
   clearedStages:[], lastReward:null, rerollCount:GameData.INITIAL_REROLL,
   handSizeBonus:0, roundsBonus:0, turnsBonus:0, relicSlotBonus:0, rerollBonus:0,
+  packCardBonus:0, // #14 特別アップグレード：パック購入時の選択可能カード枚数の追加分
   usedSpecialEffectIds:[], specialPackExhausted:false, pendingBossEffect:null,
   currentFloor:1,          // #12 現在の階層
   maxClearedFloor:0,        // #12 最高クリア階層
@@ -16,8 +17,30 @@ const GameState = {
   gameMode:'normal', // #9 ゲームモード（normal=通常デッキ／tengame=テンゲーム）
   initialPassiveGranted:false, // #6 ゲーム開始時パッシブ選択（3択）を既に提示したかどうか
 
-  // #8 シカクパッシブ1：手札上限+1
-  effectiveHandSize(){ return GameData.HAND_SIZE + this.handSizeBonus + (this.symbolPassiveTier.Square>=1?1:0); },
+  // #13 シカクパッシブ1の手札上限+1は廃止（パック選択枚数+1に変更）
+  effectiveHandSize(){ return GameData.HAND_SIZE + this.handSizeBonus; },
+  // #4 保留：前ラウンドから手札に残った保留カードは手札上限の計算に含めない
+  handCountForLimit(){ return this.hand.filter(c=>!c._reserveCarry).length; },
+  // #11/#13/#14 パック購入時に選択できるカードの枚数（通常7枚／爆発9枚＋シカクパッシブ1＋特別アップグレード）
+  packCardCount(explosive=false){
+    const base = explosive ? GameData.EXPLOSIVE_PACK_CARD_COUNT : GameData.PACK_CARD_COUNT;
+    return base + (this.symbolPassiveTier.Square>=1?1:0) + (this.packCardBonus||0);
+  },
+  // #5 レリックの大きさ（所持枠数）を🔴で表現する（ネガティブ=0枠は表示なし）
+  relicSizeDots(relic){ return '🔴'.repeat(Math.max(0,this.slotsForRelic(relic))); },
+  // #7/#8 報酬Gに加算するレリック効果（G獲得+3）とレリック強化効果（G獲得+1）
+  rewardRelicGold(noRelic=false){
+    if(noRelic) return {relic:0, relicEnhance:0};
+    return { relic:3*this.relicCountOf('gold_boost'), relicEnhance:this.relics.filter(r=>r.relicEnhance==='ren_gold').length };
+  },
+  // #8 スキップ報酬：(基本G4)×num＋レリック効果＋レリック強化効果（num=1、階層6以上で+1）
+  calcSkipReward(){
+    const base=GameData.SKIP_REWARD_BASE_G;
+    const num=1+(this.currentFloor>=6?1:0);
+    const rg=this.rewardRelicGold(false);
+    const total=base*num+rg.relic+rg.relicEnhance;
+    return {base,num,relicBonus:rg.relic,relicEnhanceBonus:rg.relicEnhance,total};
+  },
   effectiveMaxRounds(){ return GameData.MAX_ROUNDS + this.roundsBonus; },
   effectiveTurnsPerRound(){ return GameData.TURNS_PER_ROUND + this.turnsBonus; },
   effectiveMaxRelics(){ return GameData.MAX_RELICS + this.relicSlotBonus; },
@@ -60,7 +83,7 @@ const GameState = {
     this.finalShopDone=false; // #6 階層10特殊構成の初回フラグをリセット
     this.rerollCount=GameData.INITIAL_REROLL;
     this.handSizeBonus=0; this.roundsBonus=0; this.turnsBonus=0;
-    this.relicSlotBonus=0; this.rerollBonus=0;
+    this.relicSlotBonus=0; this.rerollBonus=0; this.packCardBonus=0;
     this.usedSpecialEffectIds=[]; this.discardedPile=[];
     this.specialPackExhausted=false; this.pendingBossEffect=null;
     this.currentFloor=1;
@@ -95,7 +118,7 @@ const GameState = {
       maxClearedFloor:this.maxClearedFloor, maxClearedStage:this.maxClearedStage,
       handSizeBonus:this.handSizeBonus, roundsBonus:this.roundsBonus,
       turnsBonus:this.turnsBonus, relicSlotBonus:this.relicSlotBonus,
-      rerollBonus:this.rerollBonus, usedSpecialEffectIds:this.usedSpecialEffectIds,
+      rerollBonus:this.rerollBonus, packCardBonus:this.packCardBonus, usedSpecialEffectIds:this.usedSpecialEffectIds,
       pendingBossEffect:this.pendingBossEffect,
       symbolPassiveTier:this.symbolPassiveTier,
       totalBingoCount:this.totalBingoCount,
@@ -119,6 +142,7 @@ const GameState = {
     this.handSizeBonus=d.handSizeBonus||0; this.roundsBonus=d.roundsBonus||0;
     this.turnsBonus=d.turnsBonus||0; this.relicSlotBonus=d.relicSlotBonus||0;
     this.rerollBonus=d.rerollBonus||0;
+    this.packCardBonus=d.packCardBonus||0;
     this.usedSpecialEffectIds=d.usedSpecialEffectIds||[];
     this.pendingBossEffect=d.pendingBossEffect||null;
     this.symbolPassiveTier=d.symbolPassiveTier||{ Circle:0, Triangle:0, Square:0, Cross:0, Hoshi:0, Check:0, Seven:0 };

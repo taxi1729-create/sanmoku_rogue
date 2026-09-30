@@ -39,6 +39,10 @@ const MapSelectScene = {
     const scrollY=window.scrollY;
     this.container.innerHTML='';
     const el=document.createElement('div'); el.className='map-screen';
+    // #16 マップでもゲームメイン画面と同様にパッシブ一覧を右上に表示する
+    const topRow=document.createElement('div'); topRow.className='scene-top-row';
+    topRow.appendChild(GameMainScene.renderPassiveBar(()=>this.renderAll()));
+    el.appendChild(topRow);
     const header=document.createElement('div'); header.className='map-header';
     header.innerHTML=`<span>所持G：${GameState.gold}</span><span>第${GameState.currentFloor}階層</span>`;
     // #2(B) デバッグ促進用：タップで20000G付与するボタン
@@ -76,8 +80,8 @@ const MapSelectScene = {
       let skipBonus=null;
       if(stage.skippable&&!isCleared&&!locked){
         skipBonus=this.getSkipBonus(stage);
-        const base=GameData.SKIP_REWARD_BASE[stage.key]||1; const flat=GameData.REWARD_FLAT_BONUS;
-        skipBonusHtml=`<div class="skip-bonus-tag">スキップ報酬：G+${base+flat}${skipBonus?`　＋　${skipBonus.label}`:'（追加報酬なし）'}</div>`;
+        const sr=GameState.calcSkipReward(); // #8
+        skipBonusHtml=`<div class="skip-bonus-tag">スキップ報酬：G+${sr.total}${skipBonus?`　＋　${skipBonus.label}`:'（追加報酬なし）'}</div>`;
       }
       const actionsHtml=isCleared
         ? `<div class="stage-actions"><div class="stage-done-tag">クリア済み</div></div>`
@@ -99,16 +103,17 @@ const MapSelectScene = {
       const skipBtn=card.querySelector('.skip-btn');
       if(skipBtn) skipBtn.addEventListener('click',()=>{
         if(locked||isCleared) return;
-        const base=GameData.SKIP_REWARD_BASE[stage.key]||1;
-        const flat=GameData.REWARD_FLAT_BONUS; const total=base+flat;
+        // #8 スキップ報酬G＝(基本G4)×num＋レリック効果＋レリック強化効果（num=1、階層6以上で+1）
+        const sr=GameState.calcSkipReward();
+        const total=sr.total;
         GameState.gold+=total;
         const bonus=skipBonus||this.getSkipBonus(stage);
         const bonusMsg=this.applySkipBonusEffect(bonus);
-        GameState.lastReward={type:'skip',stageName:stage.name,gold:total,breakdown:{base,bonus:0,flat,total},extra:bonusMsg};
+        GameState.lastReward={type:'skip',stageName:stage.name,gold:total,breakdown:sr,extra:bonusMsg};
         if(!GameState.clearedStages.includes(stage.key)) GameState.clearedStages.push(stage.key);
         // #8 スキップ時セーブ
         App.saveGame();
-        this.pendingReward={stageName:stage.name,breakdown:{base,bonus:0,flat,total},gold:total,extra:bonusMsg};
+        this.pendingReward={stageName:stage.name,breakdown:sr,gold:total,extra:bonusMsg};
         this.renderAll();
       });
     });
@@ -158,6 +163,7 @@ const MapSelectScene = {
       });
     }
     this.container.appendChild(el);
+    const pip=GameMainScene.renderPassiveInfoPanel(()=>this.renderAll()); if(pip) this.container.appendChild(pip); // #16
     if(this.pendingReward) this.container.appendChild(this.renderRewardPopup());
     window.scrollTo(0,scrollY);
   },
@@ -173,7 +179,7 @@ const MapSelectScene = {
       GameState.relics.forEach((relic,i)=>{
         const rc=document.createElement('div');
         rc.className='relic-card'+(this.activeRelicId===i?' active':'');
-        rc.innerHTML=`<div class="relic-name">${relic.name}</div>${relic.relicEnhance?`<div class="relic-enhance-tag">${GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance)?.name||''}</div>`:''}`;
+        rc.innerHTML=`<div class="relic-name">${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${relic.relicEnhance?`<div class="relic-enhance-tag">${GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance)?.name||''}</div>`:''}`;
         rc.addEventListener('click',()=>{ this.activeRelicId=(this.activeRelicId===i)?null:i; this.renderAll(); });
         row.appendChild(rc);
       });
@@ -185,7 +191,7 @@ const MapSelectScene = {
       if(relic){
         const ren=GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance);
         const infoDiv=document.createElement('div'); infoDiv.className='relic-info-panel'; infoDiv.style.marginTop='8px';
-        infoDiv.innerHTML=`<div class="info-title">${relic.name}</div><div class="info-desc">${relic.desc}</div>${ren?`<div class="info-desc relic-enhance-desc">【${ren.name}】${ren.desc}</div>`:''}<div class="relic-reorder-row"><button class="relic-move-btn" ${idx<=0?'disabled':''}>◀ 左へ</button><button class="relic-move-btn" ${idx>=GameState.relics.length-1?'disabled':''}>右へ ▶</button></div>`;
+        infoDiv.innerHTML=`<div class="info-title">${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div><div class="info-desc">${relic.desc}</div>${ren?`<div class="info-desc relic-enhance-desc">【${ren.name}】${ren.desc}</div>`:''}<div class="relic-reorder-row"><button class="relic-move-btn" ${idx<=0?'disabled':''}>◀ 左へ</button><button class="relic-move-btn" ${idx>=GameState.relics.length-1?'disabled':''}>右へ ▶</button></div>`;
         const moveBtns=infoDiv.querySelectorAll('.relic-move-btn');
         moveBtns[0].addEventListener('click',()=>{ if(GameState.moveRelic(idx,-1)){ this.activeRelicId=idx-1; this.renderAll(); } });
         moveBtns[1].addEventListener('click',()=>{ if(GameState.moveRelic(idx,1)){ this.activeRelicId=idx+1; this.renderAll(); } });
@@ -199,7 +205,7 @@ const MapSelectScene = {
     const r=this.pendingReward;
     const overlay=document.createElement('div'); overlay.className='pack-modal-overlay';
     const box=document.createElement('div'); box.className='gold-reveal-popup';
-    box.innerHTML=`<div class="gr-label">${r.stageName}をスキップ</div><div class="gr-total">+${r.gold}G</div><div class="gr-breakdown">基礎G+${r.breakdown.base} ＋ 基本G+${r.breakdown.flat}${r.extra?`<br>追加報酬：${r.extra}`:''}</div><button id="btn-goto-shop" style="margin-top:16px;">ショップへ</button>`;
+    box.innerHTML=`<div class="gr-label">${r.stageName}をスキップ</div><div class="gr-total">+${r.gold}G</div><div class="gr-breakdown">基本G${r.breakdown.base} × num${r.breakdown.num}${r.breakdown.num>1?'（階層6以上+1）':''} ＋ レリック効果${r.breakdown.relicBonus} ＋ レリック強化効果${r.breakdown.relicEnhanceBonus}${r.extra?`<br>追加報酬：${r.extra}`:''}</div><button id="btn-goto-shop" style="margin-top:16px;">ショップへ</button>`;
     overlay.appendChild(box);
     setTimeout(()=>{ box.querySelector('#btn-goto-shop').addEventListener('click',()=>{ this.pendingReward=null; App.showShop(); }); });
     return overlay;
@@ -212,7 +218,7 @@ const MapSelectScene = {
     if(this._skipBonusCache[key]===undefined){
       const type=GameData.pickSkipBonusType();
       let label=null;
-      if(type==='relic'){ label='レリック🔴：ランダムレリック1つを獲得'; }
+      if(type==='relic'){ label='レリック：ランダムレリック1つを獲得'; }
       else if(type==='normal_upgrade'){ label='通常アップグレード：ショップでカードと効果を選択'; }
       else if(type==='special_upgrade'){ label='特別アップグレード：ショップでカードと効果を選択'; }
       else if(type==='normal_explosive_upgrade'){ label='💥爆発通常アップグレード：ショップで最大3つ選択'; }
@@ -238,7 +244,7 @@ const MapSelectScene = {
     if(bonus.type==='normal_upgrade'||bonus.type==='special_upgrade'){
       if(GameState.currentDeck.length===0) return '';
       const slotType = bonus.type==='special_upgrade' ? 'special' : 'normal';
-      const pickCount = Math.min(8, GameState.currentDeck.length);
+      const pickCount = Math.min(GameState.packCardCount(false), GameState.currentDeck.length); // #11
       const cardIndexes = GlobalFunctions.shuffle(GameState.currentDeck.map((_,idx)=>idx)).slice(0, pickCount);
       let effectPool;
       if(slotType==='special'){
@@ -256,13 +262,13 @@ const MapSelectScene = {
         effectPool = GlobalFunctions.shuffle(finalPool).slice(0, Math.min(3, finalPool.length));
       }
       // #8 通常のショップ購入と同じ「効果→カード」選択モーダルをショップ画面側で開かせる
-      ShopScene.pickingPack = { slotType, slotRef:null, effectPool, chosenEffect:null, cardIndexes, selectedTargets:new Set() };
+      ShopScene.pickingPack = { slotType, slotRef:null, effectPool, chosenEffect:null, cardIndexes, selectedTargets:new Set(), packType: slotType==='special'?'special_upgrade':'normal_upgrade' };
       return 'ショップでカードと効果を選択してください';
     }
     if(bonus.type==='dream_card'){
       // #9 ドリームパックも通常通りショップでカードを選択できるようにする
       const candidates=[ShopScene.genDreamCard(), ShopScene.genDreamCard()];
-      ShopScene.pickingCardPack = { candidates, pickCount:1, isDream:true };
+      ShopScene.pickingCardPack = { candidates, pickCount:1, isDream:true, packType:'dream_card' };
       return 'ショップでドリームカードを選択してください';
     }
     // #7 爆発通常アップグレードをスキップ報酬に組み込む
