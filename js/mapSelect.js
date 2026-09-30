@@ -42,9 +42,9 @@ const MapSelectScene = {
     const header=document.createElement('div'); header.className='map-header';
     header.innerHTML=`<span>所持G：${GameState.gold}</span><span>第${GameState.currentFloor}階層</span>`;
     // #2(B) デバッグ促進用：タップで20000G付与するボタン
-    const debugGoldBtn=document.createElement('button'); debugGoldBtn.className='debug-gold-btn'; debugGoldBtn.textContent='🐞+20000G';
-    debugGoldBtn.addEventListener('click',()=>{ GameState.gold+=20000; this.renderAll(); });
-    header.appendChild(debugGoldBtn);
+    //const debugGoldBtn=document.createElement('button'); debugGoldBtn.className='debug-gold-btn'; debugGoldBtn.textContent='🐞+20000G';
+    //debugGoldBtn.addEventListener('click',()=>{ GameState.gold+=20000; this.renderAll(); });
+    //header.appendChild(debugGoldBtn);
     // #2 マップ選択画面でデッキを確認できるようにする
     const deckBtn=document.createElement('button'); deckBtn.className='debug-gold-btn'; deckBtn.textContent=`デッキ確認(${GameState.currentDeck.length})`;
     deckBtn.addEventListener('click',()=>GameMainScene.showDeckModal('deck'));

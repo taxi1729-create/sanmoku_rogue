@@ -23,7 +23,7 @@ const ShopScene = {
     TutorialOverlay.show('shop');
   },
 
-  // #27 重み付き抽選で8枠を生成 + 確定枠3つ
+
   generateOffers(){
     const fixedRelics = [this.pickRelic(), this.pickRelic()]; // 確定ピックアップレリック2つ
     const fixedCardPack = [{ type:'card_pack', mystery:true }];
@@ -160,11 +160,11 @@ const ShopScene = {
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
       return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">重</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
-    // #3 加重：記号右に「基礎点+◯」（加算値は黄色）
+    // #3 加重：記号右に「基+◯」（加算値は黄色）
     if(card.enhance==='加重'){
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
       const addVal=card._weightedBonus!=null?card._weightedBonus:0;
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">基礎点<span class="gold-text">+${addVal}</span></span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">基<span class="gold-text">+${addVal}</span></span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
     // #2 ギャンブル：記号右に🎰
     if(card.enhance==='ギャンブル'){
@@ -327,8 +327,6 @@ const ShopScene = {
     this.renderAll();
   },
 
-  // #29 特別セレクト全引き後は確定性質変化付与
-  // #9 「カードを1つ選択し、基礎点+30する」を選択肢に追加する
   buySpecialPackExhausted(slotRef){
     const price = GameState.shopPriceOf(GameData.SHOP_PRICES.specialUpgrade);
     if(GameState.gold < price || GameState.currentDeck.length === 0) return;
@@ -336,8 +334,8 @@ const ShopScene = {
     slotRef.used = true;
     const pickCount = Math.min(8, GameState.currentDeck.length);
     const cardIndexes = GlobalFunctions.shuffle(GameState.currentDeck.map((_,idx)=>idx)).slice(0, pickCount);
-    const forcedEffect = { id:'grant_trait', name:'性質変化付与（確定）', desc:'カードを1枚選択しランダムな性質変化を付与', targetMin:1, targetMax:1 };
-    const forcedEffect2 = { id:'base_up30', name:'基礎点上昇（確定）', desc:'カードを1枚選択し、基礎点+30する', targetMin:1, targetMax:1 };
+    const forcedEffect = { id:'grant_trait', name:'性質変化付与', desc:'カードを1枚選択しランダムな性質変化を付与', targetMin:1, targetMax:1 };
+    const forcedEffect2 = { id:'base_up30', name:'基礎点上昇4', desc:'カードを1枚選択し、基礎点+30する', targetMin:1, targetMax:1 };
     this.pickingPack = { slotType:'special', slotRef, effectPool:[forcedEffect,forcedEffect2], chosenEffect:null, cardIndexes, selectedTargets:new Set() };
     this.renderAll();
   },
@@ -409,7 +407,7 @@ const ShopScene = {
     const bump = (sym, amt) => { GameData.BINGO_MULTIPLIER_BASE[sym] += amt; };
     switch(effectId){
       case 'circle_mult':    bump('Circle', 4);    this.message = '○ビンゴ倍率+4'; return [];
-      case 'cross_mult':     bump('Cross', 7);     this.message = '×ビンゴ倍率+7'; return [];
+      case 'cross_mult':     bump('Cross', 6);     this.message = '×ビンゴ倍率+6'; return [];
       case 'square_mult':    bump('Square', 4);    this.message = '□ビンゴ倍率+4'; return [];
       case 'triangle_mult':  bump('Triangle', 4);  this.message = '△ビンゴ倍率+4'; return [];
       case 'all_mult_up1':   GameData.SYMBOLS.forEach(s=>bump(s,1)); this.message = '全ビンゴ倍率+1'; return [];
@@ -520,7 +518,7 @@ const ShopScene = {
         { id:'circle_mult', name:'マルビンゴ+4', targetMin:0, targetMax:0, desc:'○のビンゴ倍率を+4する' },
         { id:'triangle_mult', name:'サンカクビンゴ+4', targetMin:0, targetMax:0, desc:'△のビンゴ倍率を+4する' },
         { id:'square_mult', name:'シカクビンゴ+4', targetMin:0, targetMax:0, desc:'□のビンゴ倍率を+4する' },
-        { id:'cross_mult', name:'バツビンゴ+7', targetMin:0, targetMax:0, desc:'×のビンゴ倍率を+7する' },
+        { id:'cross_mult', name:'バツビンゴ+6', targetMin:0, targetMax:0, desc:'×のビンゴ倍率を+6する' },
         { id:'all_mult_up1', name:'全ビンゴ+1', targetMin:0, targetMax:0, desc:'全記号のビンゴ倍率を+1する' },
       ];
       const pickedEffects = GlobalFunctions.shuffle(effects).slice(0, 3);
@@ -533,7 +531,7 @@ const ShopScene = {
   // #8 ドリームカードパック：2枚のうち1枚をピックアップ（またはスキップ）
   genDreamCard(){
     const card = GameData.generateShopCard();
-    card.baseScore = GlobalFunctions.randInt(120, 150); // #2 ドリームカード数値
+    card.baseScore = GlobalFunctions.randInt(100, 150); // #2 ドリームカード数値
     card.number = card.baseScore;
     card.enhance = GlobalFunctions.randChoice(GameData.ENHANCE_NAME_POOL);
     card.jamming = GlobalFunctions.randChoice(Object.keys(GameData.JAMMING_DESC));
@@ -619,7 +617,7 @@ const ShopScene = {
     el.appendChild(this.renderFixedRelicSection());
     // 確定カードパック・確定アップグレード
     el.appendChild(this.renderFixedPackSection());
-    // ランダム8枠
+    // ランダム4枠
     el.appendChild(this.renderRandomSlots());
 
     // 既存レリック販売枠
@@ -696,7 +694,7 @@ const ShopScene = {
 
   renderFixedRelicSection(){
     const sec = document.createElement('div'); sec.className='shop-section';
-    sec.innerHTML=`<h3>ピックアップレリック（確定・${GameState.shopPriceOf(GameData.SHOP_PRICES.relic+3)}G）</h3>`;
+    sec.innerHTML=`<h3>商品一覧</h3>`;
     const row = document.createElement('div'); row.className='shop-row';
     this.offers.fixedRelics.forEach((relic, i) => {
       const slot = document.createElement('div');
@@ -713,7 +711,7 @@ const ShopScene = {
 
   renderFixedPackSection(){
     const sec = document.createElement('div'); sec.className='shop-section';
-    sec.innerHTML = '<h3>確定パック枠</h3>';
+    sec.innerHTML = '';
     const row = document.createElement('div'); row.className='shop-row';
     // カードパック
     const cpSlot = this.offers.fixedCardPack[0];
@@ -756,7 +754,7 @@ const ShopScene = {
 
   renderRandomSlots(){
     const sec = document.createElement('div'); sec.className='shop-section';
-    sec.innerHTML = '<h3>ランダム商品（8枠）</h3>';
+    sec.innerHTML = '<h3>ランダム商品</h3>';
     const row = document.createElement('div'); row.className='shop-row';
     this.offers.randomSlots.forEach((slot) => {
       const el = document.createElement('div');
