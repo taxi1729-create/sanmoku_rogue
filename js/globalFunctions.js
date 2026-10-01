@@ -30,7 +30,22 @@ const GlobalFunctions = {
 
   // #9 図鑑データ（ゲーム中に発見したカード効果・レリック）
   GALLERY_KEY:'siren_spire_gallery',
-  getGallery(){ try{ return JSON.parse(localStorage.getItem(this.GALLERY_KEY)||'{"jamming":[],"enhance":[],"trait":[],"relic":[]}')}catch(e){return{jamming:[],enhance:[],trait:[],relic:[]};} },
+  getGallery(){
+    let g; try{ g=JSON.parse(localStorage.getItem(this.GALLERY_KEY)||'{}'); }catch(e){ g={}; }
+    ['jamming','enhance','trait','relic','relicEnhance','passive'].forEach(k=>{ if(!Array.isArray(g[k])) g[k]=[]; });
+    return g;
+  },
+  // #7 図鑑：レリック強化効果・パッシブ（"Circle:2" 形式、魔力は "Mana:A"）の発見記録
+  recordOwned(){
+    if(typeof GameState==='undefined') return;
+    const g=this.getGallery(); let dirty=false;
+    const add=(k,v)=>{ if(v&&!g[k].includes(v)){ g[k].push(v); dirty=true; } };
+    (GameState.relics||[]).forEach(r=>{ add('relic',r.id); add('relicEnhance',r.relicEnhance); });
+    const tiers=GameState.passiveSuspended||GameState.symbolPassiveTier||{};
+    Object.entries(tiers).forEach(([s,t])=>{ for(let i=1;i<=t;i++) add('passive',s+':'+i); });
+    ['A','B','C','D','E'].forEach(st=>{ if(GameState.hasMana&&GameState.hasMana(st)) add('passive','Mana:'+st); });
+    if(dirty) try{ localStorage.setItem(this.GALLERY_KEY,JSON.stringify(g)); }catch(e){}
+  },
   recordCard(card){
     const g=this.getGallery();
     let dirty=false;

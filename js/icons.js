@@ -72,6 +72,27 @@ const GameIcons = (function(){
     return `<path d="${d}"${s(col)}${tf(col,o==null?0.5:o)}/>`;
   };
 
+  /* --- 新規カード強化・性質変化・レリック強化効果用の共通部品 --- */
+  // 小さなカード（左上x,y・幅w・高h・色col・塗りo）。下のものを隠すため暗色で下塗り
+  const miniCard = (x,y,w,h,col,o,extra) =>
+      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.6"${s(col)} fill="${C.dark}"${extra||''}/>`
+    + `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.6"${s(col)}${tf(col,o==null?0.3:o)}${extra||''}/>`;
+  // 兜（将軍）: 色col
+  const kabuto = (col,colL) =>
+      `<path d="M9.6 9.8C8.4 6.6 6.6 4.4 4 3.2M14.4 9.8c1.2-3.2 3-5.4 5.6-6.6"${s(colL)} stroke-width="2.2"/>`
+    + `<path d="M5 15.5a7 7 0 0 1 14 0z"${s(col)}${tf(col,0.45)}/>`
+    + `<path d="M3 15.5h18M6.5 15.5l1.5 4.5h8l1.5-4.5"${s(col)}/>`;
+  // 強化の紋：レリック強化効果（ren_*）共通の下地。紫の八芒星の台座
+  const renCrest = (() => {
+    let d='';
+    for(let i=0;i<16;i++){
+      const a=-Math.PI/2+i*Math.PI/8, rr=i%2?9.3:11.4;
+      d+=(i?'L':'M')+(12+rr*Math.cos(a)).toFixed(2)+' '+(12+rr*Math.sin(a)).toFixed(2);
+    }
+    return `<path d="${d}Z"${s(C.violet)} stroke-width="1.3" stroke-opacity=".9"${tf(C.purple,0.2)}/>`;
+  })();
+  const REN = body => renCrest + body;
+
   // key → {label, tint, body}
   const D = {
     /* ---------------- ジャミング（緑） ---------------- */
@@ -484,7 +505,153 @@ const GameIcons = (function(){
         `<path d="M6.4 8C4.8 6.4 4.2 4.3 4.6 2 6 3.9 7.5 4.8 9.2 5M17.6 8c1.6-1.6 2.2-3.7 1.8-6-1.4 1.9-2.9 2.8-4.6 3"${s(C.purple)}${tf(C.purple,0.4)}/>`
       + `<circle cx="12" cy="13.5" r="8.2"${s(C.red)}${tf(C.redD,0.35)}/>`
       + `<circle cx="12" cy="13.5" r="5.6"${s(C.redL)} stroke-width="1" stroke-opacity=".6"/>`
-      + `<path d="M8.6 13.6l2.4 2.4 4.4-5"${s(C.goldL)} stroke-width="2.4"/>` }
+      + `<path d="M8.6 13.6l2.4 2.4 4.4-5"${s(C.goldL)} stroke-width="2.4"/>` },
+
+    /* ---------------- カード強化（黄）追加2：カード記号の右に出るバッジ用 ---------------- */
+    enh_number:{ label:'数値強化', tint:'fixed', body:
+        `<rect x="3" y="3" width="18" height="18" rx="4.5"${s(C.yellow)}${tf(C.yellow,0.3)}/>`
+      + `<path d="M12 6.8v10.4M6.8 12h10.4"${s(C.goldL)} stroke-width="3.2"/>` },
+    enh_expand_rect:{ label:'拡大', tint:'fixed', body:
+        `<rect x="12.6" y="3" width="8.4" height="8.4" rx="1.4"${s(C.yellow)}${tf(C.yellow,0.25)}/>`
+      + `<rect x="3" y="3" width="8.4" height="8.4" rx="1.4"${s(C.yellow)}${tf(C.yellow,0.25)}/>`
+      + `<rect x="12.6" y="12.6" width="8.4" height="8.4" rx="1.4"${s(C.yellow)}${tf(C.yellow,0.25)}/>`
+      + `<rect x="3" y="12.6" width="8.4" height="8.4" rx="1.4"${s(C.yellow)}${tf(C.yellow,1)}/>` },
+    enh_expand_h:{ label:'横拡張', tint:'fixed', body:
+        `<rect x="2.5" y="7.2" width="9" height="9.6" rx="1.5"${s(C.yellow)}${tf(C.yellow,1)}/>`
+      + `<rect x="12.5" y="7.2" width="9" height="9.6" rx="1.5"${s(C.yellow)}${tf(C.yellow,0.25)}/>`
+      + `<path d="M15 12h3.6"${s(C.goldL)} stroke-width="1.8"/>` },
+    enh_expand_v:{ label:'縦拡張', tint:'fixed', body:
+        `<rect x="7.2" y="12.5" width="9.6" height="9" rx="1.5"${s(C.yellow)}${tf(C.yellow,1)}/>`
+      + `<rect x="7.2" y="2.5" width="9.6" height="9" rx="1.5"${s(C.yellow)}${tf(C.yellow,0.25)}/>`
+      + `<path d="M12 9V5.4"${s(C.goldL)} stroke-width="1.8"/>` },
+    enh_giant:{ label:'巨大化', tint:'fixed', body:
+        `<rect x="3" y="3" width="18" height="18" rx="2.5"${s(C.yellow)} stroke-dasharray="3 2.6" stroke-opacity=".75"/>`
+      + `<rect x="3" y="13" width="8" height="8" rx="1.6"${s(C.yellow)}${tf(C.yellow,1)}/>`
+      + `<path d="M12.5 11.5l5.5-5.5M13.2 6H18v4.8"${s(C.goldL)} stroke-width="2.2"/>` },
+    enh_bloat:{ label:'肥大化', tint:'fixed', body:
+        `<ellipse cx="12" cy="9.6" rx="6.6" ry="7.4"${s(C.yellow)}${tf(C.yellow,0.4)}/>`
+      + `<path d="M10.6 17.4l1.4 1.5 1.4-1.5z"${F(C.yellow)}/>`
+      + `<path d="M12 19c-1.4 1.2-.4 2.2-1.6 3"${s(C.yellow)} stroke-width="1.4"/>`
+      + `<path d="M9.2 5.8a4 4 0 0 1 2.6-1.6"${s(C.goldL)} stroke-width="1.8"/>`
+      + `<path d="M2.6 6.2q-1.4 3.4 0 6.8M21.4 6.2q1.4 3.4 0 6.8"${s(C.goldL)} stroke-width="1.6"/>` },
+    enh_overlay:{ label:'重ね掛け', tint:'fixed', body:
+        miniCard(8.5,10,12.5,11,C.yellow,0.2,' stroke-opacity=".6"')
+      + miniCard(4,7.5,12.5,11,C.yellow,0.5)
+      + `<path d="M19.2 2.2v5.4M17 5.4l2.2 2.2 2.2-2.2"${s(C.goldL)} stroke-width="2"/>` },
+
+    /* ---------------- 性質変化（青） ---------------- */
+    trait_paint:{ label:'塗りつぶし', tint:'fixed', body:
+        `<rect x="3" y="3" width="15" height="6.5" rx="2"${s(C.blue)}${tf(C.blue,0.55)}/>`
+      + `<path d="M18 6.2h2.5v5.3h-8.5v2.8"${s(C.blue)} stroke-width="1.8"/>`
+      + `<rect x="10.4" y="14.3" width="3.2" height="7.2" rx="1"${F(C.blueL)}/>` },
+    trait_paint_relic:{ label:'塗りつぶし(レリック)', tint:'fixed', body:
+        `<rect x="3" y="3" width="15" height="6.5" rx="2"${s(C.blue)}${tf(C.blue,0.55)}/>`
+      + `<path d="M18 6.2h2.5v5.3h-8.5v2.8"${s(C.blue)} stroke-width="1.8"/>`
+      + `<rect x="10.4" y="14.3" width="3.2" height="7.2" rx="1"${F(C.blueL)}/>`
+      + gem(5.6,17.6,0.5,C.redD,0.7) },
+    trait_commander:{ label:'指令官', tint:'fixed', body:
+        `<path d="M3 9.5h3.5l9.5-5.5v16l-9.5-5.5H3z"${s(C.blue)}${tf(C.blue,0.4)}/>`
+      + `<path d="M6.5 14.5l1.4 5.5"${s(C.blue)}/>`
+      + `<path d="M19 9.5a4 4 0 0 1 0 5M21 7a7.5 7.5 0 0 1 0 10"${s(C.blueL)} stroke-width="1.8"/>` },
+    trait_negative:{ label:'ネガティブ', tint:'fixed', body:
+        `<path d="M6 3h12M6 21h12M7.2 3c0 5 4.8 6 4.8 9s-4.8 4-4.8 9M16.8 3c0 5-4.8 6-4.8 9s4.8 4 4.8 9"${s(C.blue)}/>`
+      + `<path d="M8.6 18.6c1-1.8 3.4-2.6 3.4-4.2 0 1.6 2.4 2.4 3.4 4.2z"${F(C.blue)} fill-opacity=".6"/>`
+      + `<path d="M3.5 20.5l17-17"${s(C.blueL)} stroke-width="2.4"/>` },
+    trait_discard:{ label:'ディスカード', tint:'fixed', body:
+        miniCard(3.5,3,9,12.5,C.blue,0.4,' transform="rotate(-14 8 9.2)"')
+      + `<path d="M13 5.5q4.5 .5 5.5 5"${s(C.blueL)} stroke-width="1.8"/><path d="M16.6 9.6l1.9 1.6 1.4-2.1"${s(C.blueL)} stroke-width="1.8"/>`
+      + `<circle cx="15.5" cy="16.5" r="5"${s(C.gold)}${tf(C.gold,0.45)}/>`
+      + `<path d="M17.2 14.6a2.5 2.5 0 1 0 .3 3h-1.7"${s(C.goldL)} stroke-width="1.6"/>` },
+    trait_relic_assault:{ label:'レリック特攻', tint:'fixed', body:
+        `<path d="M20.5 3.5l-1 4.2-9 9-3.2-3.2 9-9z"${s(C.blue)}${tf(C.blue,0.5)}/>`
+      + `<path d="M5.6 11.4l7 7M8.7 15.3L5 19"${s(C.blueL)}/>`
+      + gem(17.8,17.8,0.46,C.redD,0.7) },
+    trait_minimum:{ label:'ミニマム', tint:'fixed', body:
+        `<rect x="3" y="4" width="4.6" height="16.5" rx="1"${s(C.blue)} stroke-opacity=".6"/>`
+      + `<rect x="9.7" y="9" width="4.6" height="11.5" rx="1"${s(C.blue)} stroke-opacity=".6"/>`
+      + `<rect x="16.4" y="15" width="4.6" height="5.5" rx="1"${s(C.blueL)}${tf(C.blue,1)}/>`
+      + `<path d="M18.7 4v6.8M16.6 8.7l2.1 2.1 2.1-2.1"${s(C.blueL)} stroke-width="1.8"/>` },
+    trait_maximum:{ label:'マキシマム', tint:'fixed', body:
+        `<rect x="3" y="15" width="4.6" height="5.5" rx="1"${s(C.blue)} stroke-opacity=".6"/>`
+      + `<rect x="9.7" y="10" width="4.6" height="10.5" rx="1"${s(C.blue)} stroke-opacity=".6"/>`
+      + `<rect x="16.4" y="3.5" width="4.6" height="17" rx="1"${s(C.blueL)}${tf(C.blue,1)}/>`
+      + `<path d="M5.3 11.6V5M3.2 7.1l2.1-2.1 2.1 2.1"${s(C.blueL)} stroke-width="1.8"/>` },
+    trait_general:{ label:'将軍', tint:'fixed', body: kabuto(C.blue, C.blueL) },
+    trait_hold:{ label:'保留', tint:'fixed', body:
+        miniCard(5,2.5,14,19,C.blue,0.3)
+      + `<path d="M10 8.5v7M14 8.5v7"${s(C.blueL)} stroke-width="2.6"/>` },
+    trait_dragon:{ label:'竜頭蛇尾', tint:'fixed', body:
+        `<path d="M9.5 10.5c3.6 3.4 6.4 5.2 12 10.8-5.6-3-9.4-4.6-13.6-8z"${s(C.blue)}${tf(C.blue,0.45)} stroke-width="1.6"/>`
+      + `<path d="M2.5 8.2C2.2 4.6 4.8 2.4 8 2.4c3 0 5.4 2 5.4 4.8s-2.4 4.9-5.4 4.9c-1.7 0-3-.5-3.9-1.3L2 11z"${s(C.blue)}${tf(C.blue,0.7)}/>`
+      + `<path d="M9.6 3l2.6-2M12 5.2l3-.8"${s(C.blueL)} stroke-width="1.7"/>`
+      + `<path d="M3.2 9.6l3.4-.6"${s(C.dark)} stroke-width="1.3"/>`
+      + `<circle cx="8.2" cy="6" r="1.2"${F(C.dark)}/>` },
+
+    /* ---------------- レリック強化効果（ren_<id>。金・紫。共通の「強化の紋」renCrest を下地に） ---------------- */
+    ren_discard:{ label:'廃棄強化', tint:'fixed', body: REN(
+        `<path d="M7 8.3h10M10.3 8.3V7h3.4v1.3"${s(C.gold)} stroke-width="1.8"/>`
+      + `<path d="M8.2 8.3l.7 8.4a1 1 0 0 0 1 .9h4.2a1 1 0 0 0 1-.9l.7-8.4"${s(C.gold)} stroke-width="1.8"${tf(C.gold,0.4)}/>`) },
+    ren_circle:{ label:'マルオール', tint:'fixed', body: REN(
+        `<circle cx="12" cy="12" r="4.8"${s(C.gold)} stroke-width="2.6"/>`) },
+    ren_square:{ label:'シカクオール', tint:'fixed', body: REN(
+        `<rect x="7.6" y="7.6" width="8.8" height="8.8" rx=".8"${s(C.gold)} stroke-width="2.6"/>`) },
+    ren_triangle:{ label:'サンカクオール', tint:'fixed', body: REN(
+        `<path d="M12 7l5.6 9.6H6.4z"${s(C.gold)} stroke-width="2.4"/>`) },
+    ren_only_one:{ label:'オンリーワン', tint:'fixed', body: REN(
+        `<path d="M9.6 9l3-2.2v10.4M9.6 17.2h6"${s(C.goldL)} stroke-width="2.4"/>`) },
+    ren_pair:{ label:'ペアルック', tint:'fixed', body: REN(
+        gem(8.6,12,0.42,C.gold,0.6) + gem(15.4,12,0.42,C.gold,0.6)) },
+    ren_negative:{ label:'ネガティブ', tint:'fixed', body: REN(
+        `<circle cx="12" cy="12" r="5.4"${s(C.goldL)} stroke-dasharray="2.2 2"/>`
+      + `<path d="M9.2 12h5.6"${s(C.gold)} stroke-width="2.4"/>`) },
+    ren_discard_sell:{ label:'ディスカード', tint:'fixed', body: REN(
+        `<circle cx="12" cy="12" r="5.6"${s(C.gold)}${tf(C.gold,0.45)}/>`
+      + `<path d="M14 9.7a3 3 0 1 0 .4 3.6H12.4"${s(C.goldL)} stroke-width="1.7"/>`) },
+    ren_general:{ label:'将軍', tint:'fixed', body: REN(
+        `<g transform="translate(12 12.4) scale(.52) translate(-12 -12)" stroke-width="3">${kabuto(C.gold, C.goldL)}</g>`) },
+    ren_all_link:{ label:'オールリンク', tint:'fixed', body: REN(
+        `<rect x="5.6" y="10" width="7.6" height="4" rx="2" transform="rotate(-45 9.4 12)"${s(C.gold)} stroke-width="1.8"/>`
+      + `<rect x="10.8" y="10" width="7.6" height="4" rx="2" transform="rotate(-45 14.6 12)"${s(C.goldL)} stroke-width="1.8"/>`) },
+    ren_gold:{ label:'G獲得', tint:'fixed', body: REN(
+        `<ellipse cx="12" cy="14.6" rx="4.8" ry="1.9"${s(C.gold)} stroke-width="1.6"${tf(C.gold,0.5)}/>`
+      + `<ellipse cx="12" cy="11.2" rx="4.8" ry="1.9"${s(C.gold)} stroke-width="1.6"${tf(C.gold,0.5)}/>`
+      + `<path d="M12 4.6v3M10.5 6.1h3"${s(C.goldL)} stroke-width="1.6"/>`) },
+    ren_draw:{ label:'ドロー強化', tint:'fixed', body: REN(
+        `<rect x="8.5" y="7.2" width="7" height="9.6" rx="1.2"${s(C.gold)} stroke-width="1.8"${tf(C.gold,0.35)}/>`
+      + `<path d="M12 14.2V9.6M10.2 11.4L12 9.6l1.8 1.8"${s(C.goldL)} stroke-width="1.7"/>`) },
+    ren_double:{ label:'倍化', tint:'fixed', body: REN(
+        `<path d="M6.6 10.4l2.8 2.8M9.4 10.4l-2.8 2.8"${s(C.purpleL)} stroke-width="1.7"/>`
+      + `<path d="M11.4 9a2.4 2.4 0 0 1 4.7.6c0 1.9-4.7 4-4.7 6.6h5"${s(C.goldL)} stroke-width="2.2"/>`) },
+    ren_triple:{ label:'3倍化', tint:'fixed', body: REN(
+        `<path d="M6.6 10.4l2.8 2.8M9.4 10.4l-2.8 2.8"${s(C.purpleL)} stroke-width="1.7"/>`
+      + `<path d="M11.4 7.6h4.6l-2.6 3.2a2.7 2.7 0 1 1-2.2 4.6"${s(C.goldL)} stroke-width="2.2"/>`) },
+    ren_cross:{ label:'バツ強化', tint:'fixed', body: REN(
+        `<path d="M7.6 8.6l7 7M14.6 8.6l-7 7"${s(C.gold)} stroke-width="2.6"/>`
+      + `<path d="M17.2 9.6V5.6M15.6 7.2l1.6-1.6 1.6 1.6"${s(C.goldL)} stroke-width="1.6"/>`) },
+    ren_npc:{ label:'NPC強化', tint:'fixed', body: REN(
+        `<rect x="7.2" y="8.6" width="9.6" height="8" rx="2"${s(C.gold)} stroke-width="1.8"${tf(C.gold,0.35)}/>`
+      + `<path d="M12 8.6V6.2"${s(C.gold)} stroke-width="1.6"/><circle cx="12" cy="5.6" r="1"${F(C.goldL)}/>`
+      + `<circle cx="10.1" cy="12.4" r="1.1"${F(C.goldL)}/><circle cx="13.9" cy="12.4" r="1.1"${F(C.goldL)}/>`) },
+    ren_draw_pile:{ label:'山札強化', tint:'fixed', body: REN(
+        `<path d="M7.2 15.2v.8a1 1 0 0 0 1 1h7.6a1 1 0 0 0 1-1v-.8"${s(C.gold)} stroke-width="1.6" stroke-opacity=".8"/>`
+      + `<rect x="7.2" y="7.4" width="9.6" height="7" rx="1.2"${s(C.gold)} stroke-width="1.8"${tf(C.gold,0.45)}/>`
+      + `<path d="M12 9.2v3.4M10.3 10.9h3.4"${s(C.goldL)} stroke-width="1.6"/>`) },
+    ren_disc_pile:{ label:'捨て札強化', tint:'fixed', body: REN(
+        `<rect x="7.6" y="6.6" width="6.4" height="8.6" rx="1.1" transform="rotate(-16 10.8 10.9)"${s(C.gold)} stroke-width="1.6" stroke-opacity=".75"/>`
+      + `<rect x="10" y="7.4" width="6.4" height="8.6" rx="1.1" transform="rotate(14 13.2 11.7)"${s(C.gold)} stroke-width="1.8" fill="${C.dark}"/>`
+      + `<rect x="10" y="7.4" width="6.4" height="8.6" rx="1.1" transform="rotate(14 13.2 11.7)"${s(C.gold)} stroke-width="1.8"${tf(C.gold,0.4)}/>`
+      + `<path d="M7.4 17.4h9.2"${s(C.goldL)} stroke-width="1.6"/>`) },
+    ren_black:{ label:'ブラックカード', tint:'fixed', body: REN(
+        `<rect x="5.8" y="8" width="12.4" height="8.4" rx="1.6"${s(C.gold)} stroke-width="1.8" fill="#05060a"/>`
+      + `<path d="M5.8 10.6h12.4"${s(C.gold)} stroke-width="1.6"/>`
+      + `<path d="M8 13.8h2.8"${s(C.goldL)} stroke-width="1.5"/>`) },
+    ren_first:{ label:'手番高速', tint:'fixed', body: REN(
+        `<path d="M7.6 7.4v9.2"${s(C.goldL)} stroke-width="2.2"/>`
+      + `<path d="M10.4 7.6l6.4 4.4-6.4 4.4z"${s(C.gold)} stroke-width="1.8"${tf(C.gold,0.6)}/>`) },
+    ren_grade:{ label:'グレードオール', tint:'fixed', body: REN(
+        `<path d="M8 11.2l4-3.2 4 3.2"${s(C.goldL)} stroke-width="2"/>`
+      + `<path d="M8 14.4l4-3.2 4 3.2"${s(C.gold)} stroke-width="2"/>`
+      + `<path d="M8 17.6l4-3.2 4 3.2"${s(C.gold)} stroke-width="2" stroke-opacity=".65"/>`) }
   };
 
   const KEYS = Object.keys(D);

@@ -103,12 +103,12 @@ const GameData = {
     '連鎖':         '盤面の連鎖カード数nに応じビンゴ時カード基礎点+30n',
     'オールマルチ': 'マル・サンカク・シカク記号扱いになる',
     '巨大化':       '盤面にある間、ターン消費ごとに基礎点+3',
-    '肥大化':       '盤面にある間、ターン消費ごとにビンゴ倍率×2点を現在点数に加算',
+    '肥大化':       '盤面にある間、ターン消費ごとに「カード基礎点/2×ビンゴ倍率」点を現在の点数に加算',
     'ブルジョワ':   'カード基礎点+4×現在G（所持金に応じて常に変動。強化効果が外れると加算されない）',
     'ドロー':       '盤面配置時にカードを1枚ドロー',
     // #4 新規強化効果5種
     'エクステンド': 'このカードを置いたターンはビンゴしていてもラウンドが終了せず、ビンゴ計算も行われない。次に自分がカードを配置した時に効果が解除される（その時点でビンゴ判定）',
-    '加重':         '付与時、デッキ内の同じ記号を持つカードの枚数×0.5をカード基礎点に加算（即時加算）',
+    '加重':         'カード基礎点+n（n=デッキ内でこのカードと同じ記号のカード枚数×1。デッキ構成に応じて常に変動。強化効果が外れると加算されない）',
     'ギャンブル':   '手札に来るたび、カード基礎点に-50〜+50のランダムな値を加算。捨て札に行く、またはゲーム終了時にリセットされる',
     'トップスピード':'カード基礎点+5（付与時に即時加算）。ゲーム開始時、このカードをデッキの一番上に配置する',
     '重ね掛け':     '盤面に置かれている、このカードと同じ記号のカードの上に上書き配置できる。上書きされたカードの基礎点のみ、このカードの基礎点に加算される。ただし、盤面上の重ね掛けが付与されているカードの上には載せられない',
@@ -144,13 +144,7 @@ const GameData = {
     const multiMap = { 'マルマルチ':'Circle', 'サンカクマルチ':'Triangle', 'シカクマルチ':'Square', 'バツマルチ':'Cross' };
     const matched = multiMap[card.enhance];
     if(matched && card.symbol === matched) card.baseScore += 20*mul;
-    // #4 加重：付与時、デッキ内の同じ記号を持つカードの枚数×0.5を基礎点に加算（表示用に加算量を保存しておく）
-    if(card.enhance === '加重' && typeof GameState!=='undefined'){
-      const n = GameState.currentDeck.filter(c=>c.symbol===card.symbol).length;
-      const add = n*0.5;
-      card.baseScore += add;
-      card._weightedBonus = add; // #3 「基礎点+◯」表示用
-    }
+    // #3 加重は即時加算をやめ、ビンゴ時にデッキ内の同じ記号の枚数×1を加算する（GameData.weightedBonus）
     // #4 トップスピード：カード基礎点+5（付与時に即時加算。デッキ先頭配置は別途ステージ開始時に処理）
     if(card.enhance === 'トップスピード') card.baseScore += 5;
   },
@@ -161,6 +155,16 @@ const GameData = {
     const mul=(GameState.symbolPassiveTier?.Square>=2&&card.symbol==='Square')?8:4;
     return mul*Math.max(0,GameState.gold||0);
   },
+  // #3 加重：デッキ内の同じ記号のカード枚数×1。強化効果が付いている間だけ加算
+  weightedBonus(card){
+    if(!card||card.enhance!=='加重'||typeof GameState==='undefined') return 0;
+    return GameState.currentDeck.filter(c=>c.symbol===card.symbol).length;
+  },
+  // #7 図鑑・カード表示用：効果名→アイコンキー
+  ENHANCE_ICON: { '数値強化':'enh_number','拡大':'enh_expand_rect','横拡張':'enh_expand_h','縦拡張':'enh_expand_v','マルマルチ':'multi_circle','サンカクマルチ':'multi_triangle','シカクマルチ':'multi_square','バツマルチ':'multi_cross','ハブ':'enh_hub','連鎖':'enh_chain','オールマルチ':'multi_all','巨大化':'enh_giant','肥大化':'enh_bloat','ブルジョワ':'enh_bourgeois','ドロー':'enh_draw','エクステンド':'enh_extend','加重':'enh_weighted','ギャンブル':'enh_gamble','トップスピード':'enh_top_speed','重ね掛け':'enh_overlay' },
+  JAMMING_ICON: { 'スタン':'jam_stun','サンダー':'jam_thunder','混乱':'jam_confuse','ブレイク':'jam_break','延命':'jam_prolong','ビンゴ阻害':'jam_bingo_block','リンク':'jam_link','引き直し':'jam_redraw','封印':'jam_seal','誘導':'jam_guide' },
+  TRAIT_ICON: { '塗りつぶし':'trait_paint','塗りつぶし(レリック)':'trait_paint_relic','指令官':'trait_commander','ネガティブ':'trait_negative','ネガティブ(パッシブ)':'trait_negative','ディスカード':'trait_discard','レリック特攻':'trait_relic_assault','ミニマム':'trait_minimum','マキシマム':'trait_maximum','将軍':'trait_general','保留':'trait_hold','竜頭蛇尾':'trait_dragon' },
+  iconFor(kind,name,opts){ const map={enhance:this.ENHANCE_ICON,jamming:this.JAMMING_ICON,trait:this.TRAIT_ICON}[kind]||{}; const k=kind==='relicEnhance'?name:map[name]; return (k&&typeof GameIcons!=='undefined'&&GameIcons.has(k))?GameIcons.svg(k,opts):''; },
   // #21 付与効果の抽選：対象カードに現在付与されている効果以外から選ぶ
   pickDifferent(pool, current){
     const cand = pool.filter(x=>x!==current);
@@ -320,6 +324,7 @@ const GameData = {
     { id:'normal_explosive_upgrade', label:'爆発通常アップグレード' },
     { id:'special_upgrade', label:'特別アップグレード' },
     { id:'card_focus', label:'カードフォーカスパック' },
+    { id:'bingo_focus', label:'ビンゴフォーカスパック' },
     { id:'dream_card', label:'ドリームカードパック' },
     { id:'jamming_pack', label:'ジャミングカードパック' },
     { id:'relic_pack', label:'レリックパック' },
@@ -346,6 +351,10 @@ const GameData = {
     }
     if(packId==='jamming_pack'){
       return ['マル：30%','サンカク：30%','シカク：30%','バツ：10%（バツパッシブ1未取得時は出現しない）','ジャミング効果はランダムな1種が必ず付与される'];
+    }
+    // #4 ビンゴフォーカスパック：下記5種のビンゴ倍率強化から3つが提示され、1つを選ぶ（各効果の提示率60%）
+    if(packId==='bingo_focus'){
+      return ['5種のビンゴ倍率強化から3つが提示され、1つを選択（各効果が提示される確率：60%）','マルビンゴ+4：○のビンゴ倍率を+4','サンカクビンゴ+4：△のビンゴ倍率を+4','シカクビンゴ+4：□のビンゴ倍率を+4','バツビンゴ+6：×のビンゴ倍率を+6','全ビンゴ+1：全記号のビンゴ倍率を+1'];
     }
     if(packId==='dream_card'){
       return ['基礎点120〜150のカードが1枚（強化・ジャミング・性質変化のすべてが付与された状態）'];

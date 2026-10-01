@@ -236,6 +236,7 @@ const GameMainScene = {
     this.selectedCardId=null; this.boardInfoCell=null; this.rerollMode=false;
     this.rerollSelected=new Set(); this.activeRelicId=null;
     this.expandPending=null; this.paintPending=null;
+    this.extendActive=false; // #2 エクステンドはラウンドをまたがない
     this.effects.linkRestrict=null; this.effects.stunNextNpc=false;
     this.effects.confuseNextNpc=false; this.effects.redirectBan=null;
     this.effects.sealCell=null; this.effects.lureRestrict=false;
@@ -265,7 +266,7 @@ const GameMainScene = {
       this.addLog(`ラウンド強化：最終加算補正+${add}（現在ラウンド${GameState.round}）`);
     }
     for(const cell of this.board){
-      if(!cell?.card) continue;
+      if(!cell?.card||cell.card._ghostOf) continue; // #6 分身カードは捨て札に送らない
       const c=cell.card;
       // #4 保留：盤面に置いた保留カードは手札に戻さず、通常のカードと同様に捨て札（廃棄）へ送る
       if(this.hasBossEffect('discard_used')) GameState.discardedPile.push(c);
@@ -687,7 +688,7 @@ const GameMainScene = {
     this.queueJammingEffect('リンク',cellIdx);
   },
 
-  countBoardJamming(name){ return this.board.filter(c=>c&&c.card&&c.card.jamming===name).length; },
+  countBoardJamming(name){ return this.board.filter(c=>c&&c.card&&!c.card._ghostOf&&c.card.jamming===name).length; },
 
   cellCanBeSymbol(cell, targetSym){
     if(!cell) return false;
@@ -733,7 +734,8 @@ const GameMainScene = {
     if(card&&card.symbol==='Square'&&owner==='player'&&GameState.symbolPassiveTier.Square>=1){ const dc=this.drawOne(); if(dc) dc.baseScore+=1; }
     // #4 エクステンド：このカードを置いたターンはビンゴ判定を行わない（次の自分の配置で解除・判定される）
     const isExtending1 = card?.enhance==='エクステンド' && owner==='player';
-    const newBingos = isExtending1 ? [] : this.detectNewBingos();
+    // #2 エクステンド中はNPCの配置でもビンゴ判定・点数計算を行わない（次に自分がカードを置いた時に解除・判定）
+    const newBingos = (isExtending1 || (this.extendActive && owner!=='player')) ? [] : this.detectNewBingos();
     if(isExtending1){ this.extendActive=true; this.addLog('エクステンド：このターンはビンゴ判定を行わない'); }
     else if(this.extendActive && owner==='player'){ this.extendActive=false; }
     if(!isNeg){ this.turnInRound++; this.applyPerTurnEnhances(); }
@@ -807,6 +809,7 @@ const GameMainScene = {
         let v=c.baseScore;
         if(c.card?._passiveScoreAdd) v+=c.card._passiveScoreAdd;
         v+=GameData.bourgeoisBonus(c.card); // #4 ブルジョワ：現在G×4
+        v+=GameData.weightedBonus(c.card); // #3 加重：デッキ内の同じ記号の枚数×1
         // #2/#3 バツパッシブ1・ボス効果「バツ5000」はNPCのバツのカード基礎点のみ対象
         if(this.isNpcCrossCell(c)) v=this.npcCrossScore(c);
         if(c.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=1){
@@ -878,7 +881,8 @@ const GameMainScene = {
       win.cells.forEach(ci=>{
         const cell=this.board[ci]; if(!cell?.card) return;
         if(cell.card.trait==='レリック特攻') correctionBase+=10*GameState.relicCount();
-        if(cell.card.enhance==='連鎖'){ const n=this.board.filter(c=>c&&c.card&&c.card.enhance==='連鎖').length; correctionBase+=30*n; }
+        if(cell.card._ghostOf) return; // #6 分身マスは基礎点加算を重複させない
+        if(cell.card.enhance==='連鎖'){ const n=this.board.filter(c=>c&&c.card&&!c.card._ghostOf&&c.card.enhance==='連鎖').length; correctionBase+=30*n; }
       });
       let pairBonus=0;
       if(!noRelic){
@@ -921,7 +925,7 @@ const GameMainScene = {
       }
       // 性質変化（r.cellsはセルオブジェクトのため、盤面インデックスであるwin.cellsで参照する。以前は参照ミスで性質変化が発動していなかった）
       win.cells.forEach(cidx=>{
-        const cell=this.board[cidx]; if(!cell?.card) return;
+        const cell=this.board[cidx]; if(!cell?.card||cell.card._ghostOf) return; // #6 性質変化は本体マスのみ
         if(cell.card.trait==='指令官'&&this.turnInRound>=7&&this.turnInRound<=10){finalMult*=1.2;correctionMultParts.push({label:'指令官',op:'×',val:1.2});}
         // #3 ミニマム：値を+nから+20nに変更（nは盤面最少記号の数）
         if(cell.card.trait==='ミニマム'){const counts={};GameData.SYMBOLS.forEach(s=>{counts[s]=this.board.filter(c=>c&&c.symbol===s).length;});const minv=Math.min(...Object.values(counts).filter(v=>v>0));finalMult+=minv*20;correctionMultParts.push({label:'ミニマム',op:'+',val:minv*20});}
@@ -1527,6 +1531,7 @@ const GameMainScene = {
             let v=c.baseScore;
             if(c.card?._passiveScoreAdd) v+=c.card._passiveScoreAdd;
             v+=GameData.bourgeoisBonus(c.card); // #4
+            v+=GameData.weightedBonus(c.card); // #3
             if(this.isNpcCrossCell(c)) v=this.npcCrossScore(c); // #2/#3 NPCのバツのみ対象
             if(c.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=1){
               const total=GameState.currentDeck.length||1;
@@ -1751,8 +1756,10 @@ const GameMainScene = {
     // #3 シカクパッシブ1：プレイしたシカクカード自身にも基礎点+1を永続付与
     if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1) card.baseScore+=1;
     for(const ci of targets){
-      if(this.board[ci]?.card&&(isPaint||isOverlay)) this.pushToDiscard(this.board[ci].card);
-      this.board[ci]={symbol:card.symbol,baseScore:card.baseScore,owner:'player',card:ci===mainCi?card:null};
+      if(this.board[ci]?.card&&!this.board[ci].card._ghostOf&&(isPaint||isOverlay)) this.pushToDiscard(this.board[ci].card);
+      // #6 拡張・拡大で追加配置されるマスにも同じ効果を乗せる（表示用の分身カード。捨て札等への移動は本体のみ）
+      const cellCard = ci===mainCi ? card : {...card, id:card.id+'__g'+ci, _ghostOf:card.id};
+      this.board[ci]={symbol:card.symbol,baseScore:card.baseScore,owner:'player',card:cellCard};
     }
     this.lastPlacedCell=mainCi;
     // #6 配置演出：複数マス配置時も全マスをポップ表示
@@ -1977,7 +1984,13 @@ const GameMainScene = {
   },
 
   // #4 各強化効果の視覚表現を記号に反映
+  // 性質変化の常時演出レイヤー（js/traitFx.js / css/traitfx.css）を記号の前に差し込む。
+  // cardSymbolHtml は手札・盤面・ショップ・デッキ一覧・パックで共通のため、ここに入れれば全画面に効く。
   cardSymbolHtml(card){
+    const fx=(typeof TraitFX!=='undefined')?TraitFX.html(card):'';
+    return fx+this.cardSymbolInnerHtml(card);
+  },
+  cardSymbolInnerHtml(card){
     const label=GameData.SYMBOL_LABEL[card.symbol];
     const emoji=card.jamming?(GameData.JAMMING_EMOJI[card.jamming]||''):'';
     const emojiHtml=emoji?`<div class="card-jamming-emoji">${emoji}</div>`:'';
@@ -2011,14 +2024,10 @@ const GameMainScene = {
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
       return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge enhance-badge-icon">${GIcon('enh_chain')}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
-    // 肥大化：記号横に "+加算値" (黄色、ターンごとの変化をパルスで表現)
+    // 肥大化：記号右に肥大化アイコン（加算値は右上のカード基礎点に「+◯」で表示：cardScoreHtml）
     if(card.enhance==='肥大化'){
-      const sqP3=card.symbol==='Square'&&GameState.symbolPassiveTier?.Square>=2; // #1 シカクパッシブ3はシカクカードのみ有効
-      const mult=GameData.BINGO_MULTIPLIER_BASE[card.symbol]||0;
-      // #2 肥大化：カード基礎点/2×対象ビンゴ倍率
-      const val=Math.round((card.baseScore/2)*mult*(sqP3?2:1));
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap enhance-pulse"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge${sqP3?' passive-value':' gold-text'}">+${val}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
+      return `<div class="card-symbol-wrap enhance-pulse"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge enhance-badge-icon enh-enh_bloat">${GIcon('enh_bloat')}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
     // #4 エクステンド：記号右にエクステンドアイコン
     if(card.enhance==='エクステンド'){
@@ -2030,10 +2039,10 @@ const GameMainScene = {
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
       return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge enhance-badge-icon">${GIcon('enh_top_speed')}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
-    // #2 重ね掛け：記号右に「重」の文字を表示（以前は記号に重ねて表示していたため視認できなかった）
+    // #2 重ね掛け：記号右に重ね掛けアイコン
     if(card.enhance==='重ね掛け'){
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">重</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge enhance-badge-icon enh-enh_overlay">${GIcon('enh_overlay')}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
     // #4 加重・ブルジョワ・ドロー：記号右に専用アイコン（加算値は右上のカード基礎点に「+◯」で表示）
     if(card.enhance==='加重'||card.enhance==='ブルジョワ'||card.enhance==='ドロー'){
@@ -2080,9 +2089,14 @@ const GameMainScene = {
     } else if(card.enhance==='ブルジョワ'){
       // #4 ブルジョワ：現在G×4 を「+◯」で表示（所持金に応じて変動）
       bonusHtml=`<span class="card-score-bonus gold-text${sqP3?' passive-value':''}">+${GameData.bourgeoisBonus(card)}</span>`;
+    } else if(card.enhance==='肥大化'){
+      // 肥大化：カード基礎点/2×対象ビンゴ倍率（ビンゴ時の加算値）を「+◯」で表示
+      const mult=GameData.BINGO_MULTIPLIER_BASE[card.symbol]||0;
+      const val=Math.round((card.baseScore/2)*mult*(sqP3?2:1));
+      bonusHtml=`<span class="card-score-bonus${sqP3?' passive-value':' gold-text'}">+${val}</span>`;
     } else if(card.enhance==='加重'){
       // #4 加重：付与時に加算された値を「+◯」で表示
-      bonusHtml=`<span class="card-score-bonus">+${card._weightedBonus!=null?card._weightedBonus:0}</span>`;
+      bonusHtml=`<span class="card-score-bonus gold-text">+${GameData.weightedBonus(card)}</span>`;
     }
 
     // #4 パッシブ効果でカード基礎点が変化する場合、青字で実効値を表示する
@@ -2129,7 +2143,7 @@ const GameMainScene = {
   renderEffectsPanel(){
     const panel=document.createElement('div'); panel.className='effects-panel-side effects-panel-compact'+(this.effectsBubbleOpen?' open':'');
     const entries=[];
-    this.board.forEach((cd,i)=>{const card=cd&&cd.card;if(card&&(card.jamming||card.enhance||card.trait)) entries.push({i,symbol:cd.symbol,card});});
+    this.board.forEach((cd,i)=>{const card=cd&&cd.card;if(card&&!card._ghostOf&&(card.jamming||card.enhance||card.trait)) entries.push({i,symbol:cd.symbol,card});});
     const checkExt=this.isCheckExtendActive();
     const total=entries.length+(checkExt?1:0);
     // 見出し（タップで開閉）：効果の名前だけを簡潔に並べる
@@ -2264,7 +2278,7 @@ const GameMainScene = {
       const reserveRow=document.createElement('div'); reserveRow.className='reserve-row';
       GameState.reserve.forEach(card=>{
         const wrapper=document.createElement('div'); wrapper.className='card-wrapper';
-        const c=document.createElement('div'); c.className='card reserve-card';
+        const c=document.createElement('div'); c.className='card reserve-card'+(card.trait?` trait-${card.trait.replace(/[()]/g,'')}`:'');
         c.innerHTML=`${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card,GameState.gold)}`;
         this.attachHoverTip(c,card);
         wrapper.appendChild(c); reserveRow.appendChild(wrapper);

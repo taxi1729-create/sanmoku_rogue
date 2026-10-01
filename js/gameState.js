@@ -120,7 +120,12 @@ const GameState = {
     GameData.CORRECTION_BASE_SCORE=0; GameData.CORRECTION_MULTIPLIER=0;
     GameData.FINAL_MULTIPLIER=1; GameData.FINAL_ADD=0;
   },
+  // #3 旧仕様の加重（付与時に基礎点へ即時加算）で足された値を取り除く
+  migrateCards(){
+    (this.currentDeck||[]).forEach(c=>{ if(c&&c._weightedBonus!=null){ c.baseScore-=c._weightedBonus; delete c._weightedBonus; } });
+  },
   initStage(stage){
+    this.migrateCards();
     this.currentStage=stage;
     this.targetScore=stage.targetScore;
     this.currentScore=0; this.round=1; this.turn=1;
@@ -185,6 +190,7 @@ const GameState = {
     this.finalShopDone=d.finalShopDone||false;
     this.gameMode=d.gameMode||'normal';
     this.initialPassiveGranted=d.initialPassiveGranted||false;
+    this.migrateCards();
     if(d.multBase) Object.assign(GameData.BINGO_MULTIPLIER_BASE,d.multBase);
     if(d.corrBase!=null) GameData.CORRECTION_BASE_SCORE=d.corrBase;
   },

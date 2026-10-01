@@ -99,6 +99,7 @@ const App = {
   },
 
   saveGame(){
+    GlobalFunctions.recordOwned(); // #7 図鑑：所持レリック強化・パッシブを記録
     GlobalFunctions.saveSlot(this.currentSaveSlot, GameState.toSaveData());
   },
 
@@ -112,23 +113,24 @@ const App = {
     this.container.innerHTML='';
     const el=document.createElement('div'); el.className='title-screen'; el.style.marginTop='4vh';
     const g=GlobalFunctions.getGallery();
-    const sections=[
-      ['ジャミング効果',g.jamming,GameData.JAMMING_DESC],
-      ['カード強化効果',g.enhance,GameData.ENHANCE_DESC],
-      ['性質変化',g.trait,GameData.TRAIT_DESC],
-    ];
+    // #7 図鑑：各効果に対応するアイコンを付け、レリック強化効果・パッシブも掲載する
+    const item=(icon,name,desc,cls='')=>`<div class="gallery-item ${cls}"><div class="gallery-head"><span class="gallery-ico">${icon||''}</span><b>${name}</b></div><div class="gallery-desc">${desc||''}</div></div>`;
+    const sec=(title,count,total,body)=>`<div class="gallery-section"><h3>${title}（${count}${total!=null?' / '+total:''}件）</h3><div class="gallery-list">${body||'<div class="gallery-desc">まだ発見していません</div>'}</div></div>`;
     let html='<h2>図鑑</h2>';
-    sections.forEach(([title,keys,desc])=>{
-      html+=`<div class="gallery-section"><h3>${title}（${keys.length}件）</h3><div class="gallery-list">`;
-      keys.forEach(k=>{ html+=`<div class="gallery-item"><b>${k}</b><div class="gallery-desc">${desc[k]||''}</div></div>`; });
-      html+='</div></div>';
-    });
-    html+=`<div class="gallery-section"><h3>レリック（${g.relic.length}件）</h3><div class="gallery-list">`;
-    g.relic.forEach(id=>{
-      const r=GameData.RELIC_POOL.find(x=>x.id===id);
-      if(r) html+=`<div class="gallery-item"><b>${r.name}</b><div class="gallery-desc">${r.desc}</div></div>`;
-    });
-    html+='</div></div>';
+    html+=sec('ジャミング効果',g.jamming.length,Object.keys(GameData.JAMMING_DESC).length,g.jamming.map(k=>item(GameData.iconFor('jamming',k),k,GameData.JAMMING_DESC[k],'gi-jam')).join(''));
+    html+=sec('カード強化効果',g.enhance.length,GameData.ENHANCE_NAME_POOL.length,g.enhance.map(k=>item(GameData.iconFor('enhance',k),k,GameData.ENHANCE_DESC[k],'gi-enh')).join(''));
+    html+=sec('性質変化',g.trait.length,Object.keys(GameData.TRAIT_DESC).length,g.trait.map(k=>item(GameData.iconFor('trait',k),k,GameData.TRAIT_DESC[k],'gi-trait')).join(''));
+    const allRelics=[...GameData.RELIC_POOL,GameData.MAJIN_SEAL_RELIC];
+    html+=sec('レリック',g.relic.filter(id=>allRelics.some(x=>x.id===id)).length,allRelics.length,g.relic.map(id=>{const r=allRelics.find(x=>x.id===id); return r?item(GameIcons.relic(r),r.name,r.desc,'gi-relic'):'';}).join(''));
+    html+=sec('レリック強化効果',g.relicEnhance.length,GameData.RELIC_ENHANCE_POOL.length,g.relicEnhance.map(id=>{const r=GameData.RELIC_ENHANCE_POOL.find(x=>x.id===id); return r?item(GameData.iconFor('relicEnhance',id),r.name,r.desc,'gi-ren'):'';}).join(''));
+    const pBody=g.passive.map(k=>{
+      const [sym,lv]=k.split(':');
+      if(sym==='Mana'){ const d=GameData.MANA_STAGES[lv]; return d?item(GIcon('passive_mana'),d.name,d.desc,'gi-mana'):''; }
+      const p=GameData.SYMBOL_PASSIVES[sym]?.[lv]; if(!p) return '';
+      return item(GIconSym(sym),`${GameData.SYMBOL_PASSIVE_NAMES[sym]} Lv${lv}：${p.name}`,p.desc,'gi-passive');
+    }).join('');
+    const passiveTotal=Object.values(GameData.SYMBOL_PASSIVES).reduce((n,t)=>n+Object.keys(t).length,0)+5;
+    html+=sec('パッシブ',g.passive.length,passiveTotal,pBody);
     html+='<button id="btn-back">タイトルへ</button>';
     el.innerHTML=html;
     this.container.appendChild(el);
