@@ -121,7 +121,7 @@ const App = {
     html+=sec('カード強化効果',g.enhance.length,GameData.ENHANCE_NAME_POOL.length,g.enhance.map(k=>item(GameData.iconFor('enhance',k),k,GameData.ENHANCE_DESC[k],'gi-enh')).join(''));
     html+=sec('性質変化',g.trait.length,Object.keys(GameData.TRAIT_DESC).length,g.trait.map(k=>item(GameData.iconFor('trait',k),k,GameData.TRAIT_DESC[k],'gi-trait')).join(''));
     const allRelics=[...GameData.RELIC_POOL,GameData.MAJIN_SEAL_RELIC];
-    html+=sec('レリック',g.relic.filter(id=>allRelics.some(x=>x.id===id)).length,allRelics.length,g.relic.map(id=>{const r=allRelics.find(x=>x.id===id); return r?item(GameIcons.relic(r),r.name,r.desc,'gi-relic'):'';}).join(''));
+    html+=sec('レリック',g.relic.filter(id=>allRelics.some(x=>x.id===id)).length,allRelics.length,g.relic.map(id=>{const r=allRelics.find(x=>x.id===id); return r?item(GameIcons.relic(r),`${r.name}${GameMainScene.relicGradeBadgeHtml(r)}`,r.desc,'gi-relic '+GameMainScene.relicGradeClass(r)):'';}).join(''));
     html+=sec('レリック強化効果',g.relicEnhance.length,GameData.RELIC_ENHANCE_POOL.length,g.relicEnhance.map(id=>{const r=GameData.RELIC_ENHANCE_POOL.find(x=>x.id===id); return r?item(GameData.iconFor('relicEnhance',id),r.name,r.desc,'gi-ren'):'';}).join(''));
     const pBody=g.passive.map(k=>{
       const [sym,lv]=k.split(':');
@@ -136,45 +136,126 @@ const App = {
     this.container.appendChild(el);
     el.querySelector('#btn-back').addEventListener('click',()=>this.showTitle());
   },
-  // #6 自身の最高到達時のデッキ・レリックを確認
+  // #6 自身の最高到達時のデッキ・レリック・パッシブを確認（GUI：ステータスカード／パッシブ・レリックのチップ／ゲーム内と同じカードUIのグリッド）
+  // 保存データ（GlobalFunctions.getBestRun()：deck/relics/passives/gold/score/floor/stageName/savedAt）は読むだけで形式は変えない
   showBestRun(){
     this.container.innerHTML='';
-    const el=document.createElement('div'); el.className='title-screen'; el.style.marginTop='4vh';
+    const el=document.createElement('div'); el.className='title-screen best-run-screen';
     const b=GlobalFunctions.getBestRun();
-    let html='<h2>最高到達時のデッキ・レリック</h2>';
+    const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const GM=GameMainScene;
+    let html='<h2 class="br-title">最高到達記録</h2>';
     if(!b){
-      html+='<div class="gallery-desc">まだ記録がありません</div>';
-    }else{
-      const d=new Date(b.savedAt); const ds=d.toLocaleString('ja-JP');
-      html+=`<div class="title-record">第${b.floor}階層 ${b.stageName} 到達時（${ds}）</div>`;
-      // #10 最高到達時の所持金・最終スコア・所持パッシブも掲載する
-      html+=`<div class="title-record">所持金：${b.gold!=null?b.gold+'G':'-'} ／ 最終スコア：${b.score!=null?GlobalFunctions.formatScore(b.score):'-'}</div>`;
-      if(b.passives){
-        const passiveEntries=Object.entries(b.passives).filter(([sym,tier])=>tier>0);
-        html+=`<div class="gallery-section"><h3>パッシブ</h3><div class="gallery-desc">${passiveEntries.length>0?passiveEntries.map(([sym,tier])=>`${GameData.SYMBOL_ICON_KEY[sym]?GIconSym(sym):''}${GameData.SYMBOL_PASSIVE_NAMES[sym]||sym}Lv${tier}`).join('　'):'なし'}</div></div>`;
-      }
-      html+=`<div class="gallery-section"><h3>レリック（${(b.relics||[]).length}件）</h3><div class="gallery-list">`;
-      (b.relics||[]).forEach(r=>{
-        const ren=r.relicEnhance?GameData.RELIC_ENHANCE_POOL.find(x=>x.id===r.relicEnhance):null;
-        html+=`<div class="gallery-item"><b>${r.name}</b>${ren?`<span class="relic-enhance-tag"> ${ren.name}</span>`:''}<div class="gallery-desc">${r.desc}${ren?`<br>【${ren.name}】${ren.desc}`:''}</div></div>`;
-      });
-      html+='</div></div>';
-      html+=`<div class="gallery-section"><h3>デッキ（${(b.deck||[]).length}枚）</h3><div class="gallery-card-grid"></div></div>`;
+      html+=`<div class="br-empty"><div class="br-empty-ico">${GIcon('btn_map')}</div><b>まだ記録がありません</b><p>ステージをクリアすると、最も深く到達した時の<br>デッキ・レリック・パッシブがここに記録されます。</p></div>`;
+      html+='<button id="btn-back" class="br-back">タイトルへ</button>';
+      el.innerHTML=html; this.container.appendChild(el);
+      el.querySelector('#btn-back').addEventListener('click',()=>this.showTitle());
+      return;
     }
-    html+='<button id="btn-back">タイトルへ</button>';
+    const deck=Array.isArray(b.deck)?b.deck:[];
+    const relics=Array.isArray(b.relics)?b.relics:[];
+    const ds=b.savedAt?new Date(b.savedAt).toLocaleString('ja-JP'):'';
+    // ---- ヘッダー：到達ステージ＋ステータスカード（到達階層・最終スコア・所持金） ----
+    html+=`<div class="br-head">
+      <div class="br-reach"><span class="br-reach-tag">到達</span><b>第${esc(b.floor??'-')}階層</b>${b.stageName?`<span class="br-reach-stage">${esc(b.stageName)}</span>`:''}${ds?`<small>${esc(ds)}</small>`:''}</div>
+      <div class="br-stats">
+        <div class="br-stat br-stat-floor"><span class="br-stat-ico">${GIcon('btn_map')}</span><span class="br-stat-label">到達階層</span><b class="br-stat-val">${esc(b.floor??'-')}<small>階層</small></b></div>
+        <div class="br-stat br-stat-score"><span class="br-stat-ico">${GIcon('fx_sparkle')}</span><span class="br-stat-label">最終スコア</span><b class="br-stat-val">${b.score!=null?esc(GlobalFunctions.formatScore(b.score)):'-'}</b></div>
+        <div class="br-stat br-stat-gold"><span class="br-stat-ico br-coin">G</span><span class="br-stat-label">所持金</span><b class="br-stat-val">${b.gold!=null?esc(b.gold):'-'}<small>G</small></b></div>
+      </div>
+    </div>`;
+    // ---- パッシブ：記号アイコン＋名称＋Lv（段階ピップ） ----
+    const pEntries=b.passives?Object.entries(b.passives).filter(([sym,tier])=>tier>0):[];
+    const manaKeys=(b.mana&&typeof b.mana==='object')?Object.keys(GameData.MANA_STAGES).filter(k=>k==='D'?(b.mana.D||[]).length>0:(k==='C'?(b.mana.C||0)>0:!!b.mana[k])):[];
+    const pItems=[];
+    pEntries.forEach(([sym,tier])=>{
+      const table=GameData.SYMBOL_PASSIVES[sym]||{}; const max=Math.max(Object.keys(table).length,tier);
+      pItems.push({ html:`<span class="br-p-ico sym-${esc(sym)}">${GameData.SYMBOL_ICON_KEY[sym]?GIcon(GameData.SYMBOL_ICON_KEY[sym]):esc(GameData.SYMBOL_LABEL?.[sym]||sym)}</span><span class="br-p-main"><span class="br-p-name">${esc(GameData.SYMBOL_PASSIVE_NAMES[sym]||sym)}</span><span class="br-p-lv">Lv${tier}<span class="br-p-pips">${Array.from({length:max},(_,k)=>`<i class="${k<tier?'on':''}"></i>`).join('')}</span></span></span>`,
+        detail:`<div class="br-d-head"><span class="br-p-ico sym-${esc(sym)}">${GameData.SYMBOL_ICON_KEY[sym]?GIcon(GameData.SYMBOL_ICON_KEY[sym]):''}</span><b>${esc(GameData.SYMBOL_PASSIVE_NAMES[sym]||sym)} Lv${tier}</b></div>`+
+          Object.keys(table).map(Number).filter(t=>t<=tier).sort((a,c)=>a-c).map(t=>`<div class="br-d-line"><span class="br-d-lv">Lv${t}</span><span><b>${esc(table[t].name)}</b><br>${esc(table[t].desc)}</span></div>`).join('') });
+    });
+    manaKeys.forEach(k=>{ const d=GameData.MANA_STAGES[k];
+      pItems.push({ html:`<span class="br-p-ico br-p-mana">${GIcon('passive_mana')}</span><span class="br-p-main"><span class="br-p-name">${esc(d.name)}</span><span class="br-p-lv">魔力</span></span>`,
+        detail:`<div class="br-d-head"><span class="br-p-ico br-p-mana">${GIcon('passive_mana')}</span><b>${esc(d.name)}</b></div><div class="br-d-desc">${esc(d.desc)}</div>` }); });
+    html+=`<section class="br-sec"><h3 class="br-sec-h">パッシブ<small>${pItems.length}種</small></h3>${pItems.length?`<div class="br-passives">${pItems.map((it,i)=>`<button type="button" class="br-passive" data-pi="${i}">${it.html}</button>`).join('')}</div><div class="br-detail br-passive-detail" hidden></div>`:'<div class="br-none">なし</div>'}</section>`;
+    // ---- レリック：アイコン＋名称＋強化効果アイコン＋グレード演出のチップ（タップで詳細） ----
+    html+=`<section class="br-sec"><h3 class="br-sec-h">レリック<small>${relics.length}個</small><span class="br-sec-hint">タップで詳細</span></h3>${relics.length?`<div class="br-relics">${relics.map((r,i)=>`<button type="button" class="br-relic ${GM.relicGradeClass(r)}${r.relicEnhance?' has-ren':''}" data-ri="${i}"><span class="relic-ico">${GameIcons.relic(r)}</span><span class="br-relic-name">${esc(r.name)}</span>${GM.relicEnhanceBadgeHtml(r)}</button>`).join('')}</div><div class="br-detail br-relic-detail" hidden></div>`:'<div class="br-none">なし</div>'}</section>`;
+    // ---- デッキ：統計＋ソート＋カードグリッド ----
+    html+=`<section class="br-sec"><h3 class="br-sec-h">デッキ<small>${deck.length}枚</small><span class="br-sec-hint">カードをタップで効果</span></h3><div class="br-deck-stats"></div><div class="deck-sort-row br-sort-row"></div><div class="br-detail br-card-detail" hidden></div><div class="pack-card-grid br-deck-grid"></div></section>`;
+    html+='<button id="btn-back" class="br-back">タイトルへ</button>';
     el.innerHTML=html;
     this.container.appendChild(el);
-    // #7 デッキ確認：性質変化(トレイト)の見た目（材質・アニメーション）をゲーム内カードと同じに反映する
-    if(b){
-      const grid=el.querySelector('.gallery-card-grid');
-      if(grid) (b.deck||[]).forEach(c=>{
+    el.querySelector('#btn-back').addEventListener('click',()=>this.showTitle());
+
+    // パッシブ詳細
+    const pDetail=el.querySelector('.br-passive-detail'); let pSel=null;
+    el.querySelectorAll('.br-passive').forEach(btn=>btn.addEventListener('click',()=>{
+      const i=+btn.dataset.pi; pSel=(pSel===i)?null:i;
+      el.querySelectorAll('.br-passive').forEach(x=>x.classList.toggle('active',+x.dataset.pi===pSel));
+      if(pSel==null){ pDetail.hidden=true; pDetail.innerHTML=''; } else { pDetail.hidden=false; pDetail.innerHTML=pItems[pSel].detail; }
+    }));
+    // レリック詳細（グレード枠のアイコン・グレード名・説明・レリック強化）
+    const rDetail=el.querySelector('.br-relic-detail'); let rSel=null;
+    const showRelic=(i)=>{
+      rSel=(rSel===i)?null:i;
+      el.querySelectorAll('.br-relic').forEach(x=>x.classList.toggle('active',+x.dataset.ri===rSel));
+      if(!rDetail) return;
+      rDetail.className='br-detail br-relic-detail';
+      if(rSel==null){ rDetail.hidden=true; rDetail.innerHTML=''; return; }
+      const r=relics[rSel]; const ren=GM.relicEnhanceOf(r);
+      rDetail.classList.add(GM.relicGradeClass(r));
+      rDetail.hidden=false;
+      rDetail.innerHTML=`<div class="br-d-head">${GM.relicGradeIconHtml(r,'relic-ico-lg')}<b>${esc(r.name)}</b>${GM.relicGradeBadgeHtml(r)}<span class="br-d-no">${rSel+1}/${relics.length}</span></div><div class="br-d-desc">${esc(r.desc||'')}${r.sealValue!=null?`<br>n = <b>${esc(r.sealValue)}</b>`:''}</div>`+
+        (ren?`<div class="relic-ren-detail"><span class="relic-ren-detail-ico">${GameIcons.has(ren.id)?GameIcons.svg(ren.id):''}</span><div class="relic-ren-detail-text"><div class="relic-ren-detail-name">レリック強化：${esc(ren.name)}</div><div class="info-desc relic-enhance-desc">${esc(ren.desc)}</div></div></div>`:'');
+    };
+    el.querySelectorAll('.br-relic').forEach(btn=>btn.addEventListener('click',()=>showRelic(+btn.dataset.ri)));
+
+    // デッキ統計
+    const bySym={Circle:0,Triangle:0,Square:0,Cross:0}; let scoreSum=0,jamN=0,enhN=0,traitN=0;
+    deck.forEach(c=>{ if(bySym[c.symbol]!==undefined) bySym[c.symbol]++; scoreSum+=c.baseScore||0; if(c.jamming) jamN++; if(c.enhance) enhN++; if(c.trait) traitN++; });
+    const n=deck.length, avg=n>0?Math.round((scoreSum/n)*10)/10:0;
+    const symTiles=GameData.SYMBOLS.map(sym=>`<div class="br-sym-tile sym-${sym}"><span class="br-sym-ico">${GIconSym(sym)}</span><b>${bySym[sym]||0}</b><span class="br-sym-bar"><i style="width:${n?Math.round((bySym[sym]||0)/n*100):0}%"></i></span></div>`).join('');
+    el.querySelector('.br-deck-stats').innerHTML=`<div class="br-sym-tiles">${symTiles}</div>
+      <div class="deck-stats-panel br-stats-panel">
+        <span><small>合計</small><b>${n}</b>枚</span>
+        <span><small>基礎点合計</small><b>${scoreSum}</b><em>（平均${avg}）</em></span>
+        <span><small>強化</small><b>${enhN}</b></span>
+        <span><small>ジャミング</small><b>${jamN}</b></span>
+        <span><small>性質</small><b>${traitN}</b></span>
+      </div>`;
+    // ソート（表示専用）＋グリッド
+    const symbolOrder={Circle:0,Triangle:1,Square:2,Cross:3};
+    let sortMode='default'; let cSel=null;
+    const grid=el.querySelector('.br-deck-grid'); const cDetail=el.querySelector('.br-card-detail');
+    const sorted=()=>{ const arr=deck.map((c,i)=>({c,i}));
+      if(sortMode==='symbol') arr.sort((a,z)=>((symbolOrder[a.c.symbol]??9)-(symbolOrder[z.c.symbol]??9))||((z.c.baseScore||0)-(a.c.baseScore||0))||(a.i-z.i));
+      else if(sortMode==='score') arr.sort((a,z)=>((z.c.baseScore||0)-(a.c.baseScore||0))||(a.i-z.i));
+      return arr; };
+    const cardDetailHtml=(c)=>{
+      const lines=[];
+      if(c.enhance) lines.push(`<div class="br-d-line"><span class="br-d-ico">${GameData.iconFor('enhance',c.enhance)}</span><span><b class="desc-enhance">【${esc(c.enhance)}】</b>${esc(GameData.ENHANCE_DESC[c.enhance]||'')}</span></div>`);
+      if(c.jamming) lines.push(`<div class="br-d-line"><span class="br-d-ico">${GameData.iconFor('jamming',c.jamming)}</span><span><b class="desc-jamming">【${esc(c.jamming)}】</b>${esc(GameData.JAMMING_DESC[c.jamming]||'')}</span></div>`);
+      if(c.trait) lines.push(`<div class="br-d-line"><span class="br-d-ico">${GameData.iconFor('trait',c.trait)}</span><span><b class="desc-trait">【${esc(c.trait)}】</b>${esc(GameData.TRAIT_DESC[c.trait]||'')}</span></div>`);
+      return `<div class="br-d-head"><span class="br-p-ico sym-${esc(c.symbol)}">${GameData.SYMBOL_ICON_KEY[c.symbol]?GIcon(GameData.SYMBOL_ICON_KEY[c.symbol]):''}</span><b>基礎点 ${esc(c.baseScore??0)}</b></div>`+(lines.length?lines.join(''):'<div class="br-d-desc">付与効果なし</div>');
+    };
+    const rebuild=()=>{
+      grid.innerHTML='';
+      sorted().forEach(({c,i})=>{
         const cardEl=document.createElement('div');
-        cardEl.className='card'+(c.trait?` trait-${c.trait.replace(/[()]/g,'')}`:'');
-        cardEl.innerHTML=`${GameMainScene.cardTagsHtml(c)}${GameMainScene.cardSymbolHtml(c)}${GameMainScene.cardScoreHtml(c,0)}`;
+        cardEl.className='card'+(c.trait?` trait-${String(c.trait).replace(/[()]/g,'')}`:'')+(cSel===i?' br-card-picked':'');
+        cardEl.innerHTML=`${GM.cardTagsHtml(c)}${GM.cardSymbolHtml(c)}${GM.cardScoreHtml(c,0)}`;
+        cardEl.addEventListener('click',()=>{ cSel=(cSel===i)?null:i; if(cSel==null){ cDetail.hidden=true; cDetail.innerHTML=''; } else { cDetail.hidden=false; cDetail.innerHTML=cardDetailHtml(c); } grid.querySelectorAll('.card').forEach(x=>x.classList.remove('br-card-picked')); if(cSel!=null) cardEl.classList.add('br-card-picked'); });
         grid.appendChild(cardEl);
       });
-    }
-    el.querySelector('#btn-back').addEventListener('click',()=>this.showTitle());
+      if(!deck.length) grid.innerHTML='<div class="br-none">なし</div>';
+    };
+    const sortRow=el.querySelector('.br-sort-row');
+    [['default','初期順'],['symbol','記号順'],['score','基礎点順']].forEach(([v,label])=>{
+      const bt=document.createElement('button'); bt.type='button'; bt.textContent=label; bt.className='deck-sort-btn'+(sortMode===v?' active':'');
+      bt.addEventListener('click',()=>{ sortMode=v; sortRow.querySelectorAll('.deck-sort-btn').forEach(x=>x.classList.toggle('active',x===bt)); rebuild(); });
+      sortRow.appendChild(bt);
+    });
+    rebuild();
   },
 };
 window.addEventListener('DOMContentLoaded',()=>App.init());

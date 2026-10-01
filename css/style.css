@@ -801,3 +801,82 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .gallery-head{display:flex;align-items:center;gap:6px;}
 .gallery-ico{display:inline-flex;font-size:20px;line-height:1;min-width:20px;justify-content:center;}
 .gallery-item.gi-passive .gallery-ico,.gallery-item.gi-mana .gallery-ico{font-size:18px;}
+
+/* #2 付与効果のドット（ジャミング緑・強化黄・性質変化青）をカードの下に移動 */
+.card .card-dots-row{left:50%;right:auto;top:auto;bottom:4px;transform:translateX(-50%);z-index:3;}
+.card .score-dots{display:none;}
+.card-dot{box-shadow:0 0 0 1px rgba(0,0,0,.45);}
+
+/* ===================== 最高到達記録（App.showBestRun） ===================== */
+.title-screen.best-run-screen{margin-top:3vh;gap:14px;width:100%;max-width:560px;margin-left:auto;margin-right:auto;padding:0 12px 28px;box-sizing:border-box;align-items:stretch;}
+.br-title{margin:0;text-align:center;font-size:20px;letter-spacing:.12em;}
+.br-empty{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:28px 16px;border:1px dashed #3a4162;border-radius:16px;background:rgba(28,32,48,.6);}
+.br-empty-ico{font-size:40px;color:#5b6283;line-height:1;}
+.br-empty b{font-size:15px;color:var(--text);}
+.br-empty p{margin:0;font-size:11px;line-height:1.6;color:var(--text-dim);}
+.br-back{align-self:center;min-width:160px;}
+.br-head{display:flex;flex-direction:column;gap:8px;}
+.br-reach{display:flex;align-items:baseline;flex-wrap:wrap;justify-content:center;gap:4px 8px;font-size:13px;}
+.br-reach b{font-size:16px;color:var(--gold);}
+.br-reach-tag{font-size:9px;font-weight:900;letter-spacing:.15em;color:#3a2c00;background:var(--gold);border-radius:999px;padding:1px 7px;align-self:center;}
+.br-reach-stage{font-weight:700;}
+.br-reach small{flex-basis:100%;text-align:center;font-size:10px;color:var(--text-dim);}
+.br-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.br-stat{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;padding:9px 10px 8px;border-radius:12px;background:linear-gradient(160deg,var(--panel-2),var(--panel));border:1px solid #2f3756;overflow:hidden;}
+.br-stat-ico{position:absolute;right:6px;top:6px;font-size:18px;line-height:1;opacity:.85;display:inline-flex;}
+.br-stat-label{font-size:10px;color:var(--text-dim);font-weight:700;}
+.br-stat-val{font-family:'Space Mono',monospace;font-size:18px;font-weight:900;line-height:1.15;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.br-stat-val small{font-size:10px;margin-left:2px;font-family:'Noto Sans JP',sans-serif;color:var(--text-dim);}
+.br-stat-floor{border-color:rgba(125,211,252,.45);} .br-stat-floor .br-stat-ico,.br-stat-floor .br-stat-val{color:var(--accent);}
+.br-stat-score{border-color:rgba(244,114,182,.45);} .br-stat-score .br-stat-ico,.br-stat-score .br-stat-val{color:#f9a8d4;}
+.br-stat-gold{border-color:rgba(251,191,36,.5);} .br-stat-gold .br-stat-val{color:var(--gold);}
+.br-coin{width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#3a2c00;background:radial-gradient(circle at 35% 30%,#fff3c4,#fbbf24 60%,#b7791f);}
+.br-sec{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:14px;background:rgba(28,32,48,.72);border:1px solid #2b3150;}
+.br-sec-h{display:flex;align-items:baseline;gap:6px;margin:0;font-size:13px;color:var(--text);}
+.br-sec-h small{font-size:11px;color:var(--gold);font-weight:700;}
+.br-sec-hint{margin-left:auto;font-size:9px;font-weight:400;color:var(--text-dim);}
+.br-none{font-size:11px;color:var(--text-dim);}
+.br-passives,.br-relics{display:flex;flex-wrap:wrap;gap:8px 6px;}
+.br-passive{display:inline-flex;align-items:center;gap:6px;padding:5px 9px 5px 6px;border-radius:10px;background:var(--panel-2);border:1px solid #3a4162;font-size:11px;text-align:left;}
+.br-passive.active{border-color:var(--gold);background:#2a2410;}
+.br-p-ico{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;background:rgba(0,0,0,.28);font-size:18px;line-height:1;}
+.br-p-mana{color:#c084fc;}
+.br-p-main{display:flex;flex-direction:column;gap:1px;}
+.br-p-name{font-weight:700;font-size:11px;}
+.br-p-lv{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:900;color:var(--gold);font-family:'Space Mono',monospace;}
+.br-p-pips{display:inline-flex;gap:2px;}
+.br-p-pips i{width:6px;height:6px;border-radius:50%;background:#3a4162;}
+.br-p-pips i.on{background:var(--gold);box-shadow:0 0 4px rgba(251,191,36,.7);}
+.br-relic{position:relative;display:inline-flex;align-items:center;gap:3px;height:34px;max-width:100%;padding:0 10px 0 6px;border-radius:10px;background:var(--panel);border:2px solid #3a2c6a;font-size:11px;}
+.br-relic.has-ren{padding-right:12px;}
+.br-relic .relic-ico{font-size:19px;margin-right:1px;}
+.br-relic-name{font-weight:700;color:#c4b5fd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;}
+.br-relic.active{outline:2px solid var(--gold);outline-offset:1px;}
+.br-detail{padding:8px 10px;border-radius:10px;background:var(--panel);border:1px solid #3a3050;font-size:11px;display:flex;flex-direction:column;gap:5px;animation:brDetailIn .18s ease-out;}
+.br-detail[hidden]{display:none;}
+@keyframes brDetailIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+.br-d-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;}
+.br-d-head .relic-gfx-ico.relic-ico-lg{font-size:22px;margin-right:2px;}
+.br-d-no{margin-left:auto;font-size:10px;color:var(--text-dim);font-family:'Space Mono',monospace;}
+.br-d-desc{color:var(--text-dim);line-height:1.55;}
+.br-d-desc b{color:var(--gold);}
+.br-d-line{display:flex;gap:6px;align-items:flex-start;color:var(--text-dim);line-height:1.5;}
+.br-d-lv{flex:0 0 auto;font-size:10px;font-weight:900;color:var(--gold);font-family:'Space Mono',monospace;padding-top:1px;}
+.br-d-line b{color:var(--text);}
+.br-d-ico{flex:0 0 auto;display:inline-flex;font-size:18px;line-height:1;}
+.br-sym-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;}
+.br-sym-tile{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:2px 6px;padding:6px 8px;border-radius:10px;background:var(--panel-2);border:1px solid #2f3756;}
+.br-sym-ico{font-size:18px;line-height:1;display:inline-flex;}
+.br-sym-tile b{font-family:'Space Mono',monospace;font-size:16px;text-align:right;color:var(--text);}
+.br-sym-bar{grid-column:1 / -1;height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden;}
+.br-sym-bar i{display:block;height:100%;border-radius:2px;background:currentColor;}
+.br-stats-panel{margin:0;gap:6px;justify-content:space-between;padding:6px 8px;}
+.br-stats-panel span{display:inline-flex;align-items:baseline;gap:3px;color:var(--text-dim);font-size:10px;}
+.br-stats-panel b{font-family:'Space Mono',monospace;font-size:14px;color:var(--text);}
+.br-stats-panel em{font-style:normal;font-size:10px;}
+.br-sort-row{margin:0;}
+.br-deck-grid{gap:6px;}
+.br-deck-grid .card.br-card-picked{outline:2px solid var(--gold);outline-offset:1px;}
+/* 図鑑：レリックはグレード演出の縁が出るよう枠線を持たせる */
+.gallery-item.gi-relic{border:1px solid transparent;}
+.gallery-item .rg-badge{margin-left:4px;vertical-align:1px;}

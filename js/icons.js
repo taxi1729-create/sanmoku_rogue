@@ -289,6 +289,11 @@ const GameIcons = (function(){
     btn_right:{ label:'右へ', tint:'current', body:`<path d="M7.5 4.5v15L18 12z" fill="currentColor" fill-opacity=".85"/>` },
     btn_caret_up:{ label:'開く/閉じる(上)', tint:'current', body:`<path d="M4.5 16.5h15L12 6z" fill="currentColor" fill-opacity=".85"/>` },
     btn_caret_down:{ label:'開く/閉じる(下)', tint:'current', body:`<path d="M4.5 7.5h15L12 18z" fill="currentColor" fill-opacity=".85"/>` },
+    btn_list:{ label:'一覧', tint:'current', body:
+        `<rect x="3.2" y="4.6" width="3.4" height="3.4" rx=".8" fill="currentColor" fill-opacity=".45"/>`
+      + `<rect x="3.2" y="10.3" width="3.4" height="3.4" rx=".8" fill="currentColor" fill-opacity=".45"/>`
+      + `<rect x="3.2" y="16" width="3.4" height="3.4" rx=".8" fill="currentColor" fill-opacity=".45"/>`
+      + `<path d="M9.8 6.3h11M9.8 12h11M9.8 17.7h7.5"/>` },
 
     /* ---------------- レリック / 状態 ---------------- */
     relic_size_dot:{ label:'レリックサイズ', tint:'fixed', body:

@@ -176,7 +176,7 @@ const MajinEvent = (function(){
   }
   function relicHtml(r){
     const ren=r.relicEnhance?GameData.RELIC_ENHANCE_POOL.find(x=>x.id===r.relicEnhance):null;
-    return `<div class="relic-card mj-relic"><div class="relic-name"><span class="relic-ico">${GameIcons.relic(r)}</span>${r.name}</div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}</div>`;
+    return `<div class="relic-card mj-relic ${GameMainScene.relicGradeClass(r)}"><div class="relic-name"><span class="relic-ico">${GameIcons.relic(r)}</span>${r.name}</div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}</div>`;
   }
   const costLabel = ev => ev.cost==='all' ? `全財産（${G().gold}G）` : (ev.cost>0 ? `${ev.cost}G` : '無償');
   const costOf = ev => ev.cost==='all' ? G().gold : (ev.cost||0);

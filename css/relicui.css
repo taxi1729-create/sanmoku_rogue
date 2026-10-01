@@ -1,0 +1,211 @@
+/* relicui.css — レリック列（1行固定・「+n」省略・一覧吹き出し）／効果詳細のレリック強化表示／
+   ステージクリア時のレリック効果レイヤー（報酬演出 z70 の上・パッシブ選択 z80 の下 = z78）と G獲得 演出 */
+
+/* ===================== レリック列（ゲームメイン・ショップ・マップ・レリックパック共通） ===================== */
+.relic-display-row.relic-strip{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;position:relative;height:40px;min-height:40px;padding:0;width:100%;}
+.relic-strip-cards{flex:1 1 auto;min-width:0;height:100%;display:flex;flex-wrap:nowrap;align-items:center;gap:5px;position:relative;}
+.relic-card.relic-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:2px;height:32px;min-width:0;max-width:118px;padding:0 7px 0 5px;border-radius:9px;text-align:left;}
+.relic-chip .relic-ico{font-size:17px;margin-right:1px;}
+.relic-chip-name{font-size:10px;font-weight:700;color:#c4b5fd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:68px;line-height:1.2;}
+.relic-chip .relic-size{margin-left:1px;}
+.relic-chip.rs-hidden{display:none;}
+.relic-chip.has-ren{padding-right:9px;}
+.relic-strip-cards > .relic-empty{white-space:nowrap;}
+/* レリック強化効果：名称の代わりのアイコンバッジ（チップの右上） */
+.relic-ren-badge{position:absolute;top:-7px;right:-6px;width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:#1e1830;border:1px solid var(--gold,#fbbf24);box-shadow:0 0 5px rgba(251,191,36,.55);z-index:2;pointer-events:none;}
+.relic-ren-badge .gi{width:14px;height:14px;}
+.relic-ren-badge.inline{position:static;display:inline-flex;width:16px;height:16px;margin-right:3px;vertical-align:-3px;box-shadow:none;}
+/* 「+n／一覧」ボタン（固定幅） */
+.relic-strip-more{flex:0 0 auto;width:52px;height:34px;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;position:relative;
+  background:#1e1830;border:1px solid #6a4ad4;border-radius:9px;color:#cfc7ff;font-size:10px;line-height:1.1;}
+.relic-strip-more:hover:not(:disabled){background:#2a2148;}
+.rsm-top{display:flex;align-items:center;gap:2px;font-weight:700;}
+.rsm-count{font-size:12px;font-weight:900;color:var(--gold,#fbbf24);}
+.rsm-count:empty{display:none;}
+.relic-strip-more.has-more .rsm-label{font-size:0;}
+.relic-strip-more.has-more .rsm-label .gi{font-size:11px;}
+.rsm-label .gi{margin-right:1px;}
+.rsm-cap{font-size:9px;color:var(--text-dim,#8b90a5);}
+.relic-strip-more.open,.relic-strip-more.active-hidden{border-color:var(--gold,#fbbf24);background:#2a2410;}
+.relic-strip-more.bounce{animation:relicBounce .5s ease-in-out;border-color:var(--gold,#fbbf24);box-shadow:0 0 10px rgba(251,191,36,.7);}
+/* 省略されたレリックが点数計算に関わった時の数値吹き出し（+n ボタンの上・右寄せ） */
+.relic-strip-more .rsm-bubble{left:auto;right:-2px;transform:none;display:flex;gap:4px;align-items:center;animation:rsmBubblePop .3s ease;}
+.relic-strip-more .rsm-bubble::after{left:auto;right:18px;transform:none;}
+.rsm-b-item{display:inline-flex;align-items:center;gap:2px;}
+.rsm-b-item .gi{width:13px;height:13px;}
+@keyframes rsmBubblePop{0%{transform:scale(.4);opacity:0;}100%{transform:scale(1);opacity:1;}}
+
+/* 所持レリック一覧の吹き出し（盤面効果一覧 .effects-bubble と同じ作法。列の下に開く） */
+.relic-list-backdrop{position:fixed;inset:0;z-index:44;background:transparent;}
+.effects-bubble.relic-list-bubble{top:calc(100% + 10px);bottom:auto;right:0;left:auto;text-align:left;}
+.effects-bubble.relic-list-bubble::after{top:auto;bottom:100%;right:18px;border-top-color:transparent;border-bottom-color:var(--accent);}
+.rl-hint{display:block;font-size:9px;font-weight:400;color:var(--text-dim,#8b90a5);margin-top:1px;}
+.relic-list-row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;margin-top:5px;padding:7px 8px;border-radius:9px;
+  background:var(--panel-2,#232a40);border:1px solid #2b3150;color:var(--text,#e7e9f0);font-size:12px;}
+.relic-list-row:hover:not(:disabled){transform:none;background:#2c3350;}
+.relic-list-row.active{border-color:var(--gold,#fbbf24);background:#2c2410;}
+.relic-list-row.scoring{box-shadow:0 0 8px rgba(251,191,36,.6);}
+.rl-no{flex:0 0 auto;min-width:16px;font-size:10px;color:var(--text-dim,#8b90a5);font-family:'Space Mono',monospace;text-align:right;}
+.relic-list-row .relic-ico{margin-right:0;}
+.rl-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+.rl-name{font-weight:700;color:#c4b5fd;}
+.rl-ren{font-size:10px;color:var(--gold,#fbbf24);display:flex;align-items:center;}
+.relic-list-row .rl-go{opacity:.55;font-size:11px;flex:0 0 auto;}
+/* レリックパックモーダル内：モーダルのスクロールに埋もれないよう画面中央に固定表示 */
+.relic-strip-in-modal{margin-top:6px;}
+.relic-strip-in-modal .effects-bubble.relic-list-bubble{position:fixed;left:0;right:0;margin:0 auto;top:12vh;bottom:auto;width:min(340px,90vw);}
+.relic-strip-in-modal .effects-bubble.relic-list-bubble::after{display:none;}
+
+/* ===================== 効果詳細の吹き出し：レリック強化（アイコン＋名称＋説明） ===================== */
+.relic-info-panel .info-title{display:flex;align-items:center;flex-wrap:wrap;gap:2px;}
+.relic-pos-tag{margin-left:auto;font-size:10px;font-weight:400;color:var(--text-dim,#8b90a5);font-family:'Space Mono',monospace;}
+.relic-ren-detail{display:flex;align-items:flex-start;gap:8px;margin-top:2px;padding:6px 8px;border-radius:9px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.38);}
+.relic-ren-detail-ico{flex:0 0 auto;font-size:28px;line-height:1;display:inline-flex;}
+.relic-ren-detail-text{flex:1;min-width:0;}
+.relic-ren-detail-name{font-size:12px;font-weight:900;color:var(--gold,#fbbf24);}
+.relic-ren-detail .info-desc{margin:1px 0 0;}
+.relic-reorder-row{flex-wrap:wrap;}
+
+/* ===================== ステージクリア：レリック効果レイヤー（z78） ===================== */
+.stfx-relic-layer{position:fixed;inset:0;z-index:78;pointer-events:none;overflow:hidden;font-family:'Noto Sans JP',sans-serif;}
+.stfx-relic-layer.viewing{pointer-events:auto;background:rgba(6,7,12,.55);cursor:pointer;}
+.stfx-rfx{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:min(320px,88vw);pointer-events:auto;cursor:pointer;text-align:center;
+  background:linear-gradient(180deg,#241d3d,#1c2030 60%);border:2px solid #a78bfa;border-radius:14px;padding:12px 14px 10px;
+  box-shadow:0 0 0 1px rgba(0,0,0,.6),0 0 26px rgba(167,139,250,.55),0 12px 34px rgba(0,0,0,.7);}
+.stfx-rfx.k-card{border-color:var(--gold,#fbbf24);box-shadow:0 0 0 1px rgba(0,0,0,.6),0 0 26px rgba(251,191,36,.45),0 12px 34px rgba(0,0,0,.7);}
+.stfx-rfx-head{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px;}
+.stfx-rfx-ico{display:inline-flex;font-size:36px;line-height:1;filter:drop-shadow(0 0 8px rgba(196,181,253,.8));}
+.stfx-rfx-ico .sym-Circle,.stfx-rfx-ico > span{font-size:30px;}
+.stfx-rfx-ttl{display:flex;flex-direction:column;align-items:flex-start;text-align:left;}
+.stfx-rfx-ttl small{font-size:10px;letter-spacing:.12em;color:#c4b5fd;font-weight:700;}
+.stfx-rfx-ttl b{font-size:16px;font-weight:900;color:#fff;text-shadow:0 0 8px rgba(167,139,250,.9);}
+.stfx-rfx-body{display:flex;flex-direction:column;align-items:center;}
+.stfx-rfx-body .gr-label{font-size:11px;color:var(--gold,#fbbf24);font-weight:700;}
+.stfx-rfx-body .mult-change-table{font-size:14px;}
+.stfx-rfx-body .pack-card-grid{margin-top:6px;gap:8px;}
+.stfx-rfx-hint{font-size:9px;color:var(--text-dim,#8b90a5);letter-spacing:.15em;margin-top:6px;}
+/* 報酬画面内：発動した効果のチップ（演出後にタップで再確認） */
+.stfx-res-relics{border:1px solid rgba(167,139,250,.5);border-radius:12px;padding:6px 8px;background:rgba(167,139,250,.08);}
+.stfx-res-relics-h{font-size:10px;letter-spacing:.15em;color:#c4b5fd;font-weight:900;margin-bottom:4px;}
+.stfx-res-relics-h small{font-size:9px;letter-spacing:0;font-weight:400;color:var(--text-dim,#8b90a5);margin-left:6px;}
+.stfx-res-rchips{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;}
+.stfx-res-rchip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px 3px 5px;font-size:11px;font-weight:700;border-radius:999px;
+  background:#1e1830;border:1px solid #6a4ad4;color:#e9e3ff;opacity:0;transition:opacity .2s;}
+.stfx-res-rchip.on{opacity:1;}
+.stfx-res-rchip-ico{display:inline-flex;font-size:17px;}
+.stfx-res-rchip-ico > span{font-size:14px;}
+/* G獲得：内訳行のアイコンと、行の上に出る「レリック効果が発動」タグ */
+.stfx-res-gicons{display:inline-flex;align-items:center;margin-right:4px;vertical-align:-3px;}
+.stfx-res-gico{display:inline-flex;font-style:normal;font-size:17px;margin-right:-4px;}
+.stfx-res-line.ren .stfx-res-gico{font-size:14px;}
+.stfx-res-line.g-line.lit{color:#fde68a;}
+.stfx-res-line.g-line.lit b{color:var(--gold,#fbbf24);text-shadow:0 0 8px rgba(251,191,36,.8);}
+.stfx-rfx-tag{position:absolute;white-space:nowrap;pointer-events:none;display:flex;align-items:center;gap:4px;
+  font-size:12px;font-weight:900;color:#3a2c00;background:linear-gradient(180deg,#fde68a,#fbbf24);padding:4px 10px 4px 6px;border-radius:999px;
+  box-shadow:0 0 14px rgba(251,191,36,.9),0 2px 6px rgba(0,0,0,.6);}
+.stfx-rfx-tag b{font-size:14px;}
+.stfx-rfx-tag.small{font-size:10px;padding:3px 8px 3px 5px;}
+.stfx-rfx-tag.small b{font-size:12px;}
+.stfx-rfx-tag-ico{display:inline-flex;font-size:18px;}
+.stfx-rfx-tag.small .stfx-rfx-tag-ico{font-size:14px;}
+.stfx-relic-layer .stfx-coin.fly{display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;}
+.stfx-relic-layer .stfx-coin.fly.small{width:12px;height:12px;font-size:7px;}
+.stfx-reduced .stfx-rfx-ico{filter:none;}
+/* 所持レリック欄は画面幅に合わせる（マップ画面は align-items:center のため中身の幅に伸びてしまう） */
+.shop-relic-confirm{min-width:0;max-width:100%;box-sizing:border-box;}
+.map-screen > .shop-relic-confirm{align-self:stretch;}
+
+/* ===================== レリックのグレード演出（.rg-normal / .rg-rare / .rg-super / .rg-legend） =====================
+   各所（レリック列のチップ・一覧の行・効果詳細のアイコン・ショップ枠・パック・魔神・図鑑・最高到達記録・報酬演出）は
+   GameMainScene.relicGradeClass(relic) のクラスを付けるだけ。装飾は ::before/::after（pointer-events:none・absolute）で
+   ホストの寸法・レイアウトを変えない。アニメーションは transform/opacity 中心（スーパーレアの光沢のみ background-position）。
+   ノーマル＝演出なし。 */
+:where(.rg-rare,.rg-super,.rg-legend){position:relative;}
+.rg-rare::before,.rg-rare::after,.rg-super::before,.rg-super::after,.rg-legend::before,.rg-legend::after{
+  content:'';position:absolute;pointer-events:none;box-sizing:border-box;}
+/* 効果詳細・報酬演出などで使うアイコン単体の枠 */
+.relic-gfx-ico{display:inline-flex;align-items:center;justify-content:center;padding:2px;border-radius:8px;border:1px solid rgba(196,181,253,.18);background:rgba(10,8,20,.35);line-height:1;}
+.relic-gfx-ico.rg-normal{border-color:rgba(196,181,253,.18);}
+.info-title .relic-gfx-ico.relic-ico-lg{font-size:1.45em;margin-right:7px;}
+
+/* ---- レア：上品な銀〜水色の縁取り＋控えめなきらめき（角に時々光る星） ---- */
+.rg-rare{border-color:#9fd3ea;box-shadow:0 0 0 1px rgba(224,242,254,.10) inset,0 0 6px rgba(125,211,252,.30);}
+.relic-card.rg-rare,.relic-list-row.rg-rare,.shop-slot.rg-rare,.gallery-item.rg-rare,.br-relic.rg-rare{background-image:linear-gradient(160deg,rgba(186,230,253,.10),rgba(186,230,253,0) 55%);}
+.rg-rare::before{inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(240,249,255,.16),rgba(240,249,255,0) 42%);}
+.rg-rare::after{width:11px;height:11px;top:-5px;left:-4px;opacity:0;transform:scale(.2) rotate(0deg);
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 0L11.5 8.5L20 10L11.5 11.5L10 20L8.5 11.5L0 10L8.5 8.5Z' fill='%23f0fbff'/%3E%3C/svg%3E") center/contain no-repeat;
+  filter:drop-shadow(0 0 2px rgba(125,211,252,.95));animation:rgRareGlint 4.2s ease-in-out infinite;}
+.rg-rare:nth-child(3n+2)::after{animation-delay:-1.4s;}
+.rg-rare:nth-child(3n)::after{animation-delay:-2.8s;}
+@keyframes rgRareGlint{0%,62%,100%{opacity:0;transform:scale(.2) rotate(0deg);}74%{opacity:1;transform:scale(1) rotate(45deg);}86%{opacity:0;transform:scale(.3) rotate(90deg);}}
+.rg-rare .relic-chip-name,.rg-rare .relic-name,.rg-rare .rl-name,.rg-rare .br-relic-name{color:#dbeafe;}
+
+/* ---- スーパーレア：金の縁＋ゆっくり流れる光沢＋小さな粒子 ---- */
+.rg-super{border-color:#f5c451;box-shadow:0 0 0 1px rgba(253,230,138,.14) inset,0 0 8px rgba(251,191,36,.38);}
+.relic-card.rg-super,.relic-list-row.rg-super,.shop-slot.rg-super,.gallery-item.rg-super,.br-relic.rg-super{background-image:linear-gradient(160deg,rgba(251,191,36,.16),rgba(251,191,36,0) 60%);}
+.rg-super::before{inset:0;border-radius:inherit;
+  background:linear-gradient(110deg,rgba(255,236,170,0) 38%,rgba(255,236,170,.20) 46%,rgba(255,252,235,.38) 50%,rgba(255,236,170,.20) 54%,rgba(255,236,170,0) 62%) 100% 0/260% 100% no-repeat;
+  animation:rgSuperSheen 5.5s ease-in-out infinite;}
+.rg-super::after{left:18%;right:18%;top:-7px;height:14px;opacity:0;
+  background:
+    radial-gradient(circle,#fff6d0 0 1px,rgba(253,224,71,0) 1.8px) 12% 80%/8px 8px no-repeat,
+    radial-gradient(circle,#fde68a 0 1.2px,rgba(253,224,71,0) 2px) 55% 60%/8px 8px no-repeat,
+    radial-gradient(circle,#fff6d0 0 .9px,rgba(253,224,71,0) 1.6px) 90% 90%/8px 8px no-repeat;
+  animation:rgSuperMote 3.6s ease-out infinite;}
+.rg-super:nth-child(2n)::before{animation-delay:-2.2s;}
+.rg-super:nth-child(2n)::after{animation-delay:-1.7s;}
+@keyframes rgSuperSheen{0%{background-position:100% 0;}55%,100%{background-position:0% 0;}}
+@keyframes rgSuperMote{0%{opacity:0;transform:translateY(7px);}25%{opacity:1;}70%{opacity:.8;}100%{opacity:0;transform:translateY(-6px);}}
+.rg-super .relic-chip-name,.rg-super .relic-name,.rg-super .rl-name,.rg-super .br-relic-name{color:#fde68a;}
+
+/* ---- レジェンド：闇の契約（紫黒のオーラが脈打つ・縁を縛る鎖・回る契約の紋章・赤い眼光） ---- */
+.rg-legend,.rg-legend.active{border-color:#7e22ce;
+  background-color:#14081d;
+  background-image:radial-gradient(120% 150% at 0% 0%,rgba(147,51,234,.32),rgba(147,51,234,0) 60%),radial-gradient(90% 120% at 100% 100%,rgba(185,28,28,.22),rgba(185,28,28,0) 60%);
+  box-shadow:0 0 0 1px rgba(0,0,0,.6) inset,0 0 7px rgba(126,34,206,.55);}
+.rg-legend.active{border-color:var(--gold,#fbbf24);}
+/* オーラ＋鎖（縁の上下）＋左上の赤い眼（::after の紋章の中心に重なる） */
+.rg-legend::before{inset:-3px;border-radius:12px;
+  background:
+    radial-gradient(ellipse 3.6px 2.2px at 3px 3px,#ff5a5a 0 50%,rgba(239,68,68,.6) 72%,rgba(239,68,68,0) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 6'%3E%3Crect x='1' y='1.2' width='6.4' height='3.6' rx='1.8' fill='none' stroke='%23a78bfa' stroke-width='1'/%3E%3Cpath d='M7.4 3H12' stroke='%236d28d9' stroke-width='1.4'/%3E%3C/svg%3E") 0 0/9px 4.5px repeat-x,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 6'%3E%3Crect x='1' y='1.2' width='6.4' height='3.6' rx='1.8' fill='none' stroke='%23a78bfa' stroke-width='1'/%3E%3Cpath d='M7.4 3H12' stroke='%236d28d9' stroke-width='1.4'/%3E%3C/svg%3E") 4px 100%/9px 4.5px repeat-x;
+  box-shadow:0 0 9px 1px rgba(147,51,234,.75),0 0 18px 2px rgba(76,29,149,.55),inset 0 0 6px rgba(220,38,38,.35);
+  opacity:.75;animation:rgLegendPulse 2.6s ease-in-out infinite;}
+/* 回る契約の紋章（左上） */
+.rg-legend::after{--rg-sig:16px;width:var(--rg-sig);height:var(--rg-sig);top:calc(var(--rg-sig) / -2);left:calc(var(--rg-sig) / -2);border-radius:50%;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10.6' fill='%23120616' fill-opacity='.3' stroke='%23c084fc' stroke-width='1.3'/%3E%3Ccircle cx='12' cy='12' r='8' fill='none' stroke='%237e22ce' stroke-width='.9' stroke-dasharray='2.2 1.6'/%3E%3Cpath d='M12 3.6L19.3 16.2H4.7Z M12 20.4L4.7 7.8H19.3Z' fill='none' stroke='%23d8b4fe' stroke-width='.7' stroke-opacity='.85'/%3E%3C/svg%3E") center/contain no-repeat;
+  filter:drop-shadow(0 0 3px rgba(168,85,247,.9));animation:rgLegendSigil 9s linear infinite;}
+.rg-legend:nth-child(2n)::before{animation-delay:-1.3s;}
+@keyframes rgLegendPulse{0%,100%{opacity:.55;transform:scale(1);}45%{opacity:1;transform:scale(1.025);}55%{opacity:.82;transform:scale(1.012);}}
+@keyframes rgLegendSigil{0%{transform:rotate(0deg) scale(1);}50%{transform:rotate(180deg) scale(1.12);}100%{transform:rotate(360deg) scale(1);}}
+.rg-legend .relic-chip-name,.rg-legend .relic-name,.rg-legend .rl-name,.rg-legend .br-relic-name{color:#f5d0fe;text-shadow:0 0 4px rgba(239,68,68,.55),0 0 2px rgba(0,0,0,.9);}
+.rg-legend .relic-ico .gi,.rg-legend.relic-gfx-ico .gi{filter:drop-shadow(0 0 3px rgba(239,68,68,.65));}
+/* 小さい枠（効果詳細のアイコン・報酬演出のチップ）は紋章も小さく */
+.relic-gfx-ico.rg-legend::after,.stfx-res-rchip.rg-legend::after{--rg-sig:12px;}
+/* 大きい枠（ショップ枠・図鑑・最高到達記録）は紋章を大きく */
+.shop-slot.rg-legend::after,.gallery-item.rg-legend::after,.relic-card.pickup.rg-legend::after,.br-relic-detail.rg-legend::after{--rg-sig:20px;}
+
+/* 報酬演出のアイコン枠（.stfx-rfx-ico） */
+.stfx-rfx-ico.rg-rare,.stfx-rfx-ico.rg-super,.stfx-rfx-ico.rg-legend{padding:4px;border-radius:12px;border:1px solid;}
+.stfx-res-rchip.rg-super,.stfx-res-rchip.rg-rare,.stfx-res-rchip.rg-legend{border-radius:999px;}
+
+/* 効果詳細の吹き出し：グレード名バッジとパネルの縁 */
+.rg-badge{display:inline-flex;align-items:center;flex:0 0 auto;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.06em;line-height:1.5;
+  color:#c7cbe0;background:#262b40;border:1px solid #3b4262;}
+.rg-badge-rare{color:#0c2533;background:linear-gradient(180deg,#f0f9ff,#a5d8f0);border-color:#e0f2fe;}
+.rg-badge-super{color:#3a2600;background:linear-gradient(180deg,#fff3c4,#f5b82e);border-color:#fde68a;box-shadow:0 0 6px rgba(251,191,36,.5);}
+.rg-badge-legend{color:#fecaca;background:linear-gradient(180deg,#3b0a4a,#12051a);border-color:#9333ea;box-shadow:0 0 6px rgba(147,51,234,.7);text-shadow:0 0 4px rgba(239,68,68,.9);}
+.relic-info-panel.rg-panel-rare{border-color:#7fb6cf;}
+.relic-info-panel.rg-panel-super{border-color:#c99a2e;}
+.relic-info-panel.rg-panel-legend{border-color:#7e22ce;box-shadow:0 8px 28px rgba(0,0,0,.6),0 0 16px rgba(126,34,206,.45);}
+
+/* 動きを減らす設定：装飾は静止表現 */
+@media (prefers-reduced-motion: reduce){
+  .rg-rare::after,.rg-super::before,.rg-super::after,.rg-legend::before,.rg-legend::after{animation:none !important;}
+  .rg-rare::after{opacity:.85;transform:scale(.8) rotate(45deg);}
+  .rg-super::before{background-position:30% 0;opacity:.7;}
+  .rg-super::after{opacity:.7;transform:none;}
+  .rg-legend::before{opacity:.85;transform:none;}
+}

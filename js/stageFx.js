@@ -764,6 +764,15 @@ const StageFX = (function(){
     const b=r&&r.breakdown;
     const fmt=v=>Math.round(v*100)/100;
     let lines=[];
+    const gf=opts.goldFx||null;            // G獲得レリック／レリック強化「G獲得」の内訳演出
+    const rfx=(opts.relicFx||[]).filter(Boolean); // クリア時に発動した効果（倍率・カード変化）
+    const hasGoldFx=!!(gf&&(gf.relic||gf.ren));
+    const lineHtml=(l)=>{
+      const g=l[3]&&gf?gf[l[3]]:null;
+      if(!g) return `<div class="stfx-res-line ${l[2]||''}"><span>${l[0]}</span><b>${l[1]}</b></div>`;
+      // 金貨はこの行のアイコンから飛び出し、値は +0 から加算される（最終値は data-final）
+      return `<div class="stfx-res-line g-line ${l[3]}" data-g="${l[3]}" data-amt="${g.amount}" data-gname="${esc(g.name)}"><span><span class="stfx-res-gicons">${Array.from({length:Math.min(3,Math.max(1,g.count||1))},()=>`<i class="stfx-res-gico">${g.iconHtml}</i>`).join('')}</span>${l[0]}</span><b data-final="+${g.amount}">+0</b></div>`;
+    };
     if(opts.win && b){
       const numNote=[b.floorBonus?'階層6以上+1':'',b.scoreBonus?'目標点数の2倍以上+1':''].filter(Boolean).join('・');
       lines=[
@@ -771,8 +780,8 @@ const StageFX = (function(){
         ['残りラウンド ×1', `+${fmt(b.roundBonus)}`],
         [`残りリロール${fmt(b.rerollBonus*2)} ×1/2`, `+${fmt(b.rerollBonus)}`],
         [`× num${b.num}${numNote?`<small>（${numNote}）</small>`:''}`, `= ${b.subtotal}`, 'sub'],
-        ['レリック効果', `+${b.relicBonus}`, b.relicBonus?'':'zero'],
-        ['レリック強化効果', `+${b.relicEnhanceBonus}`, b.relicEnhanceBonus?'':'zero'],
+        ['レリック効果', `+${b.relicBonus}`, b.relicBonus?'':'zero', gf&&gf.relic?'relic':null],
+        ['レリック強化効果', `+${b.relicEnhanceBonus}`, b.relicEnhanceBonus?'':'zero', gf&&gf.ren?'ren':null],
       ];
     }
     const extras=(opts.win&&r&&r.extra)?String(r.extra).split('／').filter(Boolean):[];
@@ -781,11 +790,12 @@ const StageFX = (function(){
       <div class="stfx-res-rays"></div>
       <div class="stfx-res-title ${opts.win?'win':'lose'}">${(opts.win?'STAGE CLEAR':'GAME OVER').split('').map(ch=>`<span>${ch===' '?'&nbsp;':ch}</span>`).join('')}</div>
       <div class="stfx-res-score">${opts.scoreText}</div>
+      ${rfx.length?`<div class="stfx-res-relics"><div class="stfx-res-relics-h">発動した効果<small>タップで確認</small></div><div class="stfx-res-rchips">${rfx.map((f,i)=>`<button type="button" class="stfx-res-rchip${f.grade?' rg-'+f.grade:''}" data-i="${i}"><span class="stfx-res-rchip-ico">${f.iconHtml}</span>${esc(f.name)}</button>`).join('')}</div></div>`:''}
       ${hasGold?`<div class="stfx-res-wallet"><span class="stfx-coin static">G</span>所持G <b class="stfx-res-wallet-v">${opts.goldBefore}</b><span class="stfx-res-wallet-d"></span></div>
       <div class="stfx-res-panel">
         <div class="gr-label">獲得ゴールド</div>
-        <div class="stfx-res-lines">${lines.map(l=>`<div class="stfx-res-line ${l[2]||''}"><span>${l[0]}</span><b>${l[1]}</b></div>`).join('')}</div>
-        <div class="stfx-res-total">+<span class="stfx-res-total-v">${r.gold}</span>G</div>
+        <div class="stfx-res-lines">${lines.map(lineHtml).join('')}</div>
+        <div class="stfx-res-total">+<span class="stfx-res-total-v" data-final="${r.gold}">${hasGoldFx?b.subtotal:r.gold}</span>G</div>
         ${opts.formulaText?`<div class="stfx-res-formula">${opts.formulaText}</div>`:''}
       </div>`:''}
       ${extras.length?`<div class="stfx-res-extras"><div class="stfx-res-extras-h">追加報酬</div>${extras.map(x=>`<div class="stfx-res-extra">${x}</div>`).join('')}</div>`:''}
@@ -794,14 +804,26 @@ const StageFX = (function(){
       <div class="stfx-res-hint">タップでスキップ</div>`;
     ov.appendChild(box);
     document.body.appendChild(ov);
-    const ui=resultUI={ ov, box, opts, done:false, skip:false };
+    // 報酬演出（z70）より上・パッシブ選択（z80）より下のレイヤー：レリック効果の表示と G獲得 の金貨
+    const rl=el('div','stfx-relic-layer'+(R?' stfx-reduced':''));
+    document.body.appendChild(rl);
+    const ui=resultUI={ ov, box, opts, done:false, skip:false, rl, rfx };
     watch();
+    box.querySelectorAll('.stfx-res-rchip').forEach(ch=>ch.addEventListener('click',(e)=>{
+      if(!ui.done) return; // 演出中のタップはスキップ扱い（下の ov のハンドラへ）
+      e.stopPropagation(); openRelicViewer(ui, parseInt(ch.dataset.i,10));
+    }));
     const btn=box.querySelector('.stfx-res-next');
     btn.addEventListener('click',(e)=>{ e.stopPropagation(); if(!ui.done) return; const fn=ui.opts.onNext; if(fn) fn(); });
     const finish=()=>{
       if(ui.done) return; ui.done=true; ui.skip=true;
       ov.getAnimations({subtree:true}).forEach(a=>{ try{a.finish();}catch(e){} });
       ov.classList.add('st-done');
+      // 演出中のレリック効果表示は畳んで「発動した効果」チップに残す（タップで再確認できる）
+      rl.querySelectorAll('.stfx-rfx:not(.viewer),.stfx-rfx-tag,.stfx-coin').forEach(n=>n.remove());
+      box.querySelectorAll('.stfx-res-rchip').forEach(c=>c.classList.add('on'));
+      box.querySelectorAll('[data-final]').forEach(n=>{ n.textContent=n.dataset.final; });
+      box.querySelectorAll('.g-line').forEach(n=>n.classList.add('lit'));
       const wv=box.querySelector('.stfx-res-wallet-v'); if(wv) wv.textContent=opts.goldAfter;
       const wd=box.querySelector('.stfx-res-wallet-d'); if(wd && opts.goldBefore+(r?r.gold:0)!==opts.goldAfter){ wd.textContent=`（${opts.goldAfter-(opts.goldBefore+r.gold)}G 消費）`; }
       btn.disabled=false; btn.classList.add('ready');
@@ -820,6 +842,11 @@ const StageFX = (function(){
         anim(box.querySelector('.stfx-res-rays'),[{opacity:0,transform:'translateX(-50%) rotate(0)'},{opacity:.85,transform:'translateX(-50%) rotate(60deg)',offset:.4},{opacity:.5,transform:'translateX(-50%) rotate(180deg)'}],{duration:R?100:4000,fill:'forwards'});
         await w(760);
         const sc=box.querySelector('.stfx-res-score'); anim(sc,[{opacity:0},{opacity:1}],{duration:220,fill:'both'});
+        // クリア時に発動した効果を、報酬演出の上で1つずつ見せる（タップで次へ。見せ終わると「発動した効果」チップへ畳む）
+        if(rfx.length){
+          const rs=box.querySelector('.stfx-res-relics'); anim(rs,[{opacity:0},{opacity:1}],{duration:200,fill:'both'});
+          for(let i=0;i<rfx.length;i++){ if(ui.skip) break; await relicPop(ui, i, R, w); }
+        }
         if(!hasGold){ await w(300); finish(); return; }
         const wal=box.querySelector('.stfx-res-wallet'); anim(wal,[{opacity:0,transform:'translateY(-6px)'},{opacity:1,transform:'none'}],{duration:240,fill:'both'});
         const panel=box.querySelector('.stfx-res-panel'); anim(panel,[{opacity:0},{opacity:1}],{duration:200,fill:'both'});
@@ -830,11 +857,27 @@ const StageFX = (function(){
           if(ui.skip) break;
           anim(row,[{opacity:0,transform:'translateX(-14px)'},{opacity:1,transform:'none'}],{duration:220,fill:'both',easing:'ease-out'});
           await w(230);
+          // G獲得：レリック（強化）アイコンから金貨が飛び出し、この行の値に加算される
+          if(row.dataset.g && !ui.skip) await goldBurst(ui, row, R, w);
         }
         // 合計
         const tot=box.querySelector('.stfx-res-total');
         anim(tot,[{opacity:0,transform:'scale(2)'},{opacity:1,transform:'scale(.95)',offset:.7},{opacity:1,transform:'scale(1)'}],{duration:380,fill:'both',easing:'cubic-bezier(.6,0,.6,1.4)'});
         await w(450);
+        // レリック効果ぶんの G を獲得G（合計）へ流し込む：小計 → 合計
+        if(hasGoldFx && !ui.skip){
+          const tv=box.querySelector('.stfx-res-total-v'); let cur=b.subtotal;
+          for(const row of box.querySelectorAll('.g-line')){
+            if(ui.skip) break;
+            const amt=+row.dataset.amt||0; if(!amt) continue;
+            const src=row.querySelector('b');
+            flyCoins(ui, src, tv, Math.min(6,Math.max(2,amt*2)), R, row.dataset.g==='ren');
+            await w(R?40:420);
+            await countTo(ui, tv, cur, cur+amt, R?40:380); cur+=amt;
+            anim(tot,[{transform:'scale(1.15)'},{transform:'scale(1)'}],{duration:240});
+          }
+          tv.textContent=r.gold;
+        }
         // 金貨が所持Gへ流れ込み、Gがカウントアップ
         if(!ui.skip) await coinFlow(ui, tot, box.querySelector('.stfx-res-wallet-v'), opts.goldBefore, opts.goldBefore+r.gold, R);
         // 大爆発などで消費があった場合
@@ -859,14 +902,15 @@ const StageFX = (function(){
       finish();
     })();
   }
-  function countTo(ui, node, from, to, ms){
+  function countTo(ui, node, from, to, ms, fmt){
+    const F=fmt||(v=>v);
     return new Promise(res=>{
       if(!node){ res(); return; }
       const t0=performance.now();
       const step=()=>{
-        if(ui.skip){ node.textContent=to; res(); return; }
+        if(ui.skip){ node.textContent=F(to); res(); return; }
         const p=Math.min(1,(performance.now()-t0)/ms); const e=1-Math.pow(1-p,3);
-        node.textContent=Math.round(from+(to-from)*e);
+        node.textContent=F(Math.round(from+(to-from)*e));
         if(p<1) requestAnimationFrame(step); else res();
       };
       requestAnimationFrame(step);
@@ -889,8 +933,78 @@ const StageFX = (function(){
     await countTo(ui, toNode, a, b, R?50:Math.min(1100, 300+n*60));
     if(wal) wal.classList.remove('pulse');
   }
+  // ---- 1a. レリック効果（報酬演出の上のレイヤー stfx-relic-layer / z78） ----
+  function rfxCard(f, viewer){
+    return el('div','stfx-rfx k-'+(f.kind||'info')+(viewer?' viewer':''),
+      `<div class="stfx-rfx-head"><span class="stfx-rfx-ico${f.grade?' rg-'+f.grade:''}">${f.iconHtml||''}</span><span class="stfx-rfx-ttl"><small>${esc(f.head||'レリック効果が発動')}</small><b>${esc(f.name)}</b></span></div>
+       <div class="stfx-rfx-body">${f.bodyHtml||''}</div><div class="stfx-rfx-hint">${viewer?'タップで閉じる':'タップで次へ'}</div>`);
+  }
+  async function relicPop(ui, i, R, w){
+    const f=ui.rfx[i]; if(!f) return;
+    const card=rfxCard(f,false); ui.rl.appendChild(card);
+    const chip=ui.box.querySelector(`.stfx-res-rchip[data-i="${i}"]`);
+    card.addEventListener('click',(e)=>{ e.stopPropagation(); if(ui.wake) ui.wake(); });
+    // 登場：アイコンが弾け、カードが展開
+    if(!R){
+      const ico=card.querySelector('.stfx-rfx-ico');
+      anim(ico,[{transform:'scale(.3) rotate(-30deg)',filter:'brightness(3)'},{transform:'scale(1.35) rotate(6deg)',filter:'brightness(1.8)',offset:.6},{transform:'scale(1)',filter:'brightness(1)'}],{duration:520,fill:'both',easing:'ease-out'});
+    }
+    await anim(card,[{opacity:0,transform:'translate(-50%,-50%) scale(.6)'},{opacity:1,transform:'translate(-50%,-50%) scale(1.04)',offset:.7},{opacity:1,transform:'translate(-50%,-50%) scale(1)'}],{duration:R?80:340,fill:'both',easing:'ease-out'}).finished.catch(()=>{});
+    // 変化（倍率表・カードの横回転）を確認できるよう保持
+    await w(f.kind==='card'?2600:2000);
+    if(!card.isConnected) return;
+    // 「発動した効果」チップへ畳む
+    const cr=chip?chip.getBoundingClientRect():null, kr=card.getBoundingClientRect();
+    const dx=cr?(cr.left+cr.width/2)-(kr.left+kr.width/2):0, dy=cr?(cr.top+cr.height/2)-(kr.top+kr.height/2):0;
+    await anim(card,[{opacity:1,transform:'translate(-50%,-50%) scale(1)'},{opacity:0,transform:`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px)) scale(.15)`}],{duration:(R||ui.skip)?60:360,fill:'forwards',easing:'cubic-bezier(.5,0,.8,.5)'}).finished.catch(()=>{});
+    card.remove();
+    if(chip){ chip.classList.add('on'); anim(chip,[{transform:'scale(1.3)',filter:'brightness(2)'},{transform:'scale(1)',filter:'brightness(1)'}],{duration:R?60:320}); }
+  }
+  function openRelicViewer(ui, i){
+    const f=ui.rfx[i]; if(!f) return;
+    closeRelicViewer(ui);
+    ui.rl.classList.add('viewing');
+    const card=rfxCard(f,true); ui.rl.appendChild(card);
+    // カード変化は再生し直して変化後を見せる
+    anim(card,[{opacity:0,transform:'translate(-50%,-50%) scale(.85)'},{opacity:1,transform:'translate(-50%,-50%) scale(1)'}],{duration:reduced()?60:220,fill:'both',easing:'ease-out'});
+    ui.rl.onclick=(e)=>{ e.stopPropagation(); closeRelicViewer(ui); };
+  }
+  function closeRelicViewer(ui){
+    if(!ui||!ui.rl) return;
+    ui.rl.querySelectorAll('.stfx-rfx.viewer').forEach(n=>n.remove());
+    ui.rl.classList.remove('viewing'); ui.rl.onclick=null;
+  }
+  // 金貨を a 要素から b 要素へ飛ばす（報酬演出の上のレイヤー）
+  function flyCoins(ui, from, to, n, R, small){
+    if(!from||!to||R) return;
+    const fc=ctr(from.getBoundingClientRect()), tc=ctr(to.getBoundingClientRect());
+    for(let i=0;i<n;i++){
+      const c=el('div','stfx-coin fly'+(small?' small':''),'G'); const sx=fc.x+rnd(-8,8);
+      c.style.left=sx+'px'; c.style.top=fc.y+'px'; ui.rl.appendChild(c);
+      const dx=tc.x-sx, dy=tc.y-fc.y;
+      anim(c,[{opacity:0,transform:'translate(-50%,-50%) scale(.5)'},{opacity:1,transform:`translate(calc(-50% + ${dx*.35+rnd(-18,18)}px),calc(-50% + ${dy*.35-rnd(26,44)}px)) scale(1.15)`,offset:.45},{opacity:1,transform:`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px)) scale(.7)`}],{duration:560,delay:i*60,easing:'cubic-bezier(.4,0,.6,1)',fill:'both'})
+        .finished.catch(()=>{}).then(()=>c.remove());
+    }
+  }
+  // G獲得（レリック）／G獲得（レリック強化）：アイコンから金貨が飛び出し、内訳行の値が +0 → +n
+  async function goldBurst(ui, row, R, w){
+    const amt=+row.dataset.amt||0; if(!amt) return;
+    const small=row.dataset.g==='ren';
+    const icons=row.querySelector('.stfx-res-gicons'); const val=row.querySelector('b');
+    row.classList.add('lit');
+    if(icons) anim(icons,[{transform:'scale(1)',filter:'brightness(1)'},{transform:'scale(1.7) translateY(-3px)',filter:'brightness(2.2)',offset:.35},{transform:'scale(1)',filter:'brightness(1)'}],{duration:R?60:620,easing:'ease-out'});
+    const rr=row.getBoundingClientRect();
+    const tag=el('div','stfx-rfx-tag'+(small?' small':''),`<span class="stfx-rfx-tag-ico">${row.querySelector('.stfx-res-gico')?row.querySelector('.stfx-res-gico').innerHTML:''}</span>レリック${small?'強化':''}効果が発動：${esc(row.dataset.gname)} <b>+${amt}G</b>`);
+    tag.style.left=Math.max(110,Math.min(innerWidth-110,rr.left+rr.width/2))+'px'; tag.style.top=(rr.top-4)+'px';
+    ui.rl.appendChild(tag);
+    anim(tag,[{opacity:0,transform:'translate(-50%,-60%) scale(.7)'},{opacity:1,transform:'translate(-50%,-100%) scale(1)',offset:.18},{opacity:1,transform:'translate(-50%,-110%) scale(1)',offset:.85},{opacity:0,transform:'translate(-50%,-130%) scale(1)'}],{duration:R?300:1500,fill:'forwards'}).finished.catch(()=>{}).then(()=>tag.remove());
+    flyCoins(ui, icons||row, val, small?Math.min(4,1+amt):Math.min(9,amt*2+1), R, small);
+    await w(R?40:380);
+    await countTo(ui, val, 0, amt, R?40:(small?260:420), v=>'+'+v);
+    await w(small?180:280);
+  }
   function hideResult(){
-    if(!resultUI) return; resultUI.ov.remove(); resultUI=null; stopWatchIfIdle();
+    if(!resultUI) return; resultUI.ov.remove(); if(resultUI.rl) resultUI.rl.remove(); resultUI=null; stopWatchIfIdle();
   }
 
   // =====================================================================

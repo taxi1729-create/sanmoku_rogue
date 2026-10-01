@@ -25,10 +25,10 @@ const MapSelectScene = {
     if(!GameState.pendingBossEffect&&GameData.BOSS_EFFECT_POOL.length>0){
       GameState.bossRerollUsed=false; // #3 新しいボス出現時にリロール権をリセット
       if(bossCount<=1){
-        GameState.pendingBossEffect=GlobalFunctions.randChoice(GameData.BOSS_EFFECT_POOL);
+        GameState.pendingBossEffect=GameData.bossEffectForFloor(GlobalFunctions.randChoice(GameData.BOSS_EFFECT_POOL),GameState.currentFloor);
       }else{
         // 複数効果（第5階層以降）
-        GameState.pendingBossEffect=GlobalFunctions.shuffle(GameData.BOSS_EFFECT_POOL).slice(0,bossCount);
+        GameState.pendingBossEffect=GlobalFunctions.shuffle(GameData.BOSS_EFFECT_POOL).slice(0,bossCount).map(e=>GameData.bossEffectForFloor(e,GameState.currentFloor));
       }
     }
     // #6 階層10特有ボス効果：5ターンごと（6,11,16…ターン）に次のターンがNPCになる（2つのランダムボス効果とは別枠）
@@ -48,9 +48,9 @@ const MapSelectScene = {
     const header=document.createElement('div'); header.className='map-header';
     header.innerHTML=`<span>所持G：${GameState.gold}</span><span>第${GameState.currentFloor}階層</span>`;
     // #2(B) デバッグ促進用：タップで20000G付与するボタン
-    const debugGoldBtn=document.createElement('button'); debugGoldBtn.className='debug-gold-btn'; debugGoldBtn.textContent='🐞+20000G';
-    debugGoldBtn.addEventListener('click',()=>{ GameState.gold+=20000; this.renderAll(); });
-    header.appendChild(debugGoldBtn);
+    //const debugGoldBtn=document.createElement('button'); debugGoldBtn.className='debug-gold-btn'; debugGoldBtn.textContent='🐞+20000G';
+    //debugGoldBtn.addEventListener('click',()=>{ GameState.gold+=20000; this.renderAll(); });
+    //header.appendChild(debugGoldBtn);
     // #2 マップ選択画面でデッキを確認できるようにする
     const deckBtn=document.createElement('button'); deckBtn.className='debug-gold-btn'; deckBtn.textContent=`デッキ確認(${GameState.currentDeck.length})`;
     deckBtn.addEventListener('click',()=>GameMainScene.showDeckModal('deck'));
@@ -102,8 +102,8 @@ const MapSelectScene = {
       if(bossRerollBtn) bossRerollBtn.addEventListener('click',()=>{
         const bossCount=Array.isArray(GameState.pendingBossEffect)?GameState.pendingBossEffect.length:1;
         GameState.pendingBossEffect = bossCount<=1
-          ? GlobalFunctions.randChoice(GameData.BOSS_EFFECT_POOL)
-          : GlobalFunctions.shuffle(GameData.BOSS_EFFECT_POOL).slice(0,bossCount);
+          ? GameData.bossEffectForFloor(GlobalFunctions.randChoice(GameData.BOSS_EFFECT_POOL),GameState.currentFloor)
+          : GlobalFunctions.shuffle(GameData.BOSS_EFFECT_POOL).slice(0,bossCount).map(e=>GameData.bossEffectForFloor(e,GameState.currentFloor));
         GameState.bossRerollUsed=true;
         this.renderAll();
       });
@@ -179,22 +179,16 @@ const MapSelectScene = {
   renderRelicSection(){
     const area=document.createElement('div'); area.className='shop-relic-confirm';
     area.innerHTML=`<div class="shop-section-title">所持レリック（${GameState.usedRelicSlots()}/${GameState.effectiveMaxRelics()}）</div>`;
-    const row=document.createElement('div'); row.className='relic-display-row';
-    if(GameState.relics.length===0){
-      const empty=document.createElement('div'); empty.className='relic-empty'; empty.textContent='なし'; row.appendChild(empty);
-    }else{
-      GameState.relics.forEach((relic,i)=>{
-        const rc=document.createElement('div');
-        rc.className='relic-card'+(this.activeRelicId===i?' active':'');
-        rc.innerHTML=`<div class="relic-name"><span class="relic-ico">${GameIcons.relic(relic)}</span>${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${relic.relicEnhance?`<div class="relic-enhance-tag">${GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance)?.name||''}</div>`:''}`;
-        rc.addEventListener('click',()=>{ this.activeRelicId=(this.activeRelicId===i)?null:i; this.renderAll(); });
-        row.appendChild(rc);
-      });
-    }
+    // 共通のレリック列（1行固定・収まらない分は「+n」、一覧吹き出し→詳細）
+    const row=GameMainScene.renderRelicStrip({
+      activeIdx:this.activeRelicId, emptyText:'なし', listOpen:!!this.relicListOpen,
+      onPick:(i)=>{ this.relicListOpen=false; this.activeRelicId=(this.activeRelicId===i)?null:i; this.renderAll(); },
+      onToggleList:()=>{ this.relicListOpen=!this.relicListOpen; if(this.relicListOpen) this.activeRelicId=null; this.renderAll(); },
+    });
     area.appendChild(row);
     // #7 ゲームメイン画面と同じ吹き出し表示（マップでは売却なし）
     if(this.activeRelicId!=null){
-      const rp=GameMainScene.renderRelicInfoPanel({ idx:this.activeRelicId, setIdx:(i)=>{this.activeRelicId=i;}, redraw:()=>this.renderAll(), onSell:null });
+      const rp=GameMainScene.renderRelicInfoPanel({ idx:this.activeRelicId, setIdx:(i)=>{this.activeRelicId=i;}, redraw:()=>this.renderAll(), onSell:null, openList:()=>{ this.activeRelicId=null; this.relicListOpen=true; this.renderAll(); } });
       if(rp) area.appendChild(rp);
     }
     return area;
