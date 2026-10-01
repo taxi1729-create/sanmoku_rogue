@@ -44,7 +44,7 @@
 .pfx-emoji{
   position:absolute; left:0; right:0; top:43%; font-size:4.1em; line-height:1; margin-top:-.52em;
   text-shadow:0 .05em .12em rgba(0,0,0,.5);
-  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
+  display:flex; justify-content:center;
 }
 .pfx-band{
   position:absolute; left:0; right:0; bottom:17%; height:1.9em; display:flex; align-items:center; justify-content:center;
@@ -150,12 +150,13 @@
 .pfx-item.pfx-item-rare.pfx-landed .pfx-item-inner{ -webkit-filter:drop-shadow(0 0 4px #fbbf24) drop-shadow(0 0 12px rgba(251,191,36,.75)); filter:drop-shadow(0 0 4px #fbbf24) drop-shadow(0 0 12px rgba(251,191,36,.75)); }
 .pfx-item-rare .card, .pfx-item-rare .relic-card{ border-color:#fbbf24; }
 .pfx-item-rare.pfx-landed::before, .pfx-item-rare.pfx-landed::after{
-  content:'✦'; position:absolute; z-index:2; color:#fde68a; font-size:14px; line-height:1; pointer-events:none;
-  text-shadow:0 0 6px #fbbf24, 0 0 2px #fff;
+  /* GameIcons fx_sparkle（mask で色付け） */
+  content:''; position:absolute; z-index:2; width:14px; height:14px; background-color:#fde68a; pointer-events:none;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' width='24px' height='24px' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2Q14.8 9.2 22 12Q14.8 14.8 12 22Q9.2 14.8 2 12Q9.2 9.2 12 2Z' fill='currentColor' stroke='none'/%3E%3C/svg%3E") center/contain no-repeat; mask:url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' width='24px' height='24px' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2Q14.8 9.2 22 12Q14.8 14.8 12 22Q9.2 14.8 2 12Q9.2 9.2 12 2Z' fill='currentColor' stroke='none'/%3E%3C/svg%3E") center/contain no-repeat;
   -webkit-animation:pfxTwinkle 1.1s ease-in-out infinite; animation:pfxTwinkle 1.1s ease-in-out infinite;
 }
 .pfx-item-rare.pfx-landed::before{ left:-6px; top:-6px; }
-.pfx-item-rare.pfx-landed::after{ right:-5px; bottom:8px; font-size:11px; -webkit-animation-delay:.45s; animation-delay:.45s; }
+.pfx-item-rare.pfx-landed::after{ right:-5px; bottom:8px; width:11px; height:11px; -webkit-animation-delay:.45s; animation-delay:.45s; }
 
 /* チップ（アップグレード効果など） */
 .pfx-chip{
@@ -444,3 +445,10 @@
 @media (prefers-reduced-motion: reduce){
   .pfx-pack-mini .pfx-sheen{ -webkit-animation:none; animation:none; display:none; }
 }
+
+/* ===== GUIアイコン（GameIcons）適用時の調整 ===== */
+.pfx-emoji .gi{ -webkit-filter:drop-shadow(0 .05em .1em rgba(0,0,0,.55)); filter:drop-shadow(0 .05em .1em rgba(0,0,0,.55)); }
+.pfx-toptext .gi{ width:1em; height:1em; vertical-align:-0.15em; }
+.pfx-rare-badge .gi{ width:1em; height:1em; vertical-align:-0.15em; }
+.pfx-twinkle .gi, .pfx-starburst .gi{ display:block; width:1em; height:1em; }
+.pfx-twinkle, .pfx-starburst{ -webkit-filter:drop-shadow(0 0 3px #fbbf24); filter:drop-shadow(0 0 3px #fbbf24); }

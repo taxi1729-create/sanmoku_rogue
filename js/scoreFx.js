@@ -57,7 +57,7 @@ const ScoreFX = {
   updateFF(){
     const on=this.speed()>1;
     this.el.ff.classList.toggle('active',on);
-    this.el.ff.textContent=on?'⏩ 早送り中':'⏩ 早送り';
+    this.el.ff.innerHTML=GameIcons.svg('btn_fast_forward',{cls:'gi-gap'})+(on?'早送り中':'早送り');
   },
 
   // ---------- 開閉 ----------
@@ -65,7 +65,7 @@ const ScoreFX = {
   open(opts){
     this.ensure(); this.opts=opts; this._anchorCells=opts.cells||[];
     const E=this.el;
-    E.sym.textContent=opts.symLabel||''; E.sym.className='sfx-sym '+(opts.symClass||'');
+    E.sym.innerHTML=opts.symLabel||''; /* 記号はインラインSVG（GameData.SYMBOL_LABEL。ゲーム内定数のみ） */ E.sym.className='sfx-sym '+(opts.symClass||'');
     E.title.textContent=opts.title||'';
     E.cap.textContent=''; E.caption.className='sfx-caption';
     E.trace.innerHTML=''; E.banner.classList.remove('show');

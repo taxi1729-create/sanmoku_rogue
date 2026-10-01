@@ -575,8 +575,10 @@ button:disabled{opacity:.35;cursor:not-allowed;}
   position: relative; overflow: visible;
 }
 .card.trait-保留::after {
-  content:'▲'; position:absolute; bottom:-8px; left:50%; transform:translateX(-50%);
-  color:#7dd3fc; font-size:10px;
+  /* GameIcons fx_hold_triangle（currentColor 系のため mask で color を反映） */
+  content:''; position:absolute; bottom:-8px; left:50%; transform:translateX(-50%);
+  width:10px; height:10px; background-color:#7dd3fc;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' width='24px' height='24px' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4l9 15.5H3z' fill='currentColor' fill-opacity='.9' stroke-width='1.6'/%3E%3C/svg%3E") center/contain no-repeat; mask:url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' width='24px' height='24px' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4l9 15.5H3z' fill='currentColor' fill-opacity='.9' stroke-width='1.6'/%3E%3C/svg%3E") center/contain no-repeat;
   animation: triangleRise 1.5s ease-out infinite;
 }
 @keyframes triangleRise {
@@ -591,12 +593,14 @@ button:disabled{opacity:.35;cursor:not-allowed;}
   position: relative; overflow: visible;
 }
 .card.trait-竜頭蛇尾::before {
-  content:'🔥'; position:absolute; top:-18px; left:50%; transform:translateX(-50%);
-  font-size:20px; animation:flameDance 0.6s ease-in-out infinite alternate;
+  /* GameIcons fx_flame */
+  content:''; position:absolute; top:-18px; left:50%; transform:translateX(-50%);
+  width:20px; height:20px; background:url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' width='24px' height='24px' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2.5c1 3.5 6 5.8 6 11.2a6 6 0 0 1-12 0c0-3 1.6-4.6 2.8-5.8.2 2 1 3.1 2 3.4C10.3 8.4 11.2 5.3 12 2.5z' stroke='%23fb923c' fill='%23fb923c' fill-opacity='0.35'/%3E%3Cpath d='M12 20.5a2.8 2.8 0 0 1-2.8-2.8c0-2 1.6-2.7 2.3-4.4.9 1.5 3.3 2.4 3.3 4.4a2.8 2.8 0 0 1-2.8 2.8z' fill='%23fde68a' stroke='none'/%3E%3C/svg%3E") center/contain no-repeat; animation:flameDance 0.6s ease-in-out infinite alternate;
 }
 .card.trait-竜頭蛇尾::after {
-  content:'🐍'; position:absolute; bottom:-14px; left:50%; transform:translateX(-50%);
-  font-size:14px;
+  /* GameIcons fx_snake_tail */
+  content:''; position:absolute; bottom:-14px; left:50%; transform:translateX(-50%);
+  width:14px; height:14px; background:url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' width='24px' height='24px' xmlns='http://www.w3.org/2000/svg' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5.5c5 0 7 2.4 7 5.5s-3.5 3.5-3.5 6 3 3.5 6.5 3.5c3.5 0 5-1.5 6.5-3.5' stroke='%235eead4' stroke-width='3.6'/%3E%3Cpath d='M3 5.5c5 0 7 2.4 7 5.5s-3.5 3.5-3.5 6 3 3.5 6.5 3.5c3.5 0 5-1.5 6.5-3.5' stroke='%231c2030' stroke-width='1' stroke-dasharray='1 2.4'/%3E%3Cpath d='M19.5 17l2.5-2.8' stroke='%235eead4' stroke-width='1.6'/%3E%3C/svg%3E") center/contain no-repeat;
 }
 @keyframes flameDance {
   0%{transform:translateX(-50%) scale(1) rotate(-5deg);}
@@ -604,7 +608,7 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 }
 
 
-/* #10 ショップのレリックに「レリック🔴」バッジを付与 */
+/* #10 ショップのレリックに「レリック」バッジを付与 */
 .relic-shop-badge{font-size:10px;color:#ff5566;font-weight:700;margin-bottom:2px;letter-spacing:.02em;}
 /* #7 ステージ上のスキップ報酬表示 */
 .skip-bonus-tag{font-size:11px;margin:6px 0;color:var(--gold,#f0c419);}
@@ -833,7 +837,7 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .effects-bubble-title{font-size:12px;font-weight:900;margin-bottom:6px;color:var(--text);}
 @keyframes scoringBubblePopPlain{0%{transform:scale(.8);opacity:0;}100%{transform:scale(1);opacity:1;}}
 
-/* #5 レリックの大きさ（所持枠数）を🔴で表示 */
+/* #5 レリックの大きさ（所持枠数）を赤丸アイコン（GameIcons relic_size_dot）で表示 */
 .relic-size{font-size:8px;margin-left:3px;letter-spacing:-1px;white-space:nowrap;}
 
 /* #16 ショップ・マップ画面の右上にパッシブ一覧を表示 */
@@ -863,3 +867,40 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .shop-row.shop-row-4 .relic-enhance-tag{font-size:8px;}
 .shop-row.shop-row-4 .pfx-pack{transform:scale(.85);transform-origin:top center;margin-bottom:-10px;}
 @media (min-width:700px){ .shop-row.shop-row-4 .slot-title{font-size:12px;} .shop-row.shop-row-4 .slot-desc{font-size:10px;} }
+
+/* #1 パッシブ「魔力」 */
+.passive-icon.passive-mana{background:linear-gradient(160deg,#3b0764,#7e22ce);box-shadow:0 0 8px rgba(192,132,252,.7);opacity:1;}
+.passive-icon.passive-mana .passive-sym{color:#f5d0fe;font-size:15px;}
+.passive-icon.passive-mana .passive-tier{color:#e9d5ff;letter-spacing:.05em;}
+.passive-mana-title{color:#d8b4fe;}
+
+/* ===== GUIアイコン（GameIcons / css/icons.css）適用時の配置調整 ===== */
+/* カード記号：SVGは字形より余白が少ないため、字形の○△□×と同程度の見た目に収める */
+.card-symbol-wrap .gi, .card-symbol-expand .gi{ width:.8em; height:.8em; vertical-align:middle; }
+.card-symbol-wrap > span{ display:inline-flex; align-items:center; }
+.enhance-badge-icon{ display:inline-flex; align-items:center; }
+.enhance-badge-icon .gi{ width:1.05em; height:1.05em; }
+.card-multi-sub .gi{ width:1.1em; height:1.1em; vertical-align:middle; }
+.card-jamming-emoji{ display:flex; justify-content:center; }
+.card-jamming-emoji .gi{ width:1.15em; height:1.15em; }
+.esym.square-boosted .gi{ filter:drop-shadow(0 0 3px #4fd1ff); }
+.passive-multi-badge .gi{ width:10px; height:10px; }
+.passive-icon .passive-sym{ display:inline-flex; align-items:center; justify-content:center; }
+.passive-icon .passive-sym .gi{ width:1em; height:1em; }
+.passive-icon.passive-mana .passive-sym .gi{ width:1.2em; height:1.2em; }
+.passive-pick-symbol .gi{ vertical-align:middle; }
+.eff-tap-hint .gi{ width:1.1em; height:1.1em; vertical-align:-0.2em; }
+.cell.blocked .gi{ width:1.1em; height:1.1em; color:#4a4658; }
+.relic-size .gi{ width:1em; height:1em; margin-right:1px; vertical-align:-0.1em; }
+.info-title .gi{ vertical-align:-0.15em; }
+.deck-stats-panel .gi{ vertical-align:-0.15em; }
+.ending-credits-syms .gi{ width:1.1em; height:1.1em; vertical-align:-0.2em; }
+.log-panel .gi, .result-debug-line .gi{ vertical-align:-0.15em; }
+.pack-modal h3 .gi{ width:1.3em; height:1.3em; vertical-align:-0.3em; }
+.relic-trigger-banner .gi{ vertical-align:-0.15em; }
+.pack-modal-actions button .gi{ vertical-align:middle; }
+.sym-large .gi{ width:.7em!important; height:.7em!important; }
+
+/* 操作ボタン列：スマホ幅で横にはみ出さないよう折り返し＆文字の縦並びを防止 */
+.controls-row{flex-wrap:wrap;justify-content:center;gap:6px;max-width:100%;}
+.controls-row button{white-space:nowrap;padding:6px 10px;min-width:0;}

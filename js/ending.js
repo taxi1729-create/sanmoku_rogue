@@ -19,7 +19,7 @@ const EndingScene = {
           <div class="ending-credits-name">You</div>
           <br>
           <div class="ending-credits-role">CARD & SYMBOL DESIGN</div>
-          <div class="ending-credits-name">○ △ □ × ☆ ✓</div>
+          <div class="ending-credits-name ending-credits-syms">${['Circle','Triangle','Square','Cross','Hoshi','Check'].map(s=>GIconSym(s)).join(' ')}</div>
           <br>
           <div class="ending-credits-role">SPECIAL THANKS</div>
           <div class="ending-credits-name">Playtesters</div>

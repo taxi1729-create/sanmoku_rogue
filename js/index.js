@@ -149,7 +149,7 @@ const App = {
       html+=`<div class="title-record">所持金：${b.gold!=null?b.gold+'G':'-'} ／ 最終スコア：${b.score!=null?GlobalFunctions.formatScore(b.score):'-'}</div>`;
       if(b.passives){
         const passiveEntries=Object.entries(b.passives).filter(([sym,tier])=>tier>0);
-        html+=`<div class="gallery-section"><h3>パッシブ</h3><div class="gallery-desc">${passiveEntries.length>0?passiveEntries.map(([sym,tier])=>`${GameData.SYMBOL_LABEL[sym]||sym}${GameData.SYMBOL_PASSIVE_NAMES[sym]||''}Lv${tier}`).join('　'):'なし'}</div></div>`;
+        html+=`<div class="gallery-section"><h3>パッシブ</h3><div class="gallery-desc">${passiveEntries.length>0?passiveEntries.map(([sym,tier])=>`${GameData.SYMBOL_ICON_KEY[sym]?GIconSym(sym):''}${GameData.SYMBOL_PASSIVE_NAMES[sym]||sym}Lv${tier}`).join('　'):'なし'}</div></div>`;
       }
       html+=`<div class="gallery-section"><h3>レリック（${(b.relics||[]).length}件）</h3><div class="gallery-list">`;
       (b.relics||[]).forEach(r=>{

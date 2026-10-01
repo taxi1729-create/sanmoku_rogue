@@ -1,7 +1,17 @@
+// GUIアイコン（js/icons.js の GameIcons）をインラインSVG文字列で返す。icons.js は本ファイルより前に読み込むこと
+const GIcon = (key, opts) => (typeof GameIcons!=='undefined' ? GameIcons.svg(key, opts) : '');
+// 記号アイコン（.sym-* の色を currentColor で継承）を色クラス付き span で返す（説明文・メッセージ埋め込み用）
+const GICON_SYM_KEY = { Circle:'sym_circle', Triangle:'sym_triangle', Square:'sym_square', Cross:'sym_cross', Hoshi:'passive_hoshi', Check:'passive_check', Seven:'passive_seven' };
+const GIconSym = sym => `<span class="sym-${sym}">${GIcon(GICON_SYM_KEY[sym])}</span>`;
+
 const GameData = {
   SYMBOLS: ['Circle', 'Triangle', 'Square', 'Cross'],
-  SYMBOL_LABEL: { Circle:'○', Triangle:'△', Square:'□', Cross:'×', Hoshi:'☆', Check:'✓', Seven:'7' },
-  MULTI_SYMBOL_LABEL: { 'マルマルチ':'○', 'サンカクマルチ':'△', 'シカクマルチ':'□', 'バツマルチ':'×', 'オールマルチ':'○△□' },
+  // 記号の表示（インラインSVG。innerHTML で描画すること）。色は親要素の .sym-* クラスから currentColor で継承
+  SYMBOL_ICON_KEY: GICON_SYM_KEY,
+  SYMBOL_LABEL: { Circle:GIcon('sym_circle'), Triangle:GIcon('sym_triangle'), Square:GIcon('sym_square'), Cross:GIcon('sym_cross'), Hoshi:GIcon('passive_hoshi'), Check:GIcon('passive_check'), Seven:GIcon('passive_seven') },
+  // プレーンテキストしか使えない箇所（title属性等）用の記号名
+  SYMBOL_TEXT: { Circle:'マル', Triangle:'サンカク', Square:'シカク', Cross:'バツ', Hoshi:'ホシ', Check:'チェック', Seven:'セブン' },
+  MULTI_SYMBOL_LABEL: { 'マルマルチ':GIcon('multi_circle'), 'サンカクマルチ':GIcon('multi_triangle'), 'シカクマルチ':GIcon('multi_square'), 'バツマルチ':GIcon('multi_cross'), 'オールマルチ':GIcon('multi_all') },
 
   // #1 シカクを7倍に修正
   // #1 初期ビンゴ倍率：マル・サンカク・シカクをすべて10倍に変更
@@ -22,9 +32,26 @@ const GameData = {
   QUAD_MULTIPLIER_FACTOR: 1.5,
   // #3 ホシパッシブLv2用：5列ビンゴは3列ビンゴの倍率の2倍
   PENTA_MULTIPLIER_FACTOR: 2,
-  pentaMult(symbol){ return this.BINGO_MULTIPLIER_BASE[symbol] * this.PENTA_MULTIPLIER_FACTOR; },
+  // 列補正（3列=1／4列=1.5／5列=2）に魔力ステージA・Bの倍率を掛けたもの
+  lineFactor(kind){
+    const base = kind==='penta' ? this.PENTA_MULTIPLIER_FACTOR : (kind==='quad' ? this.QUAD_MULTIPLIER_FACTOR : 1);
+    return base * ((typeof GameState!=='undefined'&&GameState.manaLineMul)?GameState.manaLineMul(kind):1);
+  },
+  triMult(symbol){ return this.BINGO_MULTIPLIER_BASE[symbol] * this.lineFactor('tri'); },
+  pentaMult(symbol){ return this.BINGO_MULTIPLIER_BASE[symbol] * this.lineFactor('penta'); },
   REWARD_FLAT_BONUS: 1,
-  quadMult(symbol){ return this.BINGO_MULTIPLIER_BASE[symbol] * this.QUAD_MULTIPLIER_FACTOR; },
+  quadMult(symbol){ return this.BINGO_MULTIPLIER_BASE[symbol] * this.lineFactor('quad'); },
+
+  // #1 パッシブ「魔力」（魔神イベントで付与。レベル制ではなくステージA〜Eを個別に所持）
+  MANA_STAGES: {
+    A:{ name:'魔力ステージA', desc:'3列ビンゴの列補正を0.75倍、4列ビンゴの列補正を2倍、5列ビンゴの列補正を3倍にする' },
+    B:{ name:'魔力ステージB', desc:'3列ビンゴの列補正を3倍、4列ビンゴと5列ビンゴの列補正を0倍にする' },
+    C:{ name:'魔力ステージC', desc:'捧げられたレリックの個数分、レリックの所持数上限が増加する' },
+    D:{ name:'魔力ステージD', desc:'付与された階層のボスクリア時のパッシブ報酬の数を3つにする' },
+    E:{ name:'魔力ステージE', desc:'カードが得られるパックのカードは、カード強化・ジャミング・性質変化の全てが付与された状態で出現する。レリックパックとピックアップレリックのレリックには全てレリック強化効果が付与される' },
+  },
+  // #3 魔神イベント専用レリック（ショップ等のランダム抽選には含めない）
+  MAJIN_SEAL_RELIC: { id:'majin_seal', name:'魔神のお墨付き', desc:'ビンゴ時、補正基礎点+n（n=魔神に捧げたカードの基礎点）' },
 
   // #18 点数計算変数の初期値を明記
   CORRECTION_BASE_SCORE: 0,   // 補正基礎点
@@ -32,9 +59,10 @@ const GameData = {
   FINAL_MULTIPLIER: 1,        // 最終乗算補正
   FINAL_ADD: 0,               // 最終加算補正
 
+  // ジャミングのアイコン（旧：絵文字。現在は GameIcons のインラインSVG。innerHTML で描画すること）
   JAMMING_EMOJI: {
-    'スタン':'❌', 'サンダー':'⚡️', '混乱':'❓', 'ブレイク':'⏯',
-    '延命':'4️⃣', 'ビンゴ阻害':'😵', 'リンク':'⛓', '引き直し':'↩️', '封印':'🗃', '誘導':'👆',
+    'スタン':GIcon('jam_stun'), 'サンダー':GIcon('jam_thunder'), '混乱':GIcon('jam_confuse'), 'ブレイク':GIcon('jam_break'),
+    '延命':GIcon('jam_prolong'), 'ビンゴ阻害':GIcon('jam_bingo_block'), 'リンク':GIcon('jam_link'), '引き直し':GIcon('jam_redraw'), '封印':GIcon('jam_seal'), '誘導':GIcon('jam_guide'),
   },
 
   JAMMING_IMG: {
@@ -258,6 +286,7 @@ const GameData = {
       case 'round_boost': return `最終加算補正:+${1000*GameState.round}（ラウンド終了時）`;
       case 'base_boost': return '最終加算補正:+2000（取得時に反映済み）';
       case 'jamming_boost': return `点数:+${Math.round(GameState.targetScore*0.05)}（ビンゴ阻害カード配置時）`;
+      case 'majin_seal': return `補正基礎点:+${relic.sealValue||0}`;
     }
     switch(relic.relicEnhance){
       case 'ren_circle': return `補正基礎点:+${GameState.currentDeck.filter(c=>c.symbol==='Circle').length}`;
@@ -382,7 +411,8 @@ const GameData = {
     { id:'cross5000', name:'バツ5000',         desc:'NPCの×のカード基礎点が5000点になる' },
     { id:'block_cells', name:'マス妨害',          desc:'盤面の4つのランダムなマスが使用不可になる' },
     { id:'quad_only', name:'４ビンゴ',          desc:'お互い4列でないとビンゴできない' },
-    { id:'blackout', name:'ブラックアウト',    desc:'手札は記号が？で隠れる。カード強化のみ確認可。盤面に出したら表示される' },
+    // #4 旧ブラックアウト → パッシブ効果無効（idは互換のため据え置き）
+    { id:'blackout', name:'パッシブ効果無効',  desc:'ゲーム開始時、パッシブ効果を無効化する（パッシブ「魔力」は例外）。ゲーム終了時に解除される' },
     { id:'unify', name:'統一',              desc:'マル・サンカク・シカクいずれか1記号のビンゴ倍率+10、他は-20。ステージ終了時に元に戻す' },
     { id:'no_relic', name:'レリック使用不可',  desc:'レリックの効果が発動しない' },
     { id:'cross_corner', name:'バツ配置',          desc:'×が盤面四隅に置かれた状態でラウンドが始まる' },
@@ -394,22 +424,22 @@ const GameData = {
 
   MAX_RELICS: 5,
 
-  // #27 ショップ商品種別の確率テーブル
+  // #27 ショップ商品種別の確率テーブル（icon は GameIcons のキー。描画側で GIcon(icon) を呼ぶ）
   SHOP_RANDOM_TYPES: [
-    { id:'pickup_relic', name:'ピックアップレリック',   weight:10, emoji:'🏺' },
-    { id:'card_pack', name:'？カードパック',         weight:5, emoji:'🎴' },
-    { id:'pickup_upgrade', name:'ピックアップアップグレード', weight:5, emoji:'🎯' },
-    { id:'normal_upgrade', name:'通常アップグレード',     weight:60, emoji:'⬆️' }, // #5 出現確率2倍(30→60)
-    { id:'special_upgrade', name:'特別アップグレード',     weight:8, emoji:'✨' },
-    { id:'card_focus', name:'カードフォーカスパック', weight:20, emoji:'🔍' },
-    { id:'bingo_focus', name:'ビンゴフォーカスパック', weight:20, emoji:'🎰' },
-    { id:'dream_card', name:'ドリームカードパック',   weight:2, emoji:'🌙' },
+    { id:'pickup_relic', name:'ピックアップレリック',   weight:10, icon:'shop_pickup_relic' },
+    { id:'card_pack', name:'？カードパック',         weight:5, icon:'pack_card' },
+    { id:'pickup_upgrade', name:'ピックアップアップグレード', weight:5, icon:'shop_pickup_upgrade' },
+    { id:'normal_upgrade', name:'通常アップグレード',     weight:60, icon:'pack_upgrade' }, // #5 出現確率2倍(30→60)
+    { id:'special_upgrade', name:'特別アップグレード',     weight:8, icon:'pack_special' },
+    { id:'card_focus', name:'カードフォーカスパック', weight:20, icon:'pack_card_focus' },
+    { id:'bingo_focus', name:'ビンゴフォーカスパック', weight:20, icon:'pack_bingo_focus' },
+    { id:'dream_card', name:'ドリームカードパック',   weight:2, icon:'pack_dream' },
     // #9 新商品：強化カードパック20%・ジャミングカードパック30%・レリックパック15%を追加（合計165%、上限175%以内）
-    { id:'enhance_pack', name:'強化カードパック',     weight:20, emoji:'💪' },
-    { id:'jamming_pack', name:'ジャミングカードパック', weight:30, emoji:'🌀' },
-    { id:'relic_pack', name:'レリックパック',         weight:15, emoji:'🏆' },
+    { id:'enhance_pack', name:'強化カードパック',     weight:20, icon:'pack_enhance' },
+    { id:'jamming_pack', name:'ジャミングカードパック', weight:30, icon:'pack_jamming' },
+    { id:'relic_pack', name:'レリックパック',         weight:15, icon:'pack_relic' },
     // #6 爆発通常アップグレード：通常の重み付き抽選には含めず、ショップ生成時に20%の確率で別途1枠を確保する
-    { id:'normal_explosive_upgrade', name:'爆発通常アップグレード', weight:0, emoji:'💥' },
+    { id:'normal_explosive_upgrade', name:'爆発通常アップグレード', weight:0, icon:'pack_explosive' },
   ],
 
   // #3 スキップ報酬：爆発通常アップグレードを100%排出率にする（旧抽選プールは参考として残す）
@@ -459,6 +489,12 @@ const GameData = {
     if(forced.enhance!==undefined) enhance=forced.enhance;
     if(forced.jamming!==undefined) jamming=forced.jamming;
     if(forced.trait!==undefined) trait=forced.trait;
+    // #1 魔力ステージE：パックから得るカードは強化・ジャミング・性質変化が全て付与された状態で出現する
+    if(typeof GameState!=='undefined' && GameState.hasMana && GameState.hasMana('E')){
+      if(!enhance) enhance=GlobalFunctions.randChoice(this.ENHANCE_NAME_POOL);
+      if(!jamming) jamming=GlobalFunctions.randChoice(Object.keys(this.JAMMING_DESC));
+      if(!trait) trait=GlobalFunctions.randChoice(this.TRAIT_NAME_POOL);
+    }
     const card = { id:'shopcard_'+Date.now()+'_'+Math.floor(Math.random()*100000), symbol, number:baseScore, baseScore, jamming, enhance, trait };
     this.applyGrantSideEffects(card, (typeof GameState!=='undefined')?GameState.gold:0); // #1 生成時に現在Gを正しく反映
     return card;
@@ -472,34 +508,34 @@ const GameData = {
                  normalExplosiveUpgrade:10 },
 
   NORMAL_SELECT_POOL: [
-    { id:'circle_mult', name:'🟡マルビンゴ強化',    desc:'○のビンゴ倍率を+4する',              targetMin:0, targetMax:0 },
-    { id:'cross_mult', name:'🟡バツビンゴ強化',    desc:'×のビンゴ倍率を+6する',              targetMin:0, targetMax:0 },
-    { id:'square_mult', name:'🟡シカクビンゴ強化',  desc:'□のビンゴ倍率を+4する',              targetMin:0, targetMax:0 },
-    { id:'triangle_mult', name:'🟡サンカクビンゴ強化',desc:'△のビンゴ倍率を+4する',              targetMin:0, targetMax:0 },
-    { id:'number_up2', name:'🟡数値上昇',          desc:'カードを2枚選択し、それぞれ基礎点+5', targetMin:2, targetMax:2 },
-    { id:'number_up3', name:'🟡数値上昇3',         desc:'カードを3枚選択し、それぞれ基礎点+3', targetMin:3, targetMax:3 },
-    { id:'base_up5', name:'🟡基礎点上昇1',       desc:'カードを1枚選択し、基礎点+10する',    targetMin:1, targetMax:1 },
-    { id:'symbol_change', name:'🟡記号変化',          desc:'カードを最大3枚選択し記号をランダム変化', targetMin:1, targetMax:3 },
-    { id:'cash_in', name:'🟡換金',              desc:'カードを1枚取り除きG獲得（強化数に応じた金額）', targetMin:1, targetMax:1 },
-    // #18 複製をレア枠に変更（🔵表記・出現率5%）
-    { id:'duplicate', name:'🔵複製',              desc:'カードを1枚選択し複製',               targetMin:1, targetMax:1, rarity:0.05 },
-    { id:'grant_enhance', name:'🟡カード強化付与',    desc:'カードを1枚選択しランダムなカード強化を付与', targetMin:1, targetMax:1 },
-    { id:'grant_jamming', name:'🟢ジャミング効果付与',desc:'カードを1枚選択しランダムなジャミングを付与', targetMin:1, targetMax:1 },
-    { id:'all_mult_up1', name:'🟡オールビンゴ強化',  desc:'全記号のビンゴ倍率を+1する',          targetMin:0, targetMax:0 },
+    { id:'circle_mult', name:`${GIcon('rarity_normal')}マルビンゴ強化`,    desc:`${GIconSym('Circle')}のビンゴ倍率を+4する`,              targetMin:0, targetMax:0 },
+    { id:'cross_mult', name:`${GIcon('rarity_normal')}バツビンゴ強化`,    desc:`${GIconSym('Cross')}のビンゴ倍率を+6する`,              targetMin:0, targetMax:0 },
+    { id:'square_mult', name:`${GIcon('rarity_normal')}シカクビンゴ強化`,  desc:`${GIconSym('Square')}のビンゴ倍率を+4する`,              targetMin:0, targetMax:0 },
+    { id:'triangle_mult', name:`${GIcon('rarity_normal')}サンカクビンゴ強化`,desc:`${GIconSym('Triangle')}のビンゴ倍率を+4する`,              targetMin:0, targetMax:0 },
+    { id:'number_up2', name:`${GIcon('rarity_normal')}数値上昇`,          desc:'カードを2枚選択し、それぞれ基礎点+5', targetMin:2, targetMax:2 },
+    { id:'number_up3', name:`${GIcon('rarity_normal')}数値上昇3`,         desc:'カードを3枚選択し、それぞれ基礎点+3', targetMin:3, targetMax:3 },
+    { id:'base_up5', name:`${GIcon('rarity_normal')}基礎点上昇1`,       desc:'カードを1枚選択し、基礎点+10する',    targetMin:1, targetMax:1 },
+    { id:'symbol_change', name:`${GIcon('rarity_normal')}記号変化`,          desc:'カードを最大3枚選択し記号をランダム変化', targetMin:1, targetMax:3 },
+    { id:'cash_in', name:`${GIcon('rarity_normal')}換金`,              desc:'カードを1枚取り除きG獲得（強化数に応じた金額）', targetMin:1, targetMax:1 },
+    // #18 複製をレア枠に変更（レア(青)マーカー表記・出現率5%）
+    { id:'duplicate', name:`${GIcon('rarity_rare')}複製`,              desc:'カードを1枚選択し複製',               targetMin:1, targetMax:1, rarity:0.05 },
+    { id:'grant_enhance', name:`${GIcon('rarity_normal')}カード強化付与`,    desc:'カードを1枚選択しランダムなカード強化を付与', targetMin:1, targetMax:1 },
+    { id:'grant_jamming', name:`${GIcon('rarity_jamming')}ジャミング効果付与`,desc:'カードを1枚選択しランダムなジャミングを付与', targetMin:1, targetMax:1 },
+    { id:'all_mult_up1', name:`${GIcon('rarity_normal')}オールビンゴ強化`,  desc:'全記号のビンゴ倍率を+1する',          targetMin:0, targetMax:0 },
     // #8: 1%で性質変化付与
     // #18 性質変化のレア枠出現率を3%に変更
-    { id:'grant_trait_rare', name:'🔵性質変化付与',     desc:'カードを1枚選択しランダムな性質変化を付与（レア）', targetMin:1, targetMax:1, rarity:0.03 },
+    { id:'grant_trait_rare', name:`${GIcon('rarity_rare')}性質変化付与`,     desc:'カードを1枚選択しランダムな性質変化を付与（レア）', targetMin:1, targetMax:1, rarity:0.03 },
   ],
   SPECIAL_SELECT_POOL: [
-    { id:'grant_trait', name:'🔵性質変化効果付与',  desc:'カードを1枚選択しランダムな性質変化を付与', targetMin:1, targetMax:1 },
-    { id:'hand_up2', name:'🔵手札増加',          desc:'手札の上限が2枚増加する',         targetMin:0, targetMax:0 },
-    { id:'reroll_up2', name:'🔵リロール増加',       desc:'リロール回数を2回増加する',        targetMin:0, targetMax:0 },
-    { id:'round_up1', name:'🔵ラウンド増加',       desc:'挑戦できるラウンド数が1増加する',  targetMin:0, targetMax:0 },
+    { id:'grant_trait', name:`${GIcon('rarity_rare')}性質変化効果付与`,  desc:'カードを1枚選択しランダムな性質変化を付与', targetMin:1, targetMax:1 },
+    { id:'hand_up2', name:`${GIcon('rarity_rare')}手札増加`,          desc:'手札の上限が2枚増加する',         targetMin:0, targetMax:0 },
+    { id:'reroll_up2', name:`${GIcon('rarity_rare')}リロール増加`,       desc:'リロール回数を2回増加する',        targetMin:0, targetMax:0 },
+    { id:'round_up1', name:`${GIcon('rarity_rare')}ラウンド増加`,       desc:'挑戦できるラウンド数が1増加する',  targetMin:0, targetMax:0 },
     // #11: 4ターン増加
-    { id:'turn_up4', name:'🔵ターン増加',         desc:'1ラウンドのターン数が4増加する',   targetMin:0, targetMax:0 },
-    { id:'relic_slot_up1', name:'🔵レリック所持数増加', desc:'レリック所持数上限が1増加する',    targetMin:0, targetMax:0 },
+    { id:'turn_up4', name:`${GIcon('rarity_rare')}ターン増加`,         desc:'1ラウンドのターン数が4増加する',   targetMin:0, targetMax:0 },
+    { id:'relic_slot_up1', name:`${GIcon('rarity_rare')}レリック所持数増加`, desc:'レリック所持数上限が1増加する',    targetMin:0, targetMax:0 },
     // #14 パック購入時の選択可能カード枚数+2
-    { id:'pack_card_up2', name:'🔵パック選択枚数増加', desc:'パック購入時の選択可能カード枚数が2枚増加する', targetMin:0, targetMax:0 },
+    { id:'pack_card_up2', name:`${GIcon('rarity_rare')}パック選択枚数増加`, desc:'パック購入時の選択可能カード枚数が2枚増加する', targetMin:0, targetMax:0 },
     // #29: 全引き後確定性質変化付与は applyEffect 側で処理
   ],
 

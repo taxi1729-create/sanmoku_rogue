@@ -12,6 +12,8 @@ const MapSelectScene = {
       return;
     }
     this._initBossEffect();
+    // 魔神イベント：階層侵入時にハイレベルが魔神イベントになるか判定（判定済みなら保存値を使う）
+    if(typeof MajinEvent!=='undefined') MajinEvent.ensureDecided(GameState.currentFloor);
     this.renderAll();
     TutorialOverlay.show('mapSelect');
   },
@@ -62,6 +64,11 @@ const MapSelectScene = {
       const clearedBefore=i===0||GameState.clearedStages.includes(stages[i-1].key);
       const isCleared=GameState.clearedStages.includes(stage.key);
       const locked=!clearedBefore;
+      // 魔神イベント：ハイレベルが魔神イベントに変わった階層は専用のステージカードを表示する
+      if(stage.key==='high'&&typeof MajinEvent!=='undefined'&&MajinEvent.isMajinFloor(GameState.currentFloor)){
+        path.appendChild(MajinEvent.buildStageCard(stage,locked,isCleared));
+        return;
+      }
       const card=document.createElement('div');
       // #4 「クリア済み・再挑戦」表記を廃止
       card.className='stage-card'+(locked?' locked':'');
@@ -72,7 +79,7 @@ const MapSelectScene = {
         bossInfoHtml=`<div class="boss-preview"><div class="boss-preview-title">ボス効果</div>${effects.map(b=>`<div class="boss-preview-item"><b>${b.name}</b>：${b.desc}</div>`).join('')}</div>`;
         // #3 ホシパッシブ1：ボス効果を一度だけリロール可能
         if(!locked&&GameState.symbolPassiveTier.Hoshi>=1&&!GameState.bossRerollUsed){
-          bossRerollBtnHtml=`<button class="boss-reroll-btn">☆ボス効果リロール（残り1回）</button>`;
+          bossRerollBtnHtml=`<button class="boss-reroll-btn">${GIcon('btn_boss_reroll',{cls:'gi-gap'})}ボス効果リロール（残り1回）</button>`;
         }
       }
       // #7 スキップ報酬内容をステージ上に表示
@@ -125,7 +132,7 @@ const MapSelectScene = {
       const done=document.createElement('div'); done.style.marginTop='18px';
       if(GameState.currentFloor>=10){
         // #2 階層10クリア時はエンディング（ゲームクリア画面＋スタッフロール）へ
-        done.innerHTML=`<div style="color:var(--gold);font-weight:900;margin-bottom:10px;">🎉 全10階層クリア！おめでとうございます！</div><button id="btn-show-ending">エンディングへ</button>`;
+        done.innerHTML=`<div style="color:var(--gold);font-weight:900;margin-bottom:10px;">${GIcon('all_clear',{cls:'gi-lg gi-gap'})}全10階層クリア！おめでとうございます！</div><button id="btn-show-ending">エンディングへ</button>`;
       }else if(GameState.currentFloor===5){
         done.innerHTML=`<div style="color:var(--square);font-weight:900;margin-bottom:10px;">第5階層クリア！ゲームクリア！やり込み要素として第6階層以降も挑戦できます。</div><button id="btn-next-floor">第${nextFloor}階層へ</button><button id="btn-back-title" style="margin-left:8px;">タイトルに戻る</button>`;
       }else{
@@ -191,7 +198,7 @@ const MapSelectScene = {
       if(relic){
         const ren=GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance);
         const infoDiv=document.createElement('div'); infoDiv.className='relic-info-panel'; infoDiv.style.marginTop='8px';
-        infoDiv.innerHTML=`<div class="info-title">${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div><div class="info-desc">${relic.desc}</div>${ren?`<div class="info-desc relic-enhance-desc">【${ren.name}】${ren.desc}</div>`:''}<div class="relic-reorder-row"><button class="relic-move-btn" ${idx<=0?'disabled':''}>◀ 左へ</button><button class="relic-move-btn" ${idx>=GameState.relics.length-1?'disabled':''}>右へ ▶</button></div>`;
+        infoDiv.innerHTML=`<div class="info-title">${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div><div class="info-desc">${relic.desc}</div>${ren?`<div class="info-desc relic-enhance-desc">【${ren.name}】${ren.desc}</div>`:''}<div class="relic-reorder-row"><button class="relic-move-btn" ${idx<=0?'disabled':''}>${GIcon('btn_left',{cls:'gi-gap'})}左へ</button><button class="relic-move-btn" ${idx>=GameState.relics.length-1?'disabled':''}>右へ${GIcon('btn_right',{cls:'gi-gap-l'})}</button></div>`;
         const moveBtns=infoDiv.querySelectorAll('.relic-move-btn');
         moveBtns[0].addEventListener('click',()=>{ if(GameState.moveRelic(idx,-1)){ this.activeRelicId=idx-1; this.renderAll(); } });
         moveBtns[1].addEventListener('click',()=>{ if(GameState.moveRelic(idx,1)){ this.activeRelicId=idx+1; this.renderAll(); } });
@@ -221,7 +228,7 @@ const MapSelectScene = {
       if(type==='relic'){ label='レリック：ランダムレリック1つを獲得'; }
       else if(type==='normal_upgrade'){ label='通常アップグレード：ショップでカードと効果を選択'; }
       else if(type==='special_upgrade'){ label='特別アップグレード：ショップでカードと効果を選択'; }
-      else if(type==='normal_explosive_upgrade'){ label='💥爆発通常アップグレード：ショップで最大3つ選択'; }
+      else if(type==='normal_explosive_upgrade'){ label=GIcon('pack_explosive',{cls:'gi-gap'})+'爆発通常アップグレード：ショップで最大3つ選択'; }
       else if(type==='dream_card'){ label='ドリームカードパック'; }
       this._skipBonusCache[key]=type?{type,label}:null;
     }
@@ -275,7 +282,7 @@ const MapSelectScene = {
     if(bonus.type==='normal_explosive_upgrade'){
       if(GameState.currentDeck.length===0) return '';
       ShopScene.pickingPack = ShopScene.buildExplosiveUpgradePack(null);
-      return 'ショップで💥爆発通常アップグレードを選択してください（5つから最大3つまで選択可）';
+      return 'ショップで'+GIcon('pack_explosive',{cls:'gi-gap'})+'爆発通常アップグレードを選択してください（5つから最大3つまで選択可）';
     }
     return '';
   },

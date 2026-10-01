@@ -3,6 +3,11 @@ const GameState = {
   targetScore:0, currentScore:0, relics:[], gold:0, round:1, turn:1, currentStage:null,
   clearedStages:[], lastReward:null, rerollCount:GameData.INITIAL_REROLL,
   handSizeBonus:0, roundsBonus:0, turnsBonus:0, relicSlotBonus:0, rerollBonus:0,
+  // #1 パッシブ「魔力」：A/B/E=所持フラグ、C=捧げたレリック数（レリック上限加算）、D=付与された階層の配列
+  mana:{ A:false, B:false, C:0, D:[], E:false },
+  // #2 魔神イベントの進行状況（decided: 階層ごとの判定結果 true/false、done1/done2: 各区間で発生済みか、usedMajin: 登場した魔神id、cleared: イベント終了済み階層）
+  majin:{ decided:{}, done1:false, done2:false, usedMajin:[], cleared:{} },
+  passiveSuspended:null, // #4 ボス効果「パッシブ効果無効」中に退避したパッシブ
   packCardBonus:0, // #14 特別アップグレード：パック購入時の選択可能カード枚数の追加分
   usedSpecialEffectIds:[], specialPackExhausted:false, pendingBossEffect:null,
   currentFloor:1,          // #12 現在の階層
@@ -26,8 +31,8 @@ const GameState = {
     const base = explosive ? GameData.EXPLOSIVE_PACK_CARD_COUNT : GameData.PACK_CARD_COUNT;
     return base + (this.symbolPassiveTier.Square>=1?1:0) + (this.packCardBonus||0);
   },
-  // #5 レリックの大きさ（所持枠数）を🔴で表現する（ネガティブ=0枠は表示なし）
-  relicSizeDots(relic){ return '🔴'.repeat(Math.max(0,this.slotsForRelic(relic))); },
+  // #5 レリックの大きさ（所持枠数）を赤丸アイコン（GameIcons relic_size_dot）で表現する（ネガティブ=0枠は表示なし）。innerHTML で描画すること
+  relicSizeDots(relic){ return GIcon('relic_size_dot').repeat(Math.max(0,this.slotsForRelic(relic))); },
   // #7/#8 報酬Gに加算するレリック効果（G獲得+3）とレリック強化効果（G獲得+1）
   rewardRelicGold(noRelic=false){
     if(noRelic) return {relic:0, relicEnhance:0};
@@ -43,7 +48,25 @@ const GameState = {
   },
   effectiveMaxRounds(){ return GameData.MAX_ROUNDS + this.roundsBonus; },
   effectiveTurnsPerRound(){ return GameData.TURNS_PER_ROUND + this.turnsBonus; },
-  effectiveMaxRelics(){ return GameData.MAX_RELICS + this.relicSlotBonus; },
+  effectiveMaxRelics(){ return GameData.MAX_RELICS + this.relicSlotBonus + (this.mana?.C||0); },
+  // #1 魔力
+  hasMana(st){ if(!this.mana) return false; if(st==='C') return (this.mana.C||0)>0; if(st==='D') return (this.mana.D||[]).length>0; return !!this.mana[st]; },
+  hasAnyMana(){ return ['A','B','C','D','E'].some(s=>this.hasMana(s)); },
+  grantMana(st, arg){
+    if(!this.mana) this.mana={A:false,B:false,C:0,D:[],E:false};
+    if(st==='C') this.mana.C=(this.mana.C||0)+(arg||0);
+    else if(st==='D'){ const f=arg!=null?arg:this.currentFloor; if(!this.mana.D.includes(f)) this.mana.D.push(f); }
+    else this.mana[st]=true;
+  },
+  // 列補正への魔力倍率（A・Bを両方持つ場合は掛け合わせる）
+  manaLineMul(kind){
+    let m=1;
+    if(this.hasMana('A')) m*= kind==='tri'?0.75:(kind==='quad'?2:3);
+    if(this.hasMana('B')) m*= kind==='tri'?3:0;
+    return m;
+  },
+  // 魔力ステージD：この階層のボスクリア時のパッシブ報酬数
+  passiveRewardCount(){ return (this.mana?.D||[]).includes(this.currentFloor)?3:1; },
   hasRelic(id){ return this.relics.some(r=>r.id===id); },
   // #5 同一レリックを複数所持している場合、その所持数を返す（点数計算で所持数分の効果を反映するために使用）
   relicCountOf(id){ return this.relics.filter(r=>r.id===id).length; },
@@ -88,6 +111,9 @@ const GameState = {
     this.specialPackExhausted=false; this.pendingBossEffect=null;
     this.currentFloor=1;
     this.symbolPassiveTier={ Circle:0, Triangle:0, Square:0, Cross:0, Hoshi:0, Check:0, Seven:0 };
+    this.mana={ A:false, B:false, C:0, D:[], E:false };
+    this.majin={ decided:{}, done1:false, done2:false, usedMajin:[], cleared:{} };
+    this.passiveSuspended=null;
     this.bingoCountThisStage=0;
     this.totalBingoCount=0; this.sevenPendingMultBoost=false;
     GameData.BINGO_MULTIPLIER_BASE={...GameData.BINGO_MULTIPLIER_BASE_ORIGINAL};
@@ -120,7 +146,8 @@ const GameState = {
       turnsBonus:this.turnsBonus, relicSlotBonus:this.relicSlotBonus,
       rerollBonus:this.rerollBonus, packCardBonus:this.packCardBonus, usedSpecialEffectIds:this.usedSpecialEffectIds,
       pendingBossEffect:this.pendingBossEffect,
-      symbolPassiveTier:this.symbolPassiveTier,
+      symbolPassiveTier:this.passiveSuspended||this.symbolPassiveTier,
+      mana:this.mana, majin:this.majin,
       totalBingoCount:this.totalBingoCount,
       sevenPendingMultBoost:this.sevenPendingMultBoost,
       bossRerollUsed:this.bossRerollUsed,
@@ -146,6 +173,9 @@ const GameState = {
     this.usedSpecialEffectIds=d.usedSpecialEffectIds||[];
     this.pendingBossEffect=d.pendingBossEffect||null;
     this.symbolPassiveTier=d.symbolPassiveTier||{ Circle:0, Triangle:0, Square:0, Cross:0, Hoshi:0, Check:0, Seven:0 };
+    this.mana=Object.assign({ A:false, B:false, C:0, D:[], E:false }, d.mana||{});
+    this.majin=Object.assign({ decided:{}, done1:false, done2:false, usedMajin:[], cleared:{} }, d.majin||{});
+    this.passiveSuspended=null;
     if(this.symbolPassiveTier.Hoshi===undefined) this.symbolPassiveTier.Hoshi=0;
     if(this.symbolPassiveTier.Check===undefined) this.symbolPassiveTier.Check=0;
     if(this.symbolPassiveTier.Seven===undefined) this.symbolPassiveTier.Seven=0;

@@ -1,18 +1,24 @@
 /* packFx.js — カードパック開封演出モジュール（自己完結 / 依存なし）
  * API:
- *   PackFX.EMOJI, PackFX.NAME
+ *   PackFX.EMOJI（パック絵中央のアイコン。GameIcons のインラインSVG文字列）, PackFX.ICON（同 GameIcons キー）, PackFX.NAME
  *   PackFX.packHtml(type, {size:'mini'|'large', label})  -> string
  *   PackFX.play({type, title, items:[{html, rare}], rare}) -> Promise<void>
  *   PackFX.isPlaying() -> boolean
  * 使用CSS: css/packfx.css（クラスはすべて pfx- プレフィックス）
+ * アイコン: js/icons.js（GameIcons）が先に読み込まれていればそのSVGを使う（未読込時はアイコン無しで描画）
  */
 const PackFX = (function(){
   'use strict';
 
-  const EMOJI = {
-    card_pack:'🎴', normal_upgrade:'⬆️', normal_explosive_upgrade:'💥', special_upgrade:'✨',
-    card_focus:'🔍', dream_card:'🌙', jamming_pack:'🌀', relic_pack:'🏆', enhance_pack:'💪', bingo_focus:'🎰'
+  const icon = (key, opts) => (typeof GameIcons !== 'undefined' ? GameIcons.svg(key, opts) : '');
+  // パック種別 → GameIcons キー
+  const ICON = {
+    card_pack:'pack_card', normal_upgrade:'pack_upgrade', normal_explosive_upgrade:'pack_explosive', special_upgrade:'pack_special',
+    card_focus:'pack_card_focus', dream_card:'pack_dream', jamming_pack:'pack_jamming', relic_pack:'pack_relic', enhance_pack:'pack_enhance', bingo_focus:'pack_bingo_focus'
   };
+  // 旧：絵文字。現在はインラインSVG文字列（キーの存在判定にも使われるため名前は維持）
+  const EMOJI = {};
+  Object.keys(ICON).forEach(t => { EMOJI[t] = icon(ICON[t], {cls:'pfx-icon'}); });
   const NAME = {
     card_pack:'？カードパック', normal_upgrade:'通常アップグレード', normal_explosive_upgrade:'爆発通常アップグレード',
     special_upgrade:'特別アップグレード', card_focus:'カードフォーカスパック', dream_card:'ドリームカードパック',
@@ -58,7 +64,7 @@ const PackFX = (function(){
       + '<div class="pfx-pack-clip" style="'+clipStyle(PACK_POLY)+'">'
       +   '<div class="pfx-face"></div><div class="pfx-foil"></div>'
       +   '<div class="pfx-crimp pfx-crimp-t"></div><div class="pfx-crimp pfx-crimp-b"></div>'
-      +   (size === 'large' ? '<div class="pfx-toptext">✦ BOOSTER PACK ✦</div>' : '')
+      +   (size === 'large' ? '<div class="pfx-toptext">'+icon('fx_sparkle')+' BOOSTER PACK '+icon('fx_sparkle')+'</div>' : '')
       +   '<div class="pfx-medal"></div><div class="pfx-emoji">'+EMOJI[t]+'</div>'
       +   '<div class="pfx-band"><span>'+esc(label)+'</span></div>'
       +   '<div class="pfx-sheen"></div>'
@@ -159,7 +165,7 @@ const PackFX = (function(){
         +     '<div class="pfx-ring"></div>'
         +     '<div class="pfx-fx"></div>'
         +   '</div>'
-        +   '<div class="pfx-title"><span>'+esc(title)+'</span>'+(rareAny?'<em class="pfx-rare-badge">✦ RARE ✦</em>':'')+'</div>'
+        +   '<div class="pfx-title"><span>'+esc(title)+'</span>'+(rareAny?'<em class="pfx-rare-badge">'+icon('fx_sparkle')+' RARE '+icon('fx_sparkle')+'</em>':'')+'</div>'
         + '</div></div>';
 
       const c = { overlay:ov, timers:[], resolve, done:false };
@@ -185,7 +191,7 @@ const PackFX = (function(){
       if(sparkle && !reduced){
         spawn(fx, 16, el => {
           el.className = 'pfx-twinkle';
-          el.textContent = Math.random() < .7 ? '✦' : '✧';
+          el.innerHTML = icon(Math.random() < .7 ? 'fx_sparkle' : 'fx_sparkle_outline');
           const a = rnd(0, Math.PI*2), r = rnd(.55, 1.05);
           setVars(el, { x: (Math.cos(a)*r*105).toFixed(0)+'px', y: (Math.sin(a)*r*140).toFixed(0)+'px',
             s: rnd(10,20).toFixed(0)+'px', delay: rnd(0,1.2).toFixed(2)+'s', dur: rnd(.9,1.6).toFixed(2)+'s',
@@ -292,7 +298,7 @@ const PackFX = (function(){
         if(sparkle){
           spawn(fx, 14, el => {
             el.className = 'pfx-starburst';
-            el.textContent = '✦';
+            el.innerHTML = icon('fx_sparkle');
             const a = rnd(0, Math.PI*2), d = rnd(90, 190);
             setVars(el, { dx: (Math.cos(a)*d).toFixed(0)+'px', dy: (Math.sin(a)*d - 40).toFixed(0)+'px',
               s: rnd(10,20).toFixed(0)+'px', delay: rnd(0,.25).toFixed(2)+'s', dur: rnd(.8,1.3).toFixed(2)+'s',
@@ -327,6 +333,6 @@ const PackFX = (function(){
     });
   }
 
-  return { EMOJI, NAME, SHORT, packHtml, play, isPlaying, skip: finish };
+  return { EMOJI, ICON, NAME, SHORT, packHtml, play, isPlaying, skip: finish };
 })();
 if(typeof window !== 'undefined') window.PackFX = PackFX;
