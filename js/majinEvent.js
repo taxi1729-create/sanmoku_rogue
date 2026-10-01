@@ -75,7 +75,7 @@ const MajinEvent = (function(){
         gold_1:'札の性（さが）を練り直してやろう。黄金の炉でな！',
         gold_2:'倍率を一・五倍に膨らませてやる。金は、殖やすものだ！',
         gold_3:'四十ずつ、束ごと底上げだ！ 豪勢であろう？',
-        gold_4:'全部か！ 全部だな！ グハハ、その額の夢を見せてやる！',
+        gold_4:'全部か！ 全部だな！ グハハ、その十倍の夢を見せてやる！',
       },
       special:{},
       refuse:'ケチくさい！ 払えぬ者に見せる夢などないわ！',
@@ -176,7 +176,7 @@ const MajinEvent = (function(){
   }
   function relicHtml(r){
     const ren=r.relicEnhance?GameData.RELIC_ENHANCE_POOL.find(x=>x.id===r.relicEnhance):null;
-    return `<div class="relic-card mj-relic"><div class="relic-name">${r.name}</div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}</div>`;
+    return `<div class="relic-card mj-relic"><div class="relic-name"><span class="relic-ico">${GameIcons.relic(r)}</span>${r.name}</div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}</div>`;
   }
   const costLabel = ev => ev.cost==='all' ? `全財産（${G().gold}G）` : (ev.cost>0 ? `${ev.cost}G` : '無償');
   const costOf = ev => ev.cost==='all' ? G().gold : (ev.cost||0);
@@ -287,10 +287,10 @@ const MajinEvent = (function(){
         return `<div class="mj-note">デッキ全${deck().length}枚の基礎点 <b>+40</b></div>${sample.map((b,i)=>`<div class="mj-ba mj-ba-mini"><div class="mj-ba-col">${cardHtml(b)}</div><div class="mj-ba-arrow">→</div><div class="mj-ba-col">${cardHtml(after[i],'mj-reveal')}</div></div>`).join('')}${deck().length>4?'<div class="mj-note">…ほか全カード</div>':''}`;
       } },
     gold_4: { majin:'gold', title:'全財産の夢', cost:'all', rx:'coins',
-      desc: () => `全財産（${G().gold}G）を失い、その金額と同じ基礎点のドリームカード2枚から1枚を選ぶ。`,
+      desc: () => `全財産（${G().gold}G）を失い、その金額×10の基礎点のドリームカード2枚から1枚を選ぶ。`,
       check: () => G().gold<=0 ? '所持Gが0では夢は買えない' : null,
       async run(api){
-        const g=api.paid;
+        const g=api.paid*10; // #9 全財産×10の基礎点
         const cands=[ShopScene.genDreamCard(g), ShopScene.genDreamCard(g)];
         await api.packFx(cands);
         const [c]=await api.pickCards(cands,{min:1,max:1,title:`基礎点${g}のドリームカードを1枚選べ`,desc:true});

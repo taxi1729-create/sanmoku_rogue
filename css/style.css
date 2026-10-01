@@ -904,3 +904,26 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 /* 操作ボタン列：スマホ幅で横にはみ出さないよう折り返し＆文字の縦並びを防止 */
 .controls-row{flex-wrap:wrap;justify-content:center;gap:6px;max-width:100%;}
 .controls-row button{white-space:nowrap;padding:6px 10px;min-width:0;}
+
+/* #6 ステータス上段：ラウンド・Gの右にパッシブを隙間なく配置 */
+.status-top-row{display:flex;align-items:center;gap:10px;width:100%;flex-wrap:nowrap;}
+.status-top-row .round-big-stat,.status-top-row .stat{flex:0 0 auto;}
+.passive-bar.passive-bar-inline{flex:1 1 auto;min-width:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(32px,1fr));gap:4px;margin:0;}
+.passive-bar-inline .passive-icon{min-width:0;padding:3px 2px;}
+.passive-bar-inline .passive-icon .passive-sym{font-size:14px;}
+.passive-bar-inline .passive-icon .passive-tier{font-size:8px;}
+
+/* #8 手札カードの効果詳細：選択カードの近くに吹き出し表示 */
+.hand-card-bubble{position:fixed;z-index:42;max-width:300px;box-shadow:0 8px 24px rgba(0,0,0,.55);border:1px solid var(--gold);pointer-events:none;animation:scoringBubblePopPlain .18s ease;}
+.hand-card-bubble::after{content:'';position:absolute;left:var(--tail-x,50%);top:100%;transform:translateX(-50%);border:8px solid transparent;border-top-color:var(--gold);}
+.hand-card-bubble.below::after{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:var(--gold);}
+
+/* #4 加重・ブルジョワ・ドローのアイコンバッジ */
+.enh-draw-n{font-size:9px;font-weight:900;margin-left:1px;color:var(--gold);vertical-align:top;}
+
+/* #10 レリックアイコン */
+.relic-ico{display:inline-flex;vertical-align:-0.2em;margin-right:3px;font-size:1.5em;line-height:1;}
+.relic-ico-lg{font-size:1.6em;margin-right:6px;}
+.relic-card .relic-name{display:flex;align-items:center;justify-content:center;gap:1px;flex-wrap:wrap;}
+.passive-bar.passive-bar-inline{display:flex;flex-wrap:nowrap;}
+.passive-bar-inline .passive-icon{flex:1 1 0;max-width:44px;}

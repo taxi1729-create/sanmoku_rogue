@@ -10,6 +10,8 @@
  *   GameIcons.byEmoji        … 元の絵文字 → 代表key
  *   GameIcons.COLOR          … 使用色
  *   GameIcons.meta(key)      … {label, tint:'current'|'fixed'}
+ *   GameIcons.relic(relicOrId, opts) … レリック（{id,…} または id）のSVG。キーは 'relic_<id>'、未定義idは 'relic_generic'
+ *   GameIcons.relicKey(relicOrId)    … 上記で使うキー文字列
  * 色の方針:
  *   ジャミング=緑 / 強化=黄 / 性質変化=青 / 危険・レリック=赤 は固定色。
  *   ボタン類・記号（○△□×☆✓7）は currentColor（既存の .sym-* クラス等の色を継承）。
@@ -25,7 +27,8 @@ const GameIcons = (function(){
     blue:'#7dd3fc', blueL:'#bfdbfe',
     red:'#f87171', redD:'#ef4444',
     teal:'#5eead4', orange:'#fb923c', indigo:'#a5b4fc', purple:'#c084fc', violet:'#a78bfa',
-    pink:'#f472b6', white:'#f1f5f9', dark:'#1c2030'
+    pink:'#f472b6', white:'#f1f5f9', dark:'#1c2030',
+    goldL:'#fde68a', redL:'#fecaca', purpleL:'#e9d5ff'
   };
 
   // 属性ヘルパー
@@ -52,6 +55,22 @@ const GameIcons = (function(){
       `<rect x="3.5" y="4" width="11" height="15" rx="2" transform="rotate(-12 9 11.5)"${s(col)} stroke-opacity=".55"/>`
     + `<rect x="7" y="3" width="13" height="18" rx="2.2"${s(col)} fill="${C.dark}"/>`
     + `<rect x="7" y="3" width="13" height="18" rx="2.2"${s(col)}${tf(col,0.22)}/>`;
+
+  /* --- レリック/新強化用の共通部品 --- */
+  // 補正基礎点（+）バッジ：金の丸に暗色の＋
+  const badgePlus = (cx,cy) =>
+      `<circle cx="${cx}" cy="${cy}" r="4.4"${F(C.gold)}/>`
+    + `<path d="M${cx-2.2} ${cy}h4.4M${cx} ${cy-2.2}v4.4"${s(C.dark)} stroke-width="1.9"/>`;
+  // 倍率（×）バッジ：紫の丸に暗色の×
+  const badgeMult = (cx,cy) =>
+      `<circle cx="${cx}" cy="${cy}" r="4.4"${F(C.purple)}/>`
+    + `<path d="M${cx-1.7} ${cy-1.7}l3.4 3.4M${cx+1.7} ${cy-1.7}l-3.4 3.4"${s(C.dark)} stroke-width="1.9"/>`;
+  // 宝石（中心cx,cy・倍率k）。rarity_* と同じ形を縮小
+  const gem = (cx,cy,k,col,o) => {
+    const P=[[-5.5,-8],[5.5,-8],[9.5,-2.7],[0,8.5],[-9.5,-2.7]];
+    const d=P.map((p,i)=>(i?'L':'M')+(cx+p[0]*k).toFixed(2)+' '+(cy+p[1]*k).toFixed(2)).join('')+'Z';
+    return `<path d="${d}"${s(col)}${tf(col,o==null?0.5:o)}/>`;
+  };
 
   // key → {label, tint, body}
   const D = {
@@ -296,7 +315,176 @@ const GameIcons = (function(){
         `<path d="M6.5 9.5C4 8 2.8 5.5 3.2 2.5 5 4.8 6.8 5.7 8.8 6M17.5 9.5C20 8 21.2 5.5 20.8 2.5 19 4.8 17.2 5.7 15.2 6"${s(C.red)}${tf(C.red,0.35)}/>`
       + `<path d="M12 5.5l6.5 3.5v6.5L12 21l-6.5-5.5V9z"${s(C.purple)}${tf(C.purple,0.3)}/>`
       + `<path d="M8.4 11.4l2.6 1.2M15.6 11.4L13 12.6"${s('#fecaca')} stroke-width="2.2"/>`
-      + `<path d="M10 16.8l2 1.4 2-1.4"${s(C.purple)} stroke-width="1.6"/>` }
+      + `<path d="M10 16.8l2 1.4 2-1.4"${s(C.purple)} stroke-width="1.6"/>` },
+
+    /* ---------------- カード強化（黄）追加 ---------------- */
+    enh_draw:{ label:'ドロー', tint:'fixed', body:
+        `<path d="M3.5 16.5v2.3a1.7 1.7 0 0 0 1.7 1.7h13.6a1.7 1.7 0 0 0 1.7-1.7v-2.3"${s(C.yellow)} stroke-opacity=".6"/>`
+      + `<path d="M5.5 16.5h13"${s(C.yellow)} stroke-opacity=".6"/>`
+      + `<rect x="7" y="4.5" width="10" height="13" rx="1.8"${s(C.yellow)} fill="${C.dark}"/>`
+      + `<rect x="7" y="4.5" width="10" height="13" rx="1.8"${s(C.yellow)}${tf(C.yellow,0.35)}/>`
+      + `<path d="M12 14V8.2M9.4 10.6L12 8l2.6 2.6"${s(C.goldL)} stroke-width="2.2"/>` },
+    enh_weighted:{ label:'加重', tint:'fixed', body:
+        `<path d="M3 17.6h18M4 20.8h16"${s(C.yellow)} stroke-opacity=".55"/>`
+      + `<rect x="2.5" y="13.2" width="19" height="4.4" rx="1.2"${s(C.yellow)} fill="${C.dark}"/>`
+      + `<rect x="2.5" y="13.2" width="19" height="4.4" rx="1.2"${s(C.yellow)}${tf(C.yellow,0.25)}/>`
+      + `<circle cx="12" cy="3.8" r="2"${s(C.yellow)}/>`
+      + `<path d="M8.3 6.4h7.4l2.3 6.8H6z"${s(C.yellow)} fill="${C.dark}"/>`
+      + `<path d="M8.3 6.4h7.4l2.3 6.8H6z"${s(C.yellow)}${tf(C.yellow,0.6)}/>` },
+    enh_bourgeois:{ label:'ブルジョワ', tint:'fixed', body:
+        `<path d="M5.5 9.6L4.4 3.6l3.9 2.8L12 2l3.7 4.4 3.9-2.8-1.1 6z"${s(C.yellow)}${tf(C.yellow,0.5)}/>`
+      + `<path d="M5 13.6v5c0 1.3 3.1 2.4 7 2.4s7-1.1 7-2.4v-5"${s(C.gold)}${tf(C.gold,0.3)}/>`
+      + `<path d="M5 16.2c0 1.3 3.1 2.4 7 2.4s7-1.1 7-2.4"${s(C.gold)} stroke-width="1.5"/>`
+      + `<ellipse cx="12" cy="13.6" rx="7" ry="2.4"${s(C.gold)} fill="${C.dark}"/>`
+      + `<ellipse cx="12" cy="13.6" rx="7" ry="2.4"${s(C.gold)}${tf(C.gold,0.6)}/>` },
+
+    /* ---------------- レリック（relic_<id>。赤・金・紫系） ---------------- */
+    relic_generic:{ label:'レリック', tint:'fixed', body:
+        gem(12,12.5,1,C.redD,0.45)
+      + `<path d="M2.8 9.8h18.4M9 4.7l-1.6 5.1L12 20.5M15 4.7l1.6 5.1L12 20.5"${s(C.redL)} stroke-width="1.3"/>`
+      + star4(20,3.4,2.6,F(C.goldL)) },
+    relic_bingo:{ label:'ビンゴ', tint:'fixed', body:
+        `<circle cx="12" cy="12" r="9.6"${s(C.gold)}${tf(C.gold,0.22)}/>`
+      + `<path d="M7.2 16.8L16.8 7.2"${s(C.redD)} stroke-width="2.8"/>`
+      + `<circle cx="7.2" cy="16.8" r="2"${F(C.goldL)}/><circle cx="12" cy="12" r="2"${F(C.goldL)}/><circle cx="16.8" cy="7.2" r="2"${F(C.goldL)}/>` },
+    relic_charge:{ label:'チャージ', tint:'fixed', body:
+        `<rect x="2.5" y="6.5" width="17" height="11" rx="2.2"${s(C.gold)}${tf(C.gold,0.2)}/>`
+      + `<path d="M22 10.2v3.6"${s(C.gold)} stroke-width="2.4"/>`
+      + `<path d="M12.6 7.6l-4.8 5.2h3.7l-1.2 3.7 5-5.4h-3.7z"${s(C.red)} stroke-width="1.4"${tf(C.redD,0.9)}/>` },
+    relic_double:{ label:'ダブル', tint:'fixed', body:
+        `<path d="M4.5 4.5l15 15M19.5 4.5l-15 15"${s(C.purple)} stroke-width="2.4"/>`
+      + `<circle cx="4.5" cy="4.5" r="2"${F(C.gold)}/><circle cx="19.5" cy="19.5" r="2"${F(C.gold)}/>`
+      + `<circle cx="19.5" cy="4.5" r="2"${F(C.gold)}/><circle cx="4.5" cy="19.5" r="2"${F(C.gold)}/>`
+      + `<circle cx="12" cy="12" r="3"${F(C.redD)}/><circle cx="12" cy="12" r="3"${s(C.redL)} stroke-width="1.3"/>` },
+    relic_odd_boost:{ label:'奇数補正', tint:'fixed', body:
+        `<rect x="2.5" y="2.5" width="16" height="16" rx="3.6"${s(C.red)}${tf(C.red,0.25)}/>`
+      + `<circle cx="6.8" cy="6.8" r="1.7"${F(C.redL)}/><circle cx="10.5" cy="10.5" r="1.7"${F(C.redL)}/><circle cx="14.2" cy="14.2" r="1.7"${F(C.redL)}/>`
+      + badgePlus(18.6,18.6) },
+    relic_even_boost:{ label:'偶数補正', tint:'fixed', body:
+        `<rect x="2.5" y="2.5" width="16" height="16" rx="3.6"${s(C.purple)}${tf(C.purple,0.25)}/>`
+      + `<circle cx="6.8" cy="6.8" r="1.7"${F(C.purpleL)}/><circle cx="14.2" cy="6.8" r="1.7"${F(C.purpleL)}/>`
+      + `<circle cx="6.8" cy="14.2" r="1.7"${F(C.purpleL)}/><circle cx="14.2" cy="14.2" r="1.7"${F(C.purpleL)}/>`
+      + badgePlus(18.6,18.6) },
+    relic_circle_boost:{ label:'マル補正', tint:'fixed', body:
+        `<circle cx="10.5" cy="13" r="7.4"${s(C.blue)} stroke-width="2.8"${tf(C.blue,0.15)}/>`
+      + badgePlus(18.6,5.4) },
+    relic_triangle_boost:{ label:'サンカク補正', tint:'fixed', body:
+        `<path d="M10.5 5l8.2 14.5H2.3z"${s(C.green)} stroke-width="2.8"${tf(C.green,0.15)}/>`
+      + badgePlus(18.6,5.4) },
+    relic_square_boost:{ label:'シカク補正', tint:'fixed', body:
+        `<rect x="3.4" y="6" width="14" height="14" rx="1.2"${s(C.yellow)} stroke-width="2.8"${tf(C.yellow,0.15)}/>`
+      + badgePlus(18.6,5.4) },
+    relic_combo:{ label:'コンボ', tint:'fixed', body:
+        `<circle cx="6.5" cy="6.5" r="3.8"${s(C.blue)} stroke-width="2.4"/>`
+      + `<path d="M17.5 11.2l4.5 8H13z"${s(C.green)} stroke-width="2.4"/>`
+      + `<path d="M12 4.6q5.6-.4 6.2 4.4"${s(C.white)} stroke-width="1.9"/><path d="M16.2 7.6l2 1.6 1.7-2"${s(C.white)} stroke-width="1.9"/>`
+      + badgeMult(5.6,18.4) },
+    relic_relic_boost:{ label:'レリック強化', tint:'fixed', body:
+        gem(7,8.6,0.48,C.redD,0.55) + gem(16.6,7.6,0.48,C.purple,0.55) + gem(10,17,0.48,C.gold,0.55)
+      + badgePlus(18.6,18.6) },
+    relic_paint:{ label:'ペイント', tint:'fixed', body:
+        `<rect x="3" y="7" width="11" height="14.5" rx="2"${s(C.red)}${tf(C.red,0.45)}/>`
+      + `<path d="M21 3l-5.8 5.8"${s(C.gold)} stroke-width="2.8"/>`
+      + `<path d="M15.2 8.8l-2.2 2.2c-1.6 1.6-1.4 3.4-.3 4.5 1.6-.2 3-1.5 4.5-3l2.1-2.2z"${s(C.purple)} stroke-width="1.6"${tf(C.purple,0.85)}/>`
+      + `<path d="M5.8 11v4.5"${s(C.redL)} stroke-width="1.8"/>` },
+    relic_turn_boost:{ label:'ターン強化', tint:'fixed', body:
+        `<circle cx="10.5" cy="13" r="8.5"${s(C.gold)}${tf(C.gold,0.22)}/>`
+      + `<path d="M10.5 8.2V13l3.2 2.2"${s(C.goldL)} stroke-width="2.2"/>`
+      + `<path d="M10.5 4.5v.01M2 13h.01M19 13h.01M10.5 21.5v.01"${s(C.gold)} stroke-width="2"/>`
+      + badgeMult(19,4.8) },
+    relic_jamming_boost:{ label:'ジャミング増強', tint:'fixed', body:
+        `<circle cx="9.2" cy="13.8" r="6.8"${s(C.green)} stroke-width="2.3"${tf(C.green,0.15)}/>`
+      + `<path d="M4.4 9l9.6 9.6"${s(C.green)} stroke-width="2.3"/>`
+      + `<path d="M18.6 1.8l-5.2 7.4h3.6l-1.6 6 6.6-8.4h-3.7z"${s(C.gold)} stroke-width="1.4"${tf(C.gold,0.9)}/>` },
+    relic_empty_boost:{ label:'空きマス強化', tint:'fixed', body:
+        `<rect x="3" y="3" width="18" height="18" rx="2.5"${s(C.gold)}${tf(C.gold,0.1)}/>`
+      + `<path d="M9 3v18M15 3v18M3 9h18M3 15h18"${s(C.gold)} stroke-width="1.3" stroke-opacity=".6"/>`
+      + `<rect x="4.3" y="4.3" width="3.4" height="3.4" rx=".6"${F(C.redD)}/>`
+      + star4(12,12,2.7,F(C.goldL)) + star4(18,18,2.4,F(C.goldL)) + star4(18,6,2.1,F(C.goldL)) },
+    relic_draw_boost:{ label:'ドロー強化', tint:'fixed', body:
+        `<path d="M3.6 16.5A8.8 8.8 0 0 1 16 3.4"${s(C.purple)} stroke-width="1.8" stroke-dasharray="2 2.2"/>`
+      + `<path d="M13.4 2.2l2.9 1.2-1.1 2.9"${s(C.purple)} stroke-width="1.8"/>`
+      + `<rect x="9.5" y="8" width="10.5" height="13.5" rx="1.8"${s(C.red)} fill="${C.dark}"/>`
+      + `<rect x="9.5" y="8" width="10.5" height="13.5" rx="1.8"${s(C.red)}${tf(C.red,0.3)}/>`
+      + `<path d="M14.75 18v-6.2M12.3 14.2l2.45-2.45 2.45 2.45"${s(C.redL)} stroke-width="2"/>` },
+    relic_last_stand:{ label:'背水の陣', tint:'fixed', body:
+        `<path d="M12 1.8l2.1 3V13H9.9V4.8z"${s(C.redL)} stroke-width="1.6"${tf(C.red,0.55)}/>`
+      + `<path d="M7.6 13.2h8.8"${s(C.gold)} stroke-width="2.4"/><path d="M12 13.4v3.6"${s(C.gold)} stroke-width="2.4"/>`
+      + `<path d="M2 20.5c1.7-1.3 3.3-1.3 5 0s3.3 1.3 5 0 3.3-1.3 5 0 3.3 1.3 5 0"${s(C.blue)}/>` },
+    relic_base_boost:{ label:'補正基礎点強化', tint:'fixed', body:
+        `<path d="M12 2.3l8 3v6.2c0 5-3.5 8.6-8 10.2-4.5-1.6-8-5.2-8-10.2V5.3z"${s(C.gold)}${tf(C.gold,0.3)}/>`
+      + `<path d="M12 7.6v8.4M7.8 11.8h8.4"${s(C.redD)} stroke-width="2.8"/>` },
+    relic_round_boost:{ label:'ラウンド強化', tint:'fixed', body:
+        `<rect x="3" y="15" width="4.6" height="6" rx="1"${s(C.gold)}${tf(C.gold,0.3)}/>`
+      + `<rect x="9.7" y="11" width="4.6" height="10" rx="1"${s(C.gold)}${tf(C.gold,0.5)}/>`
+      + `<rect x="16.4" y="6.5" width="4.6" height="14.5" rx="1"${s(C.gold)}${tf(C.gold,0.75)}/>`
+      + `<path d="M3.2 10.8L11.5 3.8"${s(C.red)} stroke-width="2.2"/><path d="M8 3.4h3.6V7"${s(C.red)} stroke-width="2.2"/>` },
+    relic_reroll_boost:{ label:'リロール強化', tint:'fixed', body:
+        `<path d="M19.5 10A8 8 0 0 0 5.6 7M4.5 14a8 8 0 0 0 13.9 3"${s(C.red)}/>`
+      + `<path d="M5 2.8v4.6h4.6M19 21.2v-4.6h-4.6"${s(C.red)}/>`
+      + badgePlus(12,12) },
+    relic_hand_boost:{ label:'手札強化', tint:'fixed', body:
+        ''
+      + `<rect x="8.4" y="2.5" width="7.2" height="11" rx="1.4" transform="rotate(-30 12 21)"${s(C.purple)} fill="${C.dark}"/>`
+      + `<rect x="8.4" y="2.5" width="7.2" height="11" rx="1.4" transform="rotate(-30 12 21)"${s(C.purple)}${tf(C.purple,0.3)}/>`
+      + `<rect x="8.4" y="2.5" width="7.2" height="11" rx="1.4" transform="rotate(30 12 21)"${s(C.purple)} fill="${C.dark}"/>`
+      + `<rect x="8.4" y="2.5" width="7.2" height="11" rx="1.4" transform="rotate(30 12 21)"${s(C.purple)}${tf(C.purple,0.3)}/>`
+      + `<rect x="8.4" y="2.5" width="7.2" height="11" rx="1.4" transform="rotate(0 12 21)"${s(C.red)} fill="${C.dark}"/>`
+      + `<rect x="8.4" y="2.5" width="7.2" height="11" rx="1.4" transform="rotate(0 12 21)"${s(C.red)}${tf(C.red,0.45)}/>`
+      + badgeMult(12,18.6) },
+    relic_gold_boost:{ label:'G獲得', tint:'fixed', body:
+        `<circle cx="10.5" cy="13.5" r="8"${s(C.gold)}${tf(C.gold,0.4)}/>`
+      + `<path d="M13.2 10.8a3.6 3.6 0 1 0 .3 5V13.6h-2.4"${s(C.goldL)} stroke-width="2.1"/>`
+      + `<path d="M19.6 8.2V2.6M17.2 5l2.4-2.4L22 5"${s(C.green)} stroke-width="2.2"/>` },
+    relic_all_bingo_gain:{ label:'オールビンゴ獲得', tint:'fixed', body:
+        `<circle cx="6.8" cy="6.8" r="3.6"${s(C.blue)} stroke-width="2.2"/>`
+      + `<path d="M17.2 2.8l4.1 7.1h-8.2z"${s(C.green)} stroke-width="2.2"/>`
+      + `<rect x="3.2" y="13.6" width="7.2" height="7.2" rx=".8"${s(C.yellow)} stroke-width="2.2"/>`
+      + `<path d="M13.9 14l6.2 6.2M20.1 14l-6.2 6.2"${s(C.red)} stroke-width="2.4"/>`
+      + `<circle cx="12" cy="12" r="2.6"${F(C.gold)}/><path d="M12 13.3v-2.6M10.8 11.8l1.2-1.2 1.2 1.2"${s(C.dark)} stroke-width="1.2"/>` },
+    relic_num_boost3:{ label:'数値強化1獲得', tint:'fixed', body:
+        `<rect x="4.5" y="3" width="13" height="18" rx="2.2"${s(C.gold)}${tf(C.gold,0.22)}/>`
+      + `<path d="M11 8v8M7 12h8"${s(C.goldL)} stroke-width="2.8"/>`
+      + star4(19.4,4.2,3.2,F(C.redL)) },
+    relic_hobby_collect:{ label:'趣味レリック集め', tint:'fixed', body:
+        gem(7.5,6.8,0.36,C.redD,0.7) + gem(12,5.4,0.36,C.purple,0.7) + gem(16.5,6.8,0.36,C.blue,0.7)
+      + `<path d="M3 11.5h18v8a1.8 1.8 0 0 1-1.8 1.8H4.8A1.8 1.8 0 0 1 3 19.5z"${s(C.gold)}${tf(C.redD,0.4)}/>`
+      + `<path d="M3 11.5h18"${s(C.gold)} stroke-width="2.4"/>`
+      + `<rect x="10.2" y="11" width="3.6" height="4.4" rx=".8"${F(C.goldL)}/>` },
+    relic_passive_unneeded:{ label:'パッシブ不要理論', tint:'fixed', body:
+        `<path d="${star5(12,12.6,7,3)}"${s(C.gold)} stroke-width="1.8"${tf(C.gold,0.35)}/>`
+      + `<circle cx="12" cy="12" r="9.6"${s(C.red)} stroke-width="2.3"/>`
+      + `<path d="M5.2 5.2l13.6 13.6"${s(C.red)} stroke-width="2.3"/>` },
+    relic_ten_stage:{ label:'テンステージ', tint:'fixed', body:
+        `<rect x="2" y="3" width="20" height="18" rx="4"${s(C.red)}${tf(C.red,0.22)}/>`
+      + `<path d="M6.2 9l2.6-2v10"${s(C.goldL)} stroke-width="2.4"/>`
+      + `<ellipse cx="15" cy="12" rx="3.4" ry="5"${s(C.goldL)} stroke-width="2.4"/>` },
+    relic_joker:{ label:'ジョーカー', tint:'fixed', body:
+        `<path d="M4.6 17C4.4 13 3.7 9.6 2.6 7.4 6.4 7.6 9 10.4 12 15.5 15 10.4 17.6 7.6 21.4 7.4 20.3 9.6 19.6 13 19.4 17z"${s(C.purple)}${tf(C.purple,0.45)}/>`
+      + `<path d="M12 15.5C11 11 10.7 6.8 12 3.6c1.3 3.2 1 7.4 0 11.9"${s(C.red)} stroke-width="1.8"${tf(C.red,0.55)}/>`
+      + `<path d="M4.4 20h15.2"${s(C.purple)} stroke-width="2.4"/>`
+      + `<circle cx="2.8" cy="7.2" r="1.6"${F(C.gold)}/><circle cx="21.2" cy="7.2" r="1.6"${F(C.gold)}/><circle cx="12" cy="3" r="1.6"${F(C.gold)}/>` },
+    relic_gambling_addict:{ label:'ギャンブル依存症', tint:'fixed', body:
+        `<rect x="2.5" y="8" width="12" height="12" rx="3" transform="rotate(-12 8.5 14)"${s(C.red)}${tf(C.red,0.3)}/>`
+      + `<circle cx="6.2" cy="12" r="1.5"${F(C.redL)}/><circle cx="8.5" cy="14" r="1.5"${F(C.redL)}/><circle cx="10.8" cy="16" r="1.5"${F(C.redL)}/>`
+      + `<path d="M18.5 2.5v6M15.5 5.5h6"${s(C.gold)} stroke-width="2.4"/>`
+      + `<path d="M15.5 13.5h6"${s(C.purple)} stroke-width="2.4"/>` },
+    relic_big_explosion:{ label:'大爆発', tint:'fixed', body:
+        `<circle cx="10" cy="14" r="7.2"${s(C.red)}${tf(C.redD,0.35)}/>`
+      + `<path d="M14.6 8.8l1.5-1.5"${s(C.red)} stroke-width="3"/>`
+      + `<path d="M16.4 7q1.4-2.2 3.2-1.8"${s(C.gold)} stroke-width="1.7"/>`
+      + `<path d="M6.6 12.2a3.8 3.8 0 0 1 2.6-2.6"${s(C.redL)} stroke-width="1.8"/>`
+      + star4(20.4,4,3.4,F(C.orange)) + star4(20.4,4,1.4,F(C.goldL)) },
+    relic_pinnacle:{ label:'極みの境地', tint:'fixed', body:
+        `<path d="M1.8 20.5L9 8.2l3.4 5.4 3.2-4.6 6.6 11.5z"${s(C.purple)}${tf(C.purple,0.3)}/>`
+      + `<path d="M7.2 11.3L9 8.2l1.8 2.9-1 .8-.8-.7z"${F(C.purpleL)}/>`
+      + `<path d="M9 8.2V2.4"${s(C.gold)} stroke-width="1.7"/>`
+      + `<path d="M9.4 2.6l4.6 1.7-4.6 1.7z"${s(C.red)} stroke-width="1.4"${tf(C.redD,1)}/>` },
+    relic_majin_seal:{ label:'魔神のお墨付き', tint:'fixed', body:
+        `<path d="M6.4 8C4.8 6.4 4.2 4.3 4.6 2 6 3.9 7.5 4.8 9.2 5M17.6 8c1.6-1.6 2.2-3.7 1.8-6-1.4 1.9-2.9 2.8-4.6 3"${s(C.purple)}${tf(C.purple,0.4)}/>`
+      + `<circle cx="12" cy="13.5" r="8.2"${s(C.red)}${tf(C.redD,0.35)}/>`
+      + `<circle cx="12" cy="13.5" r="5.6"${s(C.redL)} stroke-width="1" stroke-opacity=".6"/>`
+      + `<path d="M8.6 13.6l2.4 2.4 4.4-5"${s(C.goldL)} stroke-width="2.4"/>` }
   };
 
   const KEYS = Object.keys(D);
@@ -359,6 +547,13 @@ const GameIcons = (function(){
   }
   function has(key){ return Object.prototype.hasOwnProperty.call(D, key); }
   function meta(key){ const d=D[key]; return d ? { label:d.label, tint:d.tint } : null; }
+  // レリック（オブジェクト or id文字列）→ SVG。未定義idは汎用の宝石アイコン relic_generic
+  function relicKey(relicOrId){
+    const id = (relicOrId && typeof relicOrId==='object') ? relicOrId.id : relicOrId;
+    const k = 'relic_'+String(id==null?'':id);
+    return (id!=null && id!=='' && has(k) && k!=='relic_size_dot' && k!=='relic_trigger') ? k : 'relic_generic';
+  }
+  function relic(relicOrId, opts){ return svg(relicKey(relicOrId), opts); }
 
-  return { svg, has, meta, KEYS, byGuiId, byEmoji, COLOR:C };
+  return { svg, has, meta, relic, relicKey, KEYS, byGuiId, byEmoji, COLOR:C };
 })();

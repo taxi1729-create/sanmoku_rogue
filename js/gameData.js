@@ -104,7 +104,7 @@ const GameData = {
     'オールマルチ': 'マル・サンカク・シカク記号扱いになる',
     '巨大化':       '盤面にある間、ターン消費ごとに基礎点+3',
     '肥大化':       '盤面にある間、ターン消費ごとにビンゴ倍率×2点を現在点数に加算',
-    'ブルジョワ':   'カード基礎点+4×現在G（付与時に即時加算）',
+    'ブルジョワ':   'カード基礎点+4×現在G（所持金に応じて常に変動。強化効果が外れると加算されない）',
     'ドロー':       '盤面配置時にカードを1枚ドロー',
     // #4 新規強化効果5種
     'エクステンド': 'このカードを置いたターンはビンゴしていてもラウンドが終了せず、ビンゴ計算も行われない。次に自分がカードを配置した時に効果が解除される（その時点でビンゴ判定）',
@@ -140,7 +140,7 @@ const GameData = {
     if(doT && card.trait === '竜頭蛇尾') card.baseScore += 300;
     if(!doE) return;
     if(card.enhance === '数値強化') card.baseScore += 15*mul;
-    if(card.enhance === 'ブルジョワ') card.baseScore += 4*mul * gold;
+    // #4 ブルジョワは付与時の即時加算をやめ、ビンゴ時に現在G×4を加算する（GameData.bourgeoisBonus）
     const multiMap = { 'マルマルチ':'Circle', 'サンカクマルチ':'Triangle', 'シカクマルチ':'Square', 'バツマルチ':'Cross' };
     const matched = multiMap[card.enhance];
     if(matched && card.symbol === matched) card.baseScore += 20*mul;
@@ -155,6 +155,12 @@ const GameData = {
     if(card.enhance === 'トップスピード') card.baseScore += 5;
   },
 
+  // #4 ブルジョワ：現在G×4（シカクパッシブ3のシカクカードは×8）。強化効果が付いている間だけ加算
+  bourgeoisBonus(card){
+    if(!card||card.enhance!=='ブルジョワ'||typeof GameState==='undefined') return 0;
+    const mul=(GameState.symbolPassiveTier?.Square>=2&&card.symbol==='Square')?8:4;
+    return mul*Math.max(0,GameState.gold||0);
+  },
   // #21 付与効果の抽選：対象カードに現在付与されている効果以外から選ぶ
   pickDifferent(pool, current){
     const cand = pool.filter(x=>x!==current);
@@ -253,7 +259,7 @@ const GameData = {
     { id:'ren_draw', name:'ドロー強化',    desc:'ラウンド終了時カードを1枚ドロー' },
     { id:'ren_double', name:'倍化',          desc:'2個分とカウント。最終乗算補正×1.5' },
     { id:'ren_triple', name:'3倍化',         desc:'3個分とカウント。最終乗算補正×2' },
-    { id:'ren_cross', name:'バツ強化',      desc:'バツ倍率×5' },
+    { id:'ren_cross', name:'バツ強化',      desc:'バツビンゴ時、ビンゴ倍率を2倍にする' },
     { id:'ren_npc', name:'NPC強化',       desc:'NPCが2回行動。補正基礎点×5' },
     { id:'ren_draw_pile', name:'山札強化',      desc:'ビンゴ時、山札数×100を最終加算補正に追加' },
     { id:'ren_disc_pile', name:'捨て札強化',    desc:'ビンゴ時補正基礎点+n（n=捨て札数）' },
@@ -594,7 +600,7 @@ const GameData = {
   },
 
   // #7/#8 報酬G計算式の基本G
-  CLEAR_REWARD_BASE_G: 3,
+  CLEAR_REWARD_BASE_G: 5, // #1 クリア報酬の基本Gを5Gに変更
   SKIP_REWARD_BASE_G: 4,
 
   // #12 多階層

@@ -186,24 +186,16 @@ const MapSelectScene = {
       GameState.relics.forEach((relic,i)=>{
         const rc=document.createElement('div');
         rc.className='relic-card'+(this.activeRelicId===i?' active':'');
-        rc.innerHTML=`<div class="relic-name">${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${relic.relicEnhance?`<div class="relic-enhance-tag">${GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance)?.name||''}</div>`:''}`;
+        rc.innerHTML=`<div class="relic-name"><span class="relic-ico">${GameIcons.relic(relic)}</span>${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${relic.relicEnhance?`<div class="relic-enhance-tag">${GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance)?.name||''}</div>`:''}`;
         rc.addEventListener('click',()=>{ this.activeRelicId=(this.activeRelicId===i)?null:i; this.renderAll(); });
         row.appendChild(rc);
       });
     }
     area.appendChild(row);
+    // #7 ゲームメイン画面と同じ吹き出し表示（マップでは売却なし）
     if(this.activeRelicId!=null){
-      const idx=this.activeRelicId;
-      const relic=GameState.relics[idx];
-      if(relic){
-        const ren=GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance);
-        const infoDiv=document.createElement('div'); infoDiv.className='relic-info-panel'; infoDiv.style.marginTop='8px';
-        infoDiv.innerHTML=`<div class="info-title">${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div><div class="info-desc">${relic.desc}</div>${ren?`<div class="info-desc relic-enhance-desc">【${ren.name}】${ren.desc}</div>`:''}<div class="relic-reorder-row"><button class="relic-move-btn" ${idx<=0?'disabled':''}>${GIcon('btn_left',{cls:'gi-gap'})}左へ</button><button class="relic-move-btn" ${idx>=GameState.relics.length-1?'disabled':''}>右へ${GIcon('btn_right',{cls:'gi-gap-l'})}</button></div>`;
-        const moveBtns=infoDiv.querySelectorAll('.relic-move-btn');
-        moveBtns[0].addEventListener('click',()=>{ if(GameState.moveRelic(idx,-1)){ this.activeRelicId=idx-1; this.renderAll(); } });
-        moveBtns[1].addEventListener('click',()=>{ if(GameState.moveRelic(idx,1)){ this.activeRelicId=idx+1; this.renderAll(); } });
-        area.appendChild(infoDiv);
-      }
+      const rp=GameMainScene.renderRelicInfoPanel({ idx:this.activeRelicId, setIdx:(i)=>{this.activeRelicId=i;}, redraw:()=>this.renderAll(), onSell:null });
+      if(rp) area.appendChild(rp);
     }
     return area;
   },

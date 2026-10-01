@@ -107,117 +107,9 @@ const ShopScene = {
   },
 
   // #4 各強化効果の視覚表現を記号に反映
-  cardSymbolHtml(card){
-    const label=GameData.SYMBOL_LABEL[card.symbol];
-    const emoji=card.jamming?(GameData.JAMMING_EMOJI[card.jamming]||''):'';
-    const emojiHtml=emoji?`<div class="card-jamming-emoji">${emoji}</div>`:'';
-    const multiSym=GameData.MULTI_SYMBOL_LABEL[card.enhance];
-    const passiveMultiHtml=card._passiveMultiSymbol?`<span class="passive-multi-badge" title="マルマルチ(パッシブ)">${GameData.MULTI_SYMBOL_LABEL[card._passiveMultiSymbol]||card._passiveMultiSymbol}</span>`:'';
-
-    // 拡張・拡大
-    const squareBoosted=card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=2;
-    const boostCls=squareBoosted?' square-boosted':'';
-    if(card.enhance==='横拡張')
-      return `<div class="card-symbol-expand horiz"><span class="sym-${card.symbol} esym${boostCls}">${label}</span><span class="sym-${card.symbol} esym${boostCls}">${label}</span></div>${emojiHtml}${passiveMultiHtml}`;
-    if(card.enhance==='縦拡張')
-      return `<div class="card-symbol-expand vert"><span class="sym-${card.symbol} esym${boostCls}">${label}</span><span class="sym-${card.symbol} esym${boostCls}">${label}</span></div>${emojiHtml}${passiveMultiHtml}`;
-    if(card.enhance==='拡大')
-      return `<div class="card-symbol-expand grid2${squareBoosted?' grid4':''}"><span class="sym-${card.symbol} esym${boostCls}">${label}</span><span class="sym-${card.symbol} esym${boostCls}">${label}</span><span class="sym-${card.symbol} esym${boostCls}">${label}</span><span class="sym-${card.symbol} esym${boostCls}">${label}</span></div>${emojiHtml}${passiveMultiHtml}`;
-
-    // 巨大化：記号1.5倍
-    if(card.enhance==='巨大化'){
-      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol} sym-large">${label}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
-    }
-    // ハブ：記号右にハブアイコン
-    if(card.enhance==='ハブ'){
-      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge enhance-badge-icon">${GIcon('enh_hub')}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
-    }
-    // 連鎖：記号右に連鎖アイコン
-    if(card.enhance==='連鎖'){
-      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge enhance-badge-icon">${GIcon('enh_chain')}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
-    }
-    // 肥大化：記号横に "+倍率*2" (黄色)
-    if(card.enhance==='肥大化'){
-      const mult=GameData.BINGO_MULTIPLIER_BASE[card.symbol]||0;
-      const val=mult*2;
-      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge gold-text">+${val}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
-    }
-    // #2 エクステンド：記号右にエクステンドアイコン
-    if(card.enhance==='エクステンド'){
-      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge enhance-badge-icon">${GIcon('enh_extend')}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
-    }
-    // #2 トップスピード：記号右にトップスピードアイコン
-    if(card.enhance==='トップスピード'){
-      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge enhance-badge-icon">${GIcon('enh_top_speed')}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
-    }
-    // #2 重ね掛け：記号右に「重」
-    if(card.enhance==='重ね掛け'){
-      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">重</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
-    }
-    // #3 加重：記号右に「基+◯」（加算値は黄色）
-    if(card.enhance==='加重'){
-      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      const addVal=card._weightedBonus!=null?card._weightedBonus:0;
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">基<span class="gold-text">+${addVal}</span></span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
-    }
-    // #2 ギャンブル：記号右にギャンブルアイコン
-    if(card.enhance==='ギャンブル'){
-      const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge enhance-badge-icon">${GIcon('enh_gamble')}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
-    }
-    // マルチ系
-    const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-    return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
-  },
-
-  // #4 右上数字にブルジョワ・ドロー情報を付加
-  // #1 ドット（黄緑青）をカード基礎点の左に inline 表示
-  // #2 ブルジョワは現在Gを受け取って動的表示
-  // #6 数値強化も +15 を明示
-  // #3 バツパッシブ2・サンカクパッシブ1などの実効値をUIに反映（gameMain.js版と同期）
-  cardScoreHtml(card, currentGold=0, boardBaseScore=null){
-    const multiMap={'マルマルチ':'Circle','サンカクマルチ':'Triangle','シカクマルチ':'Square'};
-    const ms=multiMap[card.enhance];
-    const baseForDisplay = boardBaseScore!=null ? boardBaseScore : card.baseScore;
-
-    // 左側インラインドット
-    let dotHtml='';
-    if(card.enhance) dotHtml+=`<span class="score-dot dot-enhance"></span>`;
-    if(card.jamming) dotHtml+=`<span class="score-dot dot-jamming"></span>`;
-    if(card.trait)   dotHtml+=`<span class="score-dot dot-trait"></span>`;
-    const dotsSpan=dotHtml?`<span class="score-dots">${dotHtml}</span>`:'';
-
-    let bonusHtml='';
-    const sqP3=card.symbol==='Square'&&GameState.symbolPassiveTier?.Square>=2;
-    if(ms&&card.symbol===ms&&baseForDisplay>card.number){
-      bonusHtml=`<span class="card-score-bonus">+${baseForDisplay-card.number}</span>`;
-    } else if(card.enhance==='数値強化'){
-      bonusHtml=`<span class="card-score-bonus${sqP3?' passive-value':''}">+${15*(sqP3?2:1)}</span>`;
-    } else if(card.enhance==='ブルジョワ'){
-      const mulG=sqP3?8:4;
-      bonusHtml=`<span class="card-score-bonus gold-text${sqP3?' passive-value':''}">×${mulG}G</span>`;
-    }
-
-    // #3 バツパッシブ2・サンカクパッシブ1など、パッシブでカード基礎点が変化する場合は青字で実効値を表示する
-    let displayScore=baseForDisplay, scoreIsPassive=(boardBaseScore!=null&&boardBaseScore!==card.baseScore);
-    // #2 バツパッシブ1はNPCのバツのみ対象のため、プレイヤーのバツカードの表示は変えない
-    if(card.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=1){
-      const total=GameState.currentDeck.length||1;
-      const n=GameState.currentDeck.filter(cc=>cc.symbol==='Triangle').length/total;
-      displayScore=Math.round(baseForDisplay*(1+n)); scoreIsPassive=true;
-    }
-    const numHtml=scoreIsPassive?`<span class="passive-value">${displayScore}</span>`:`${baseForDisplay}`;
-    let scoreHtml=`<span class="card-number">${dotsSpan}${numHtml}${bonusHtml}</span>`;
-    if(card.enhance==='ドロー') scoreHtml+=`<span class="card-draw-label${sqP3?' passive-value':''}">draw${sqP3?2:1}</span>`;
-    return scoreHtml;
-  },
+  // カード表示はゲームメイン画面と共通（重複実装を廃止）
+  cardSymbolHtml(card){ return GameMainScene.cardSymbolHtml(card); },
+  cardScoreHtml(card, currentGold=0, boardBaseScore=null){ return GameMainScene.cardScoreHtml(card, currentGold, boardBaseScore); },
 
   // ===== Relic purchase =====
   buyRelic(i, isFixed=false){
@@ -249,7 +141,6 @@ const ShopScene = {
     }
     // #22 ブラックカード即時反映
     if(relic.relicEnhance === 'ren_black') this.message = (this.message||'') + '（ショップ金額が半額になった）';
-    if(relic.relicEnhance === 'ren_cross') GameData.BINGO_MULTIPLIER_BASE['Cross'] *= 5;
   },
 
   // ===== Card pack =====
@@ -592,7 +483,7 @@ const ShopScene = {
   packFxItems(pk){
     if(pk.candidates&&pk.packType==='relic_pack') return pk.candidates.map(r=>{
       const ren=r.relicEnhance?GameData.RELIC_ENHANCE_POOL.find(x=>x.id===r.relicEnhance):null;
-      return {html:`<div class="relic-card"><div class="relic-name">${r.name}<span class="relic-size">${GameState.relicSizeDots(r)}</span></div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}</div>`};
+      return {html:`<div class="relic-card"><div class="relic-name"><span class="relic-ico">${GameIcons.relic(r)}</span>${r.name}<span class="relic-size">${GameState.relicSizeDots(r)}</span></div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}</div>`};
     });
     if(pk.candidates) return pk.candidates.map(c=>({html:`<div class="card${c.trait?' trait-'+c.trait.replace(/[()]/g,''):''}">${this.cardTagsHtml(c)}${this.cardSymbolHtml(c)}${this.cardScoreHtml(c,GameState.gold)}</div>`}));
     return (pk.effectPool||[]).map(e=>({html:`<div class="pfx-chip${e.rarity?' pfx-rare':''}">${e.name}</div>`, rare:!!e.rarity}));
@@ -649,28 +540,16 @@ const ShopScene = {
       GameState.relics.forEach((relic,i) => {
         const rc = document.createElement('div');
         rc.className='relic-card'+(this.activeRelicId===i?' active':'');
-        rc.innerHTML=`<div class="relic-name">${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${relic.relicEnhance?`<div class="relic-enhance-tag">${GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance)?.name||''}</div>`:''}`;
+        rc.innerHTML=`<div class="relic-name"><span class="relic-ico">${GameIcons.relic(relic)}</span>${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${relic.relicEnhance?`<div class="relic-enhance-tag">${GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance)?.name||''}</div>`:''}`;
         rc.addEventListener('click', () => { this.activeRelicId=(this.activeRelicId===i)?null:i; this.renderAll(); });
         relicRow.appendChild(rc);
       });
     }
     relicArea.appendChild(relicRow);
+    // #7 ゲームメイン画面と同じ吹き出し表示
     if(this.activeRelicId!=null){
-      const relic = GameState.relics[this.activeRelicId];
-      if(relic){
-        const idx=this.activeRelicId;
-        const ren=GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance);
-        let sellPrice=1;
-        if(relic.relicEnhance==='ren_discard_sell') sellPrice=Math.floor(GameState.currentDeck.length/2);
-        else if(ren) sellPrice+=2;
-        const infoDiv=document.createElement('div'); infoDiv.className='relic-info-panel'; infoDiv.style.marginTop='8px';
-        infoDiv.innerHTML=`<div class="info-title">${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div><div class="info-desc">${relic.desc}</div>${ren?`<div class="info-desc relic-enhance-desc">【${ren.name}】${ren.desc}</div>`:''}<div class="relic-reorder-row"><button class="relic-move-btn" ${idx<=0?'disabled':''}>${GIcon('btn_left',{cls:'gi-gap'})}左へ</button><button class="relic-move-btn" ${idx>=GameState.relics.length-1?'disabled':''}>右へ${GIcon('btn_right',{cls:'gi-gap-l'})}</button></div><button class="sell-relic-btn">売却（${sellPrice}G）</button>`;
-        const moveBtns=infoDiv.querySelectorAll('.relic-move-btn');
-        moveBtns[0].addEventListener('click', ()=>{ if(GameState.moveRelic(idx,-1)){ this.activeRelicId=idx-1; this.renderAll(); } });
-        moveBtns[1].addEventListener('click', ()=>{ if(GameState.moveRelic(idx,1)){ this.activeRelicId=idx+1; this.renderAll(); } });
-        infoDiv.querySelector('.sell-relic-btn').addEventListener('click', ()=>this.shopSellRelic(idx));
-        relicArea.appendChild(infoDiv);
-      }
+      const rp=GameMainScene.renderRelicInfoPanel({ idx:this.activeRelicId, setIdx:(i)=>{this.activeRelicId=i;}, redraw:()=>this.renderAll(), onSell:(i)=>this.shopSellRelic(i) });
+      if(rp) relicArea.appendChild(rp);
     }
     el.appendChild(relicArea);
 
@@ -729,7 +608,7 @@ const ShopScene = {
       const ren = relic.relicEnhance ? GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance) : null;
       const wrap = document.createElement('div'); wrap.className='card-pick-wrap';
       const item = document.createElement('div'); item.className='relic-card pickup';
-      item.innerHTML = `<div class="relic-shop-badge">レリック</div><div class="relic-name">${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}`;
+      item.innerHTML = `<div class="relic-shop-badge">レリック</div><div class="relic-name"><span class="relic-ico">${GameIcons.relic(relic)}</span>${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}`;
       wrap.appendChild(item);
       const desc = document.createElement('div'); desc.className='card-pick-desc';
       desc.textContent = relic.desc + (ren?` ／【${ren.name}】${ren.desc}`:'');
@@ -749,7 +628,7 @@ const ShopScene = {
       let sellPrice=1; if(relic.relicEnhance==='ren_discard_sell') sellPrice=Math.floor(GameState.currentDeck.length/2); else if(ren) sellPrice+=2;
       const rc = document.createElement('div'); rc.className='relic-card';
       // #10 修正：個体（配列index）を指定して売却する
-      rc.innerHTML = `<div class="relic-name">${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}<button class="sell-relic-btn" style="margin-top:4px;">売却（${sellPrice}G）</button>`;
+      rc.innerHTML = `<div class="relic-name"><span class="relic-ico">${GameIcons.relic(relic)}</span>${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}<button class="sell-relic-btn" style="margin-top:4px;">売却（${sellPrice}G）</button>`;
       rc.querySelector('.sell-relic-btn').addEventListener('click', () => this.shopSellRelic(i));
       ownedRow.appendChild(rc);
     });
@@ -769,7 +648,7 @@ const ShopScene = {
       const price = this.relicPrice(relic);
       const ren = relic.relicEnhance ? GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance) : null;
       slot.className='shop-slot relic-shop-slot pickup-slot';
-      slot.innerHTML=`<div class="relic-shop-card pickup"><div class="relic-shop-badge">レリック</div><div class="relic-name">${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}</div><div class="slot-desc">${relic.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||!this.canAcquireRelic(relic)?'disabled':''}>購入（${price}G）</button>`;
+      slot.innerHTML=`<div class="relic-shop-card pickup"><div class="relic-shop-badge">レリック</div><div class="relic-name"><span class="relic-ico">${GameIcons.relic(relic)}</span>${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}</div><div class="slot-desc">${relic.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||!this.canAcquireRelic(relic)?'disabled':''}>購入（${price}G）</button>`;
       slot.querySelector('.buy-btn').addEventListener('click', () => this.buyRelic(i, true));
       row.appendChild(slot);
     });
@@ -839,7 +718,7 @@ const ShopScene = {
         const ren=r.relicEnhance?GameData.RELIC_ENHANCE_POOL.find(x=>x.id===r.relicEnhance):null;
         const price=this.relicPrice(r);
         el.className+=' pickup-slot';
-        el.innerHTML=`<div class="slot-title"><div class="relic-shop-badge">レリック</div>${r.name}<span class="relic-size">${GameState.relicSizeDots(r)}</span>${ren?`<span class="relic-enhance-tag"> ${ren.name}</span>`:''}</div><div class="slot-desc">${r.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||!this.canAcquireRelic(r)?'disabled':''}>購入（${price}G）</button>`;
+        el.innerHTML=`<div class="slot-title"><div class="relic-shop-badge">レリック</div><span class="relic-ico">${GameIcons.relic(r)}</span>${r.name}<span class="relic-size">${GameState.relicSizeDots(r)}</span>${ren?`<span class="relic-enhance-tag"> ${ren.name}</span>`:''}</div><div class="slot-desc">${r.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||!this.canAcquireRelic(r)?'disabled':''}>購入（${price}G）</button>`;
         el.querySelector('.buy-btn').addEventListener('click', () => this.buyPickupRelic(slot));
         row.appendChild(el); return;
       }

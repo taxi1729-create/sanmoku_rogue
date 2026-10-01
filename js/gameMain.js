@@ -18,6 +18,9 @@ const GameMainScene = {
 
   render(container,stage){
     this.container=container; this.stage=stage;
+    // #演出 前ステージの報酬・パッシブ・ボス演出が残っていれば片付ける（StageFX / js/stageFx.js）
+    if(typeof StageFX!=='undefined') StageFX.clearAll();
+    this.bossBubbleOpen=false;
     // #3 ホシパッシブ2：5×5マスでプレイ
     GameData.BOARD_SIZE = GameState.symbolPassiveTier.Hoshi>=2 ? 5 : 4;
     this.board=new Array(GameData.BOARD_SIZE*GameData.BOARD_SIZE).fill(null);
@@ -66,6 +69,8 @@ const GameMainScene = {
       this.pendingInitialCardPack=[GameData.generateShopCard(),GameData.generateShopCard()];
     }
     this.startRound();
+    // #演出 ボスステージ開始時：ボス効果が盤面に付与される演出（初回描画後。タップで早送り）
+    if(this.stage.key==='boss'&&typeof StageFX!=='undefined') StageFX.bossIntro({list:StageFX.bossList(this),floor:GameState.currentFloor});
     TutorialOverlay.show('gameMain'); // #1 初回のみゲームメイン画面のチュートリアルを表示
   },
 
@@ -131,7 +136,7 @@ const GameMainScene = {
     if(GameState.hasRelic('base_boost')) GameData.FINAL_ADD+=2000;
     if(GameState.hasRelic('paint')) this.applyPaintRelic();
     GameState.relics.forEach(r=>{
-      if(r.relicEnhance==='ren_cross') GameData.BINGO_MULTIPLIER_BASE['Cross']*=5;
+      // #2 バツ強化：即時に倍率を変えず、バツビンゴ時のビンゴ倍率を2倍にする（detectNewBingos で処理）
     });
   },
 
@@ -489,6 +494,7 @@ const GameMainScene = {
       // #4 階層10（最終決戦）クリア時はショップにも戻らないため、報酬・パッシブ選択はどちらも不要
       if(GameState.currentFloor<10){
         const rd=this.calcClearReward();
+        this._rewardGoldBefore=GameState.gold; // #演出 報酬受け取り演出のカウントアップ開始値（表示専用）
         GameState.gold+=rd.total;
         // #7 ステージクリア報酬にも爆発通常アップグレードを組み込む（20%の確率でショップに用意される）
         let clearBonusMsg=null;
@@ -695,6 +701,7 @@ const GameMainScene = {
   },
 
   async placeCard(cellIdx,symbol,baseScore,owner,card){
+    const fxPre=(owner==='player'&&card&&typeof StageFX!=='undefined')?StageFX.snapshot(this):null; // #演出 配置前の盤面（サンダー等の対象）
     // #3 ブレイク：このカード自身が今まさにブレイクを発動する場合も、このターンの判定から有効にする
     const breakActive=this.isBreakActive()||card?.jamming==='ブレイク';
     const isNeg=card&&(card.trait==='ネガティブ'||card.trait==='ネガティブ(パッシブ)')&&owner==='player';
@@ -740,6 +747,9 @@ const GameMainScene = {
     if(!isNeg && this.turnInRound%4===0){ const n=GameState.relics.filter(r=>r.id==='draw_boost').length; for(let i=0;i<n&&GameState.handCountForLimit()<GameState.effectiveHandSize();i++) this.drawOne(); }
     this.selectedCardId=null; this.boardInfoCell=null; this.activeRelicId=null; this.expandPending=null; this.paintPending=null;
     this.renderAll();
+    // #演出 カード効果ごとの配置演出（ビンゴがある時だけ点数演出と重ならないよう短く待つ）
+    const fxP=fxPre?StageFX.placement(card,[cellIdx],fxPre):null;
+    if(fxP&&newBingos.length>0) await fxP;
     if(newBingos.length>0) await this.playScoreSequence(newBingos);
     const endByBingo=this.shouldBingoEndRound(newBingos,breakActive);
     if(endByBingo||this.turnInRound>GameState.effectiveTurnsPerRound()){this.renderAll();await this.sleep(300);this.endRound();return;}
@@ -796,6 +806,7 @@ const GameMainScene = {
       const perCellScore=(c,ci)=>{
         let v=c.baseScore;
         if(c.card?._passiveScoreAdd) v+=c.card._passiveScoreAdd;
+        v+=GameData.bourgeoisBonus(c.card); // #4 ブルジョワ：現在G×4
         // #2/#3 バツパッシブ1・ボス効果「バツ5000」はNPCのバツのカード基礎点のみ対象
         if(this.isNpcCrossCell(c)) v=this.npcCrossScore(c);
         if(c.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=1){
@@ -817,6 +828,8 @@ const GameMainScene = {
       }
       // #A バツパッシブ3：点数計算時にバツ倍率をさらに4倍
       if(r.sym==='Cross'&&GameState.symbolPassiveTier.Cross>=3){ baseMult*=4; pureBaseMult*=4; }
+      // #2 レリック強化「バツ強化」：バツビンゴ時、ビンゴ倍率を2倍（所持数分）
+      if(r.sym==='Cross'&&!noRelic){ GameState.relics.filter(x=>x.relicEnhance==='ren_cross').forEach(rel=>{ baseMult*=2; pureBaseMult*=2; markRelic(rel.id,2); }); }
       // #18 点数計算式: (補正基礎点+カード基礎点) × (ビンゴ倍率+補正倍率) × 4列補正 × 最終乗算補正 + 最終加算補正
       let correctionBase=GameData.CORRECTION_BASE_SCORE;
       let relicBonus=0;
@@ -1513,6 +1526,7 @@ const GameMainScene = {
           const perCellScore=(c)=>{
             let v=c.baseScore;
             if(c.card?._passiveScoreAdd) v+=c.card._passiveScoreAdd;
+            v+=GameData.bourgeoisBonus(c.card); // #4
             if(this.isNpcCrossCell(c)) v=this.npcCrossScore(c); // #2/#3 NPCのバツのみ対象
             if(c.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=1){
               const total=GameState.currentDeck.length||1;
@@ -1526,6 +1540,7 @@ const GameMainScene = {
           let baseMult=multObj[s];
           if(s==='Cross'&&GameState.symbolPassiveTier.Cross>=2) baseMult=Math.max(...GameData.SYMBOLS.map(sy=>GameData.BINGO_MULTIPLIER_BASE[sy]));
           if(s==='Cross'&&GameState.symbolPassiveTier.Cross>=3) baseMult*=4;
+          if(s==='Cross'&&!noRelic) baseMult*=Math.pow(2,GameState.relics.filter(x=>x.relicEnhance==='ren_cross').length); // #2
           let correctionBase=GameData.CORRECTION_BASE_SCORE;
           let relicBonus=relicFlatBonus;
           if(!noRelic){
@@ -1731,6 +1746,7 @@ const GameMainScene = {
 
   async executePlacement(targets,card,isOverlay=false){
     const mainCi=targets[0];
+    const fxPre=(typeof StageFX!=='undefined')?StageFX.snapshot(this):null; // #演出 配置前の盤面（サンダー・引き直しの対象）
     const isPaint=card.trait==='塗りつぶし'||card.trait==='塗りつぶし(レリック)';
     // #3 シカクパッシブ1：プレイしたシカクカード自身にも基礎点+1を永続付与
     if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1) card.baseScore+=1;
@@ -1775,6 +1791,9 @@ const GameMainScene = {
     if(!isNeg && this.turnInRound%4===0){ const n=GameState.relics.filter(r=>r.id==='draw_boost').length; for(let i=0;i<n&&GameState.handCountForLimit()<GameState.effectiveHandSize();i++) this.drawOne(); }
     this.selectedCardId=null; this.boardInfoCell=null; this.activeRelicId=null; this.expandPending=null; this.paintPending=null;
     this.renderAll();
+    // #演出 カード効果ごとの配置演出（ビンゴがある時だけ点数演出と重ならないよう短く待つ。それ以外は進行をブロックしない）
+    const fxP=fxPre?StageFX.placement(card,targets,fxPre):null;
+    if(fxP&&newBingos.length>0) await fxP;
     if(newBingos.length>0) await this.playScoreSequence(newBingos);
     const endByBingo=this.shouldBingoEndRound(newBingos,breakActive);
     if(endByBingo||this.turnInRound>GameState.effectiveTurnsPerRound()){this.renderAll();await this.sleep(300);this.endRound();return;}
@@ -1820,7 +1839,6 @@ const GameMainScene = {
       case 'base_boost': GameData.FINAL_ADD=Math.max(0,GameData.FINAL_ADD-2000); break;
       default: break;
     }
-    if(relic.relicEnhance==='ren_cross') GameData.BINGO_MULTIPLIER_BASE['Cross']=Math.max(-30,GameData.BINGO_MULTIPLIER_BASE['Cross']/5);
   },
 
   addLog(text){ this.logs.push(text); if(this.logs.length>80) this.logs.shift(); },
@@ -1851,7 +1869,7 @@ const GameMainScene = {
     // #6 リロール・デッキ/山札/捨て札一覧・レリックを上画面に移動
     topBox.appendChild(this.renderControls());
     topBox.appendChild(this.renderRelicRow());
-    if(this.activeRelicId){const rp=this.renderRelicInfoPanel();if(rp) topBox.appendChild(rp);}
+    if(this.activeRelicId!=null){const rp=this.renderRelicInfoPanel();if(rp) topBox.appendChild(rp);} // #7 index 0 でも表示されるよう修正
     wrap.appendChild(topBox);
     const pip=this.renderPassiveInfoPanel(); if(pip) wrap.appendChild(pip);
     const turnMax=GameState.effectiveTurnsPerRound();
@@ -1860,15 +1878,22 @@ const GameMainScene = {
     const tNow=this.turnInRound;
     const turnCls=tNow>=turnMax-2?' turn-danger':(tNow>=turnMax-6?' turn-warn':'');
     turnEl.innerHTML=`${this.currentSide==='player'?'あなたの番':'NPCの番'}（<span class="turn-count${turnCls}">ターン ${tNow} / ${turnMax}</span>）`;
-    wrap.appendChild(turnEl);
+    // #演出 ボス効果は盤面上の常設枠をやめ、ターン表示の横のコンパクトなバッジにする（タップで一覧を吹き出し表示）
+    const turnRow=document.createElement('div'); turnRow.className='turn-row';
+    turnRow.appendChild(turnEl);
+    wrap.appendChild(turnRow);
     if(this.bossEffect||GameState.floor10SpecialBoss){
-      const bt=document.createElement('div'); bt.className='boss-tag';
-      // #9 複数ボス効果（第5階層以降）を全て表示する
-      let html=this.bossEffect?(this.bossEffects||[this.bossEffect]).map(be=>`<span class="boss-tag-name">ボス効果：${be.name}</span><span class="boss-tag-desc">${be.desc}</span>`).join(''):'';
-      // #6 階層10特有ボス効果を常時表示
-      if(GameState.floor10SpecialBoss) html+=`<span class="boss-tag-name">ボス効果：最終決戦</span><span class="boss-tag-desc">5ターンごと（6,11,16…ターン目）は強制的にNPCの番になる</span>`;
-      bt.innerHTML=html;
-      wrap.appendChild(bt);
+      if(typeof StageFX!=='undefined'){
+        turnRow.appendChild(StageFX.bossBadge(StageFX.bossList(this),!!this.bossBubbleOpen,()=>{ this.bossBubbleOpen=!this.bossBubbleOpen; this.renderAll(); }));
+      }else{
+        const bt=document.createElement('div'); bt.className='boss-tag';
+        // #9 複数ボス効果（第5階層以降）を全て表示する
+        let html=this.bossEffect?(this.bossEffects||[this.bossEffect]).map(be=>`<span class="boss-tag-name">ボス効果：${be.name}</span><span class="boss-tag-desc">${be.desc}</span>`).join(''):'';
+        // #6 階層10特有ボス効果を常時表示
+        if(GameState.floor10SpecialBoss) html+=`<span class="boss-tag-name">ボス効果：最終決戦</span><span class="boss-tag-desc">5ターンごと（6,11,16…ターン目）は強制的にNPCの番になる</span>`;
+        bt.innerHTML=html;
+        wrap.appendChild(bt);
+      }
     }
     const ba=document.createElement('div'); ba.className='board-area';
     ba.appendChild(this.renderBoard());
@@ -1887,7 +1912,9 @@ const GameMainScene = {
     this.container.appendChild(wrap);
     // #1 報酬画面／パッシブ選択はゲームメイン画面の上にオーバーレイ表示する（両方同時に出ても良いよう独立したifにする）
     if(this.resultState) this.container.appendChild(this.renderResult());
+    else if(typeof StageFX!=='undefined') StageFX.hideResult(); // #演出 報酬演出は body 直下の永続要素
     if(this.pendingPassiveChoice && this.passiveModalOpen) this.container.appendChild(this.renderPassiveChoiceModal());
+    else if(typeof StageFX!=='undefined') StageFX.hidePassive();
     // #1 ゲーム開始時の無料？カードパック
     if(this.pendingInitialCardPack){
       // 無料？カードパックもパックを剥く演出の後に選択させる
@@ -1904,6 +1931,7 @@ const GameMainScene = {
     // #9 レリック「ジョーカー」売却後のカード選択
     if(this.pendingJokerPick) this.container.appendChild(this.renderJokerPickModal());
     window.scrollTo(0,scrollY);
+    this.placeHandBubble(); // #8
   },
 
   renderStatusBar(){
@@ -1914,7 +1942,7 @@ const GameMainScene = {
     const sparkle=this.scoringAnim&&this.scoringAnim.reached;
     const pct=Math.min(100,Math.floor((live/GameState.targetScore)*100));
     // #6 ラウンドを大きく表示し、点数は「現在/目標」の1つの表示にまとめる
-    const topRow=document.createElement('div'); topRow.style.cssText='display:flex;align-items:center;gap:14px;width:100%;flex-wrap:wrap;';
+    const topRow=document.createElement('div'); topRow.className='status-top-row'; // #6 ラウンド・Gの右にパッシブを詰めて配置（折り返さない）
     const roundBox=document.createElement('div'); roundBox.className='round-big-stat';
     roundBox.innerHTML=`<div class="label">ラウンド</div><div class="round-big-value">${GameState.round}<span class="round-big-max">/${GameState.effectiveMaxRounds()+(this.stageBonusRounds||0)}</span></div>`;
     topRow.appendChild(roundBox);
@@ -1922,7 +1950,7 @@ const GameMainScene = {
     const stats=[['G',GameState.gold]];
     for(const [label,val] of stats){const d=document.createElement('div');d.className='stat';d.innerHTML=`<div class="label">${label}</div><div class="value">${val}</div>`;topRow.appendChild(d);}
     // #4 パッシブ一覧をラウンド・ステージと同じ行の右側に配置する
-    const passiveBar=this.renderPassiveBar(); passiveBar.style.marginLeft='auto';
+    const passiveBar=this.renderPassiveBar(); passiveBar.classList.add('passive-bar-inline');
     topRow.appendChild(passiveBar);
     bar.appendChild(topRow);
     const scoreBox=document.createElement('div'); scoreBox.className='stat score-combined-stat';
@@ -2007,11 +2035,13 @@ const GameMainScene = {
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
       return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">重</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
-    // #3 加重：記号右に「基礎点+◯」（加算値は黄色）
-    if(card.enhance==='加重'){
+    // #4 加重・ブルジョワ・ドロー：記号右に専用アイコン（加算値は右上のカード基礎点に「+◯」で表示）
+    if(card.enhance==='加重'||card.enhance==='ブルジョワ'||card.enhance==='ドロー'){
       const sub=multiSym?`<span class="card-multi-sub">${multiSym}</span>`:'';
-      const addVal=card._weightedBonus!=null?card._weightedBonus:0;
-      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge">基礎点<span class="gold-text">+${addVal}</span></span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
+      const key={'加重':'enh_weighted','ブルジョワ':'enh_bourgeois','ドロー':'enh_draw'}[card.enhance];
+      const sqP3d=card.symbol==='Square'&&GameState.symbolPassiveTier?.Square>=2;
+      const drawN=card.enhance==='ドロー'?`<span class="enh-draw-n${sqP3d?' passive-value':''}">${sqP3d?2:1}</span>`:'';
+      return `<div class="card-symbol-wrap"><span class="sym-${card.symbol}">${label}</span><span class="enhance-badge enhance-badge-icon enh-${key}">${GIcon(key)}${drawN}</span>${sub}</div>${emojiHtml}${passiveMultiHtml}`;
     }
     // #2 ギャンブル：記号右にギャンブルアイコン（以前は記号に重ねて表示していたため視認できなかった）
     if(card.enhance==='ギャンブル'){
@@ -2048,9 +2078,11 @@ const GameMainScene = {
     } else if(card.enhance==='数値強化'){
       bonusHtml=`<span class="card-score-bonus${sqP3?' passive-value':''}">+${15*(sqP3?2:1)}</span>`;
     } else if(card.enhance==='ブルジョワ'){
-      // #1 バッジは倍率のみの簡潔表示に。実際の加算数値は説明欄（cardInfoDescHtml）に記載する
-      const mulG=sqP3?8:4;
-      bonusHtml=`<span class="card-score-bonus gold-text${sqP3?' passive-value':''}">×${mulG}G</span>`;
+      // #4 ブルジョワ：現在G×4 を「+◯」で表示（所持金に応じて変動）
+      bonusHtml=`<span class="card-score-bonus gold-text${sqP3?' passive-value':''}">+${GameData.bourgeoisBonus(card)}</span>`;
+    } else if(card.enhance==='加重'){
+      // #4 加重：付与時に加算された値を「+◯」で表示
+      bonusHtml=`<span class="card-score-bonus">+${card._weightedBonus!=null?card._weightedBonus:0}</span>`;
     }
 
     // #4 パッシブ効果でカード基礎点が変化する場合、青字で実効値を表示する
@@ -2063,7 +2095,6 @@ const GameMainScene = {
     }
     const numHtml=scoreIsPassive?`<span class="passive-value">${displayScore}</span>`:`${baseForDisplay}`;
     let scoreHtml=`<span class="card-number">${dotsSpan}${numHtml}${bonusHtml}</span>`;
-    if(card.enhance==='ドロー') scoreHtml+=`<span class="card-draw-label${sqP3?' passive-value':''}">draw${sqP3?2:1}</span>`;
     return scoreHtml;
   },
 
@@ -2077,8 +2108,7 @@ const GameMainScene = {
       let extra='';
       // #1 ブルジョワ：付与時に確定した実際の加算数値を説明欄に明記する
       if(card.enhance==='ブルジョワ'){
-        const base=card.number||0; const granted=card.baseScore-base;
-        extra=`（付与時に基礎点+${granted}が確定済み。現在の基礎点${card.baseScore}に反映済み）`;
+        extra=`（現在${GameState.gold}G → ビンゴ時に基礎点+${GameData.bourgeoisBonus(card)}）`;
       }
       l.push(`<div class="info-desc desc-enhance">【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}${extra}</div>`);
     }
@@ -2366,9 +2396,24 @@ const GameMainScene = {
   renderHandInfoPanel(){
     if(this.rerollMode||!this.selectedCardId) return null;
     const card=GameState.hand.find(c=>c.id===this.selectedCardId); if(!card) return null;
-    const panel=document.createElement('div'); panel.className='card-tooltip-panel passive-info-panel';
+    // #8 選択したカードのすぐ上（入らなければ下）に吹き出しで表示する。位置は描画後に placeHandBubble() で決める
+    const panel=document.createElement('div'); panel.className='card-tooltip-panel hand-card-bubble';
     panel.innerHTML=`<div class="info-title sym-${card.symbol}">${GameData.SYMBOL_LABEL[card.symbol]} 基礎点${card.baseScore}</div>${this.cardInfoDescHtml(card)}`;
     return panel;
+  },
+  placeHandBubble(){
+    const panel=document.querySelector('.hand-card-bubble'); if(!panel) return;
+    const cardEl=document.querySelector('.hand-row .card.selected'); if(!cardEl){ panel.style.visibility='hidden'; return; }
+    const r=cardEl.getBoundingClientRect(); const vw=window.innerWidth, vh=window.innerHeight;
+    const w=Math.min(300,vw-16); panel.style.width=w+'px';
+    const h=panel.offsetHeight;
+    let left=Math.max(8,Math.min(vw-w-8,r.left+r.width/2-w/2));
+    let top=r.top-h-12, below=false;
+    if(top<8){ top=r.bottom+12; below=true; }
+    if(top+h>vh-8) top=Math.max(8,vh-h-8);
+    panel.style.left=left+'px'; panel.style.top=top+'px';
+    panel.classList.toggle('below',below);
+    panel.style.setProperty('--tail-x',(r.left+r.width/2-left)+'px');
   },
 
   renderRelicRow(){
@@ -2382,7 +2427,7 @@ const GameMainScene = {
       // #3 点数計算に関わった時だけ、関わった数値を吹き出しでレリックの上に表示する
       const scoreVal=this.scoringRelicValues?.[relic.id];
       const bubbleHtml=(isScoring&&scoreVal!=null)?`<div class="scoring-value-bubble">${scoreVal>=0?'+':''}${Math.round(scoreVal*100)/100}</div>`:'';
-      rc.innerHTML=`${bubbleHtml}<div class="relic-name">${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${relic.relicEnhance?`<div class="relic-enhance-tag">${GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance)?.name||''}</div>`:''}`;
+      rc.innerHTML=`${bubbleHtml}<div class="relic-name"><span class="relic-ico">${GameIcons.relic(relic)}</span>${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${relic.relicEnhance?`<div class="relic-enhance-tag">${GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance)?.name||''}</div>`:''}`;
       rc.addEventListener('click',()=>this.onRelicClick(i));
       row.appendChild(rc);
     });
@@ -2392,22 +2437,24 @@ const GameMainScene = {
   },
 
   // #5 レリックもパッシブと同様に吹き出し表示にする
-  renderRelicInfoPanel(){
-    const idx=this.activeRelicId;
+  // #7 レリックの吹き出し表示（ゲームメイン・ショップ・マップで共通）。ctx={idx,setIdx(i|null),redraw(),onSell(idx)|null}
+  renderRelicInfoPanel(ctx){
+    ctx=ctx||{ idx:this.activeRelicId, setIdx:(i)=>{this.activeRelicId=i;}, redraw:()=>this.renderAll(), onSell:(i)=>this.sellRelic(i) };
+    const idx=ctx.idx;
     const relic=GameState.relics[idx]; if(!relic) return null;
     const backdrop=document.createElement('div'); backdrop.className='passive-info-backdrop';
-    backdrop.addEventListener('click',()=>{ this.activeRelicId=null; this.renderAll(); });
+    backdrop.addEventListener('click',()=>{ ctx.setIdx(null); ctx.redraw(); });
     const panel=document.createElement('div'); panel.className='info-panel relic-info-panel passive-info-panel';
     panel.addEventListener('click',(e)=>e.stopPropagation());
     const ren=GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance);
     let sellPrice=1; if(relic.relicEnhance==='ren_discard_sell') sellPrice=Math.floor(GameState.currentDeck.length/2); else if(ren) sellPrice+=2;
     // #8 タップ時、レリックの現在の効果量を数値で表示する（レリック強化効果が優先）
     const liveInfo=GameData.getRelicLiveInfo(relic);
-    panel.innerHTML=`<div class="info-title">${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div><div class="info-desc">${relic.desc}</div>${ren?`<div class="info-desc relic-enhance-desc">【${ren.name}】${ren.desc}</div>`:''}${liveInfo?`<div class="info-desc relic-live-value">${liveInfo}</div>`:''}<div class="relic-reorder-row"><button class="relic-move-btn" ${idx<=0?'disabled':''}>${GIcon('btn_left',{cls:'gi-gap'})}左へ</button><button class="relic-move-btn" ${idx>=GameState.relics.length-1?'disabled':''}>右へ${GIcon('btn_right',{cls:'gi-gap-l'})}</button></div><button class="sell-relic-btn">売却（${sellPrice}G）</button>`;
+    panel.innerHTML=`<div class="info-title"><span class="relic-ico relic-ico-lg">${GameIcons.relic(relic)}</span>${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div><div class="info-desc">${relic.desc}</div>${ren?`<div class="info-desc relic-enhance-desc">【${ren.name}】${ren.desc}</div>`:''}${liveInfo?`<div class="info-desc relic-live-value">${liveInfo}</div>`:''}<div class="relic-reorder-row"><button class="relic-move-btn" ${idx<=0?'disabled':''}>${GIcon('btn_left',{cls:'gi-gap'})}左へ</button><button class="relic-move-btn" ${idx>=GameState.relics.length-1?'disabled':''}>右へ${GIcon('btn_right',{cls:'gi-gap-l'})}</button></div>${ctx.onSell?`<button class="sell-relic-btn">売却（${sellPrice}G）</button>`:''}`;
     const moveBtns=panel.querySelectorAll('.relic-move-btn');
-    moveBtns[0].addEventListener('click',()=>{ if(GameState.moveRelic(idx,-1)){ this.activeRelicId=idx-1; this.renderAll(); } });
-    moveBtns[1].addEventListener('click',()=>{ if(GameState.moveRelic(idx,1)){ this.activeRelicId=idx+1; this.renderAll(); } });
-    panel.querySelector('.sell-relic-btn').addEventListener('click',()=>this.sellRelic(idx));
+    moveBtns[0].addEventListener('click',()=>{ if(GameState.moveRelic(idx,-1)){ ctx.setIdx(idx-1); ctx.redraw(); } });
+    moveBtns[1].addEventListener('click',()=>{ if(GameState.moveRelic(idx,1)){ ctx.setIdx(idx+1); ctx.redraw(); } });
+    if(ctx.onSell) panel.querySelector('.sell-relic-btn').addEventListener('click',()=>ctx.onSell(idx));
     backdrop.appendChild(panel);
     return backdrop;
   },
@@ -2550,6 +2597,20 @@ const GameMainScene = {
     // #1 ボスクリア時：ショップへ移動の代わりに「パッシブ報酬を受け取る」をタップさせる
     const hasPassiveChoice = win && this.stage.key==='boss' && this.pendingPassiveChoice && this.pendingPassiveChoice.length>0;
     const btnLabel = hasPassiveChoice ? 'パッシブ報酬を受け取る' : (goShop?'ショップへ':'マップに戻る');
+    // #演出 報酬の受け取り演出（STAGE CLEAR→内訳→金貨が所持Gへ→追加報酬）。body 直下の永続要素で描画するため、
+    //   renderAll() で作り直されても巻き戻らない。ここではプレースホルダーだけを返す
+    if(typeof StageFX!=='undefined'){
+      StageFX.showResult({
+        win, reward:(win?r:null), scoreText:`最終点数：${GlobalFunctions.formatScore(GameState.currentScore)} / ${GlobalFunctions.formatScore(GameState.targetScore)}`,
+        goldBefore:(this._rewardGoldBefore!=null?this._rewardGoldBefore:GameState.gold-((r&&r.gold)||0)), goldAfter:GameState.gold,
+        formulaText:(win&&r?.breakdown)?GameMainScene.clearRewardBreakdownText(r.breakdown):'', debugHtml, btnLabel,
+        onNext:()=>{
+          if(hasPassiveChoice){ this.passiveModalOpen=true; this.renderAll(); }
+          else{ StageFX.clearAll(); if(goShop){ App.showShop(); } else { App.showMapSelect(); } }
+        },
+      });
+      const ph=document.createElement('div'); ph.className='stfx-result-placeholder'; ph.hidden=true; return ph;
+    }
     box.innerHTML=`<div class="result-title ${win?'win':'lose'}">${win?'STAGE CLEAR':'GAME OVER'}</div><div>最終点数：${GlobalFunctions.formatScore(GameState.currentScore)} / ${GlobalFunctions.formatScore(GameState.targetScore)}</div>${gr}${debugHtml}<button id="btn-next">${btnLabel}</button>`;
     el.appendChild(box);
     setTimeout(()=>{el.querySelector('#btn-next').addEventListener('click',()=>{
@@ -2561,6 +2622,16 @@ const GameMainScene = {
 
   // #A ボスクリア時：記号パッシブ選択モーダル（ゲームメイン画面上にオーバーレイ表示）
   renderPassiveChoiceModal(){
+    // #演出 神々しい降臨演出（光の柱・降る光の粒・後光）。body 直下の永続要素で描画し、同じ候補なら作り直さない
+    if(typeof StageFX!=='undefined'){
+      StageFX.showPassiveChoice({
+        picks:this.pendingPassiveChoice, remaining:this.passiveRewardsRemaining||1,
+        items:this.pendingPassiveChoice.map(cand=>{ const p=GameData.SYMBOL_PASSIVES[cand.symbol][cand.nextTier]; let live=''; try{ live=p.live(); }catch(e){} return {sym:cand.symbol,tier:cand.nextTier,symHtml:GameData.SYMBOL_LABEL[cand.symbol],name:p.name,desc:p.desc,live}; }),
+        onChoose:(idx)=>this.choosePassive(idx),
+        onSkip:()=>this.skipPassiveChoice(),
+      });
+      const ph=document.createElement('div'); ph.className='stfx-passive-placeholder'; ph.hidden=true; return ph;
+    }
     const el=document.createElement('div'); el.className='pack-modal-overlay passive-choice-overlay';
     const box=document.createElement('div'); box.className='pack-modal';
     box.innerHTML=`<h3>記号パッシブを1つ選んでください${(this.passiveRewardsRemaining||1)>1?`（魔力ステージD：あと${this.passiveRewardsRemaining}回）`:''}</h3>`;
@@ -2604,6 +2675,7 @@ const GameMainScene = {
     if(this.passiveChoiceContext==='start'){ this.passiveChoiceContext=null; App.saveGame(); this.renderAll(); return; }
     this.passiveChoiceContext=null;
     App.saveGame();
+    if(typeof StageFX!=='undefined') StageFX.clearAll(); // #演出 報酬・パッシブ演出を片付けてからショップへ
     App.showShop();
   },
   choosePassive(idx){
@@ -2623,6 +2695,7 @@ const GameMainScene = {
     this.passiveChoiceContext=null;
     // #1 パッシブ選択後、ショップへ進む
     App.saveGame();
+    if(typeof StageFX!=='undefined') StageFX.clearAll(); // #演出
     App.showShop();
   },
 
