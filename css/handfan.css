@@ -1,0 +1,88 @@
+/* handfan.css — 手札の弓形（扇形）展開・カード効果吹き出しの×ボタン・パック内訳モーダルの枠固定
+ * 配置用の回転・沈み込みは外側ラッパー .fan-slot（= .card-wrapper）に、選択の持ち上げは内側の .card に掛ける。
+ * .fan-slot の --fan-rot / --fan-y と重なり量（margin-left）は JS（GameMainScene.fanLayoutLine）が実寸から計算する。
+ * .card 側の transform（選択・リロール選択・ドロー演出）や traitFx の scale は別の層なので合成される。
+ */
+
+/* ---------- 弓形の1行 ---------- */
+.fan-line{ display:flex; flex-wrap:nowrap; justify-content:center; align-items:flex-end; }
+.hand-row.fan-line{ gap:5px; width:100%; padding-top:16px; min-height:0; }
+.hand-row.fan-line .reserve-group{ flex:0 0 auto; justify-content:flex-end; }
+.hand-row.fan-line .reserve-row{ display:flex; flex-wrap:nowrap; align-items:flex-end; }
+.hand-row.fan-line .hand-divider{ flex:0 0 auto; }
+
+.fan-slot{
+  position:relative; flex:0 0 auto; display:block;
+  transform:translateY(var(--fan-y,0px)) rotate(var(--fan-rot,0deg));
+  transform-origin:50% 100%;
+}
+/* 選択中のカードは他のカードより前面に */
+.fan-slot.fan-front{ z-index:6; }
+
+/* 持ち上げ：回転した座標系での「上」へ（.fan-slot が回転しているので translateY だけでカードの向きに沿って上がる） */
+.fan-line .card.selected{ transform:translateY(-16px); box-shadow:0 8px 16px rgba(0,0,0,.5), 0 0 0 2px rgba(251,191,36,.35); }
+.fan-line .card.reroll-selected{ transform:translateY(-12px); }
+.fan-line .pack-card-item.picked{ transform:translateY(-16px); }
+/* タッチ端末ではタップ後に :hover が残って持ち上がったままに見えるのを防ぐ */
+@media (hover:none){
+  .fan-line .card:not(.selected):not(.reroll-selected):not(.picked):hover{ transform:none; }
+}
+
+/* ---------- ショップ：アップグレード対象カード選択 ---------- */
+.pick-fan-modal{ width:min(640px, calc(100vw - 16px)); }
+.pack-card-grid.fan-grid{ display:flex; flex-direction:column; flex-wrap:nowrap; align-items:stretch; gap:20px; padding-top:20px; }
+.pack-card-grid.fan-grid .pick-fan-line{ gap:6px; width:100%; }
+/* 効果未選択でもカードをタップして効果吹き出しを見られるようにする（toggleTarget 側で選択はガードされる） */
+.pack-card-grid.fan-grid.grid-disabled{ pointer-events:auto; }
+@media (max-width:480px){
+  .pick-fan-modal{ padding:16px 12px; }
+}
+
+/* ---------- カード効果の吹き出し：×ボタン ---------- */
+.hand-card-bubble{ padding-right:38px; }
+.hand-card-bubble .bubble-close-btn{
+  pointer-events:auto; position:absolute; top:5px; right:5px;
+  width:28px; height:28px; padding:0; border-radius:50%;
+  font-size:17px; font-weight:700; line-height:26px; text-align:center;
+  background:#262c45; color:var(--text); border:1px solid #6a5a2a;
+}
+.hand-card-bubble .bubble-close-btn::before{ content:''; position:absolute; inset:-8px; } /* 指で押しやすいよう当たり判定を広げる */
+.hand-card-bubble .bubble-close-btn:hover:not(:disabled){ transform:none; background:#343b5c; }
+.pick-card-bubble{ z-index:70; }
+
+/* ---------- パック内訳：枠を固定し、一覧と詳細エリアを分離 ---------- */
+.pack-modal.pack-breakdown-modal{
+  width:min(560px, calc(100vw - 24px));
+  height:min(640px, calc(100vh - 32px));
+  max-height:none; overflow:hidden;
+  display:flex; flex-direction:column; padding:16px;
+}
+.pack-breakdown-modal h3{ flex:0 0 auto; margin-bottom:4px; }
+.pack-breakdown-modal .pack-breakdown-hint{ flex:0 0 auto; margin-bottom:8px; font-size:11px; color:var(--text-dim); }
+.pack-breakdown-modal .pack-breakdown-list{
+  flex:0 1 auto; min-height:0; max-height:46%; overflow-y:auto;
+  display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px;
+}
+.pack-breakdown-modal .pack-breakdown-item{ padding:7px 9px; font-size:12px; line-height:1.3; }
+.pack-breakdown-modal .pack-breakdown-item:hover:not(:disabled){ transform:none; }
+.pack-breakdown-detail{
+  flex:1 1 0; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+  margin-top:10px; background:#111624; border:1px solid #6a4ad4; border-radius:9px;
+  padding:8px 12px; font-size:11px; line-height:1.6; text-align:left;
+}
+.pack-breakdown-detail-title{ font-weight:900; font-size:12px; color:var(--gold); margin-bottom:4px; }
+.pack-breakdown-empty{ color:var(--text-dim); text-align:center; padding-top:12px; }
+.pack-breakdown-modal > button{ flex:0 0 auto; }
+/* 横画面（高さが低い）：一覧を左、詳細を右に並べて詳細エリアの高さを確保する */
+@media (max-height:500px) and (orientation:landscape){
+  .pack-modal.pack-breakdown-modal{
+    width:min(780px, calc(100vw - 24px)); max-width:none; padding:12px 14px;
+    display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); grid-template-rows:auto auto minmax(0,1fr) auto;
+    column-gap:12px;
+  }
+  .pack-breakdown-modal h3, .pack-breakdown-modal .pack-breakdown-hint, .pack-breakdown-modal > button{ grid-column:1 / -1; }
+  .pack-breakdown-modal h3{ margin-bottom:2px; }
+  .pack-breakdown-modal .pack-breakdown-list{ grid-column:1; grid-row:3; max-height:none; align-content:start; }
+  .pack-breakdown-modal .pack-breakdown-detail{ grid-column:2; grid-row:3; margin-top:0; }
+  .pack-breakdown-modal > button{ margin-top:8px !important; }
+}

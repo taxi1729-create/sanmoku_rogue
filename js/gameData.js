@@ -15,7 +15,7 @@ const GameData = {
 
   // #1 シカクを7倍に修正
   // #1 初期ビンゴ倍率：マル・サンカク・シカクをすべて10倍に変更
-  BINGO_MULTIPLIER_BASE: { Circle:10, Triangle:10, Square:10, Cross:-30 },
+  BINGO_MULTIPLIER_BASE: { Circle:10, Triangle:10, Square:10, Cross:-100 }, // #6 初期バツビンゴ倍率-100
   // ビンゴ倍率の変化表示（右枠）用：スナップショットと差分HTML
   snapshotMult(){ return {...this.BINGO_MULTIPLIER_BASE}; },
   multChanged(before){ return this.SYMBOLS.some(s=>before[s]!==this.BINGO_MULTIPLIER_BASE[s]); },
@@ -28,7 +28,7 @@ const GameData = {
     }).join('');
     return `<div class="gr-label">ビンゴ倍率が変化しました</div><table class="mult-change-table">${rows}</table>`;
   },
-  BINGO_MULTIPLIER_BASE_ORIGINAL: { Circle:10, Triangle:10, Square:10, Cross:-30 },
+  BINGO_MULTIPLIER_BASE_ORIGINAL: { Circle:10, Triangle:10, Square:10, Cross:-100 },
   QUAD_MULTIPLIER_FACTOR: 1.5,
   // #3 ホシパッシブLv2用：5列ビンゴは3列ビンゴの倍率の2倍
   PENTA_MULTIPLIER_FACTOR: 2,
@@ -279,7 +279,7 @@ const GameData = {
     switch(relic.id){
       case 'reroll_boost': return `補正基礎点:${GameState.rerollCount*10}`;
       case 'bingo': return '補正基礎点:+30';
-      case 'charge': return `補正倍率:+${gm?(gm.chargeN||0):0}（n=${gm?(gm.chargeN||0):0}、300超でn=-10）`;
+      case 'charge': return `補正倍率:+${gm?(gm.chargeN||0):0}（n=${gm?(gm.chargeN||0):0}、150超でn=-10）`;
       case 'odd_boost': return '補正基礎点:+15（奇数加算時）';
       case 'even_boost': return '補正基礎点:+15（偶数加算時）';
       case 'circle_boost': return '補正基礎点:+60（マルビンゴ時）';
@@ -364,8 +364,20 @@ const GameData = {
     if(packId==='dream_card'){
       return ['基礎点120〜150のカードが1枚（強化・ジャミング・性質変化のすべてが付与された状態）'];
     }
-    if(packId==='relic_pack'){
-      return ['未所持のレリックから重み付きでランダムに3つ提示（レア度が高いほど出現率は低い）'];
+    // #3 レリックパック：グレード別排出率・レリック強化付与率・全レリックの内訳
+    if(packId==='relic_pack'||packId==='pickup_relic'){
+      const lines=['レリック3つから1つ選択（各レリックは次の確率で抽選）'];
+      const gs=Object.entries(this.RELIC_GRADES).filter(([g,v])=>v.weight>0);
+      const total=gs.reduce((t,[g,v])=>t+v.weight,0);
+      gs.forEach(([g,v])=>lines.push(`<b>${v.name}：${Math.round(v.weight/total*1000)/10}%</b>`));
+      lines.push(`レリック強化効果の付与確率：${Math.round(this.RELIC_ENHANCE_RATE*100)}%（魔力ステージE所持時は100%）`);
+      gs.forEach(([g,v])=>{
+        const list=this.RELIC_POOL.filter(r=>this.relicGrade(r)===g);
+        const each=list.length?Math.round(v.weight/total/list.length*10000)/100:0;
+        lines.push(`<div class="pb-grade-head">【${v.name}】${list.length}種（1種あたり${each}%）</div>`);
+        list.forEach(r=>lines.push(`<span class="pb-relic">${typeof GameIcons!=='undefined'?GameIcons.relic(r):''}${r.name}</span>`));
+      });
+      return lines;
     }
     return ['（内訳情報なし）'];
   },
@@ -393,8 +405,8 @@ const GameData = {
     'hand_boost':'image/relic/r019.png',
     'gold_boost':'image/relic/r020.png',
   },
-  // #5 レリックのグレード（ノーマル/レア/スーパーレア/レジェンド）。ピックアップレリック・レリックパックはノーマル50%・レア35%・スーパーレア15%で抽選（レジェンドは排出されない）
-  RELIC_GRADES: { normal:{name:'ノーマル',weight:50}, rare:{name:'レア',weight:35}, super:{name:'スーパーレア',weight:15}, legend:{name:'レジェンド',weight:0} },
+  // #5 レリックのグレード（ノーマル/レア/スーパーレア/レジェンド）。ピックアップレリック・レリックパックはノーマル80%・レア15%・スーパーレア5%で抽選（レジェンドは排出されない）
+  RELIC_GRADES: { normal:{name:'ノーマル',weight:80}, rare:{name:'レア',weight:15}, super:{name:'スーパーレア',weight:5}, legend:{name:'レジェンド',weight:0} },
   RELIC_GRADE_OF: {
     combo:'normal', relic_boost:'normal', base_boost:'normal', hand_boost:'normal', round_boost:'normal', odd_boost:'normal', even_boost:'normal',
     circle_boost:'normal', triangle_boost:'normal', square_boost:'normal', bingo:'normal', empty_boost:'normal', last_stand:'normal', reroll_boost:'normal',
@@ -415,7 +427,7 @@ const GameData = {
   RELIC_ENHANCE_RATE: 0.3, // #4 レリック強化効果の付与確率30%
   RELIC_POOL: [
     { id:'bingo', name:'ビンゴ',           desc:'ビンゴした時、補正基礎点+30' },
-    { id:'charge', name:'チャージ',         desc:'補正倍率+n（ゲーム開始時n=0。次ラウンドに行く直前の手札のカード基礎点の合計をnに加算。nが300を超えるとn=-10になる）' },
+    { id:'charge', name:'チャージ',         desc:'補正倍率+n（ゲーム開始時n=0。次ラウンドに行く直前の手札のカード基礎点の合計をnに加算。nが150を超えるとn=-10になる）' },
     { id:'double', name:'ダブル',           desc:'同一ターンにビンゴが2つ以上ある時、最終乗算補正×1.5' },
     { id:'odd_boost', name:'奇数補正',         desc:'ビンゴで加算される基礎点が奇数の度に補正基礎点+15' },
     { id:'even_boost', name:'偶数補正',         desc:'ビンゴで加算される基礎点が偶数の度に補正基礎点+15' },
@@ -650,8 +662,8 @@ const GameData = {
   },
 
   // #7/#8 報酬G計算式の基本G
-  CLEAR_REWARD_BASE_G: 5, // #1 クリア報酬の基本Gを5Gに変更
-  SKIP_REWARD_BASE_G: 4,
+  CLEAR_REWARD_BASE_G: 5,
+  SKIP_REWARD_BASE_G: 8, // #9 スキップ報酬の基本G
 
   // #12 多階層
   buildFloorStages(floor){

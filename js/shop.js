@@ -232,7 +232,24 @@ const ShopScene = {
     this.renderAll();
   },
 
-  chooseEffect(effect){ if(!this.pickingPack) return; this.pickingPack.chosenEffect = effect; this.pickingPack.selectedTargets = new Set(); this.renderAll(); },
+  chooseEffect(effect){ if(!this.pickingPack) return; this.pickingPack.chosenEffect = effect; this.pickingPack.selectedTargets = new Set(); this.pickBubble = null; this.renderAll(); },
+  // #扇形 対象カードのタップ：選択トグル（toggleTarget）＋そのカードの効果吹き出しを表示
+  onPickCardTap(idx){
+    const p = this.pickingPack; if(!p) return;
+    const eff = p.chosenEffect;
+    const needsTarget = eff && eff.targetMax > 0;
+    if(needsTarget){
+      const wasPicked = p.selectedTargets.has(idx);
+      // 選択を外したカードの吹き出しは閉じる。選んだ（または上限で選べなかった）カードは吹き出しを出す
+      this.pickBubble = wasPicked ? null : { pack:p, idx, closed:false };
+      this.toggleTarget(idx);
+    }else{
+      // 効果未選択・対象不要の効果のときは選択はせず、吹き出しだけ切り替える
+      const same = this.pickBubble && this.pickBubble.pack===p && this.pickBubble.idx===idx && !this.pickBubble.closed;
+      this.pickBubble = same ? null : { pack:p, idx, closed:false };
+      this.renderAll();
+    }
+  },
 
   toggleTarget(cardIdx){
     const p = this.pickingPack; if(!p?.chosenEffect) return;
@@ -586,7 +603,9 @@ const ShopScene = {
       const pickOverlay=this.renderPickModal();
       this.container.appendChild(pickOverlay);
       const newModal=pickOverlay.querySelector('.pack-modal');
+      this.layoutPickFan(pickOverlay); // #扇形 対象カードを弓形に配置（DOM挿入後に実寸で計算してからスクロール位置を戻す）
       if(newModal){ newModal.id='pick-modal-el'; newModal.scrollTop=prevPickModalScrollTop; }
+      this.placePickBubble(pickOverlay);
     }
     if(opened(this.pickingRelicPack)) this.container.appendChild(this.renderRelicPackModal());
     if(this.cardRevealPopup) this.container.appendChild(this.renderCardRevealPopup());
@@ -815,22 +834,30 @@ const ShopScene = {
   renderPackBreakdownModal(){
     const overlay=document.createElement('div'); overlay.className='pack-modal-overlay';
     overlay.addEventListener('click',(e)=>{ if(e.target===overlay){ this.packBreakdownOpen=false; this.packBreakdownSelected=null; this.renderAll(); } });
-    const modal=document.createElement('div'); modal.className='pack-modal';
+    // #枠固定 モーダルの大きさは固定。パック一覧と詳細表示エリアを分離し、詳細は固定高さのエリア内でスクロールする。
+    // パックのタップでは renderAll せずにその場で詳細だけ差し替える（一覧のスクロール位置も動かない）
+    const modal=document.createElement('div'); modal.className='pack-modal pack-breakdown-modal';
     modal.addEventListener('click',(e)=>e.stopPropagation());
-    modal.innerHTML='<h3>'+GIcon('btn_pack_breakdown',{cls:'gi-gap'})+'パック内訳</h3><div class="slot-desc" style="margin-bottom:10px;">パックをタップすると中身の確率を表示します</div>';
+    modal.innerHTML='<h3>'+GIcon('btn_pack_breakdown',{cls:'gi-gap'})+'パック内訳</h3><div class="slot-desc pack-breakdown-hint">パックをタップすると中身の確率を表示します</div>';
     const list=document.createElement('div'); list.className='pack-breakdown-list';
+    const detail=document.createElement('div'); detail.className='pack-breakdown-detail';
+    const showDetail=()=>{
+      const sel=GameData.PACK_LIST.find(p=>p.id===this.packBreakdownSelected);
+      list.querySelectorAll('.pack-breakdown-item').forEach(b=>b.classList.toggle('active',b.dataset.pack===this.packBreakdownSelected));
+      detail.innerHTML = sel
+        ? `<div class="pack-breakdown-detail-title">${sel.label}</div>`+GameData.getPackBreakdown(sel.id).map(l=>`<div>${l}</div>`).join('')
+        : '<div class="pack-breakdown-empty">上の一覧からパックを選んでください</div>';
+      detail.scrollTop=0;
+    };
     GameData.PACK_LIST.forEach(p=>{
-      const btn=document.createElement('button'); btn.className='pack-breakdown-item'+(this.packBreakdownSelected===p.id?' active':'');
+      const btn=document.createElement('button'); btn.className='pack-breakdown-item'; btn.dataset.pack=p.id;
       btn.textContent=p.label;
-      btn.addEventListener('click',()=>{ this.packBreakdownSelected=(this.packBreakdownSelected===p.id)?null:p.id; this.renderAll(); });
+      btn.addEventListener('click',()=>{ this.packBreakdownSelected=(this.packBreakdownSelected===p.id)?null:p.id; showDetail(); });
       list.appendChild(btn);
-      if(this.packBreakdownSelected===p.id){
-        const bubble=document.createElement('div'); bubble.className='pack-breakdown-bubble';
-        bubble.innerHTML=GameData.getPackBreakdown(p.id).map(l=>`<div>${l}</div>`).join('');
-        list.appendChild(bubble);
-      }
     });
+    showDetail();
     modal.appendChild(list);
+    modal.appendChild(detail);
     const closeBtn=document.createElement('button'); closeBtn.textContent='閉じる'; closeBtn.style.marginTop='12px';
     closeBtn.addEventListener('click',()=>{ this.packBreakdownOpen=false; this.packBreakdownSelected=null; this.renderAll(); });
     modal.appendChild(closeBtn);
@@ -884,7 +911,7 @@ const ShopScene = {
   renderPickModal(){
     const p = this.pickingPack;
     const overlay = document.createElement('div'); overlay.className='pack-modal-overlay';
-    const modal = document.createElement('div'); modal.className='pack-modal pack-modal-wide';
+    const modal = document.createElement('div'); modal.className='pack-modal pack-modal-wide pick-fan-modal';
     const isExplosive = p.slotType === 'normal_explosive';
     const relicBanner = p.relicTrigger ? `<div class="relic-trigger-banner">${GIcon('relic_trigger',{cls:'gi-gap'})}レリック効果が発動：${p.relicTrigger}</div>` : '';
     modal.innerHTML = relicBanner + (isExplosive
@@ -919,15 +946,17 @@ const ShopScene = {
     else if(eff.id==='jam_favor') hint.textContent='下のカードのうちジャミング付きカード全ての基礎点+4（決定ボタンで発動）';
     else hint.textContent='対象カードの選択不要（決定ボタンで発動）';
     modal.appendChild(hint);
-    const grid = document.createElement('div'); grid.className='pack-card-grid'+((!eff||!needsTarget)?' grid-disabled':'');
+    // #扇形 対象カードはゲームメイン画面の手札と同じ弓形展開（段分けと角度は描画後に layoutPickFan で実寸計算）
+    const grid = document.createElement('div'); grid.className='pack-card-grid fan-grid'+((!eff||!needsTarget)?' grid-disabled':'');
     p.cardIndexes.forEach(idx => {
       const card = GameState.currentDeck[idx]; if(!card) return;
+      const slot = document.createElement('div'); slot.className='card-wrapper fan-slot'; slot.dataset.idx=idx;
       const item = document.createElement('div');
       item.className='card pack-card-item'+(p.selectedTargets.has(idx)?' picked':'')+(card.trait?` trait-${card.trait.replace(/[()]/g,'')}`:'');
       let sellBadge = '';
       if(eff?.id==='cash_in'){ const g=this.calcCashGain(card); sellBadge=`<div class="sell-badge">売却+${g}G</div>`; }
       item.innerHTML = `${sellBadge}${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card)}`;
-      item.addEventListener('click', () => this.toggleTarget(idx));
+      item.addEventListener('click', () => this.onPickCardTap(idx));
       // #3 カードホバー説明
       item.addEventListener('mouseenter', ()=>{
         const lines=[];
@@ -939,9 +968,18 @@ const ShopScene = {
         tip.innerHTML=lines.join('<br>');
       });
       item.addEventListener('mouseleave', ()=>{ const tip=item.querySelector('.card-hover-tip');if(tip)tip.remove(); });
-      grid.appendChild(item);
+      slot.appendChild(item);
+      grid.appendChild(slot);
     });
     modal.appendChild(grid);
+    // #扇形 タップしたカードの効果吹き出し（×で吹き出しだけ閉じる。選択状態はそのまま）
+    const pb = this.pickBubble;
+    if(pb && pb.pack===p && !pb.closed && GameState.currentDeck[pb.idx] && p.cardIndexes.includes(pb.idx)){
+      const bubble = GameMainScene.cardBubbleEl(GameState.currentDeck[pb.idx], ()=>{ pb.closed=true; }, 'pick-card-bubble');
+      overlay.appendChild(bubble);
+      // モーダル内スクロールに吹き出しを追従させる
+      modal.addEventListener('scroll', ()=>this.placePickBubble(overlay), {passive:true});
+    }
     const btnRow = document.createElement('div'); btnRow.className='pack-modal-actions';
     const confirmBtn = document.createElement('button');
     confirmBtn.textContent = (isExplosive && p.picksRemaining>1) ? '決定して次へ' : '決定';
@@ -949,6 +987,31 @@ const ShopScene = {
     const skipBtn = document.createElement('button'); skipBtn.textContent='スキップ'; skipBtn.addEventListener('click',()=>this.skipPack()); btnRow.appendChild(skipBtn);
     modal.appendChild(btnRow);
     overlay.appendChild(modal); return overlay;
+  },
+
+  // #扇形 対象カードを弓形に並べる。1段で重なりすぎる（見える幅がカード幅の約55%未満）なら2段に分け、段ごとに弓形にする
+  layoutPickFan(root){
+    const grid = (root||document).querySelector('.pack-card-grid.fan-grid'); if(!grid) return;
+    const slots = Array.from(grid.querySelectorAll('.fan-slot')); const n = slots.length; if(!n) return;
+    grid.querySelectorAll('.fan-line').forEach(l=>{ while(l.firstChild) grid.appendChild(l.firstChild); l.remove(); });
+    const width = grid.clientWidth; const card0 = slots[0].firstElementChild||slots[0]; const cw = card0.offsetWidth, ch = card0.offsetHeight; // 段に振り分ける前のスロットは横に伸びているのでカード本体で測る
+    if(!width || !cw) return;
+    const pad = Math.ceil(ch*Math.sin(12*Math.PI/180))+4;
+    const fits = k => { const per=Math.ceil(n/k); return per<=1 || (width-2*pad-cw)/(per-1) >= cw*0.55; };
+    const rows = (n>6 && !fits(1)) ? 2 : 1;
+    const per = Math.ceil(n/rows);
+    for(let r=0;r<rows;r++){
+      const line = document.createElement('div'); line.className='fan-line pick-fan-line';
+      slots.slice(r*per,(r+1)*per).forEach(s=>line.appendChild(s));
+      grid.appendChild(line);
+    }
+    grid.querySelectorAll('.fan-line').forEach(line=>GameMainScene.fanLayoutLine(line,{width,maxDeg:12}));
+    if(!this._pickFanResize){ this._pickFanResize=true; window.addEventListener('resize',()=>{ const ov=document.querySelector('#pick-modal-el'); if(ov){ this.layoutPickFan(ov.parentElement); this.placePickBubble(ov.parentElement); } }); }
+  },
+  placePickBubble(root){
+    const pb=this.pickBubble; const panel=(root||document).querySelector('.pick-card-bubble'); if(!panel||!pb) return;
+    const slot=(root||document).querySelector(`.pack-card-grid.fan-grid .fan-slot[data-idx="${pb.idx}"] .pack-card-item`);
+    GameMainScene.placeCardBubble(panel,slot);
   },
 
   renderCardRevealPopup(){

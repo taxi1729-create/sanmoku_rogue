@@ -27,7 +27,7 @@ const GameMainScene = {
     this.windows=this.buildWindows(GameData.BOARD_SIZE);
     this.logs=[]; this.resultState=null; this.boardInfoCell=null; this.scoringAnim=null;
     this.rerollMode=false; this.rerollSelected=new Set();
-    this.prevRoundBingoSymbol=null; this.prevRoundScore=0; this.chargeActive=false; this.chargeN=0; this.roundCorrMultBonus=0; // #3 チャージn・ジャミング増強の今ラウンド補正
+    this.prevRoundBingoSymbol=null; this.prevRoundScore=0; this.chargeActive=false; this.chargeN=0; this.roundCorrMultBonus=0; this.roundBoostAdd=0; // #3 チャージn・ジャミング増強の今ラウンド補正
     this.bossEffect=null; this.bossEffects=null; this.blockedCells=new Set(); this.bossBlackedOut=false;
     this.lastNpcCell=null; this.lastPlacedCell=null; this.activeRelicId=null; this.relicListOpen=false; this.scoringRelicIds=[];
     this.scoringRelicValues={}; this.scoringPassiveIds=[]; this.scoringPassiveValues={};
@@ -91,7 +91,7 @@ const GameMainScene = {
     if(card._reserveCarry) delete card._reserveCarry; // #4
     // #4 ギャンブル：捨て札に行く時にリセットする
     if(card.enhance==='ギャンブル'&&card._gambleDelta){ card.baseScore-=card._gambleDelta; card._gambleDelta=0; }
-    if(GameState.relics.some(r=>r.relicEnhance==='ren_discard')) GameState.discardedPile.push(card);
+    if(GameState.relics.some(r=>r.relicEnhance==='ren_discard')&&this.relicActive()) GameState.discardedPile.push(card);
     else GameState.discardPile.push(card);
   },
 
@@ -133,7 +133,7 @@ const GameMainScene = {
   applyRelicInitEffects(){
     // #3 「レリック使用不可」ボス効果の間はレリック効果を一切発動させない
     if(this.hasBossEffect('no_relic')) return;
-    if(GameState.hasRelic('base_boost')) GameData.FINAL_ADD+=2000;
+    // #5 補正基礎点強化（最終加算補正+2000）は所持している間だけ点数計算時に加算する（以前は毎ステージ累積していた）
     if(GameState.hasRelic('paint')) this.applyPaintRelic();
     GameState.relics.forEach(r=>{
       // #2 バツ強化：即時に倍率を変えず、バツビンゴ時のビンゴ倍率を2倍にする（detectNewBingos で処理）
@@ -197,6 +197,8 @@ const GameMainScene = {
   restoreSuspendedPassives(){
     if(GameState.passiveSuspended){ GameState.symbolPassiveTier={...GameState.passiveSuspended}; GameState.passiveSuspended=null; this.addLog('パッシブ効果無効：パッシブが元に戻った'); }
   },
+  // #4 レリック効果が有効か（ボス効果「レリック使用不可」中は全レリック・レリック強化効果が無効）
+  relicActive(){ return !this.hasBossEffect('no_relic'); },
   // #9 複数ボス効果に対応した判定ヘルパー
   hasBossEffect(id){ return (this.bossEffects||(this.bossEffect?[this.bossEffect]:[])).some(e=>e.id===id); },
   // #3 NPCが置くバツのカード基礎点（ボス効果「バツ5000」の時のみ5000）
@@ -232,7 +234,7 @@ const GameMainScene = {
       if(GameState.round===1) this.addLog('チェックパッシブ2：盤面4隅にランダムな記号・マルチ効果のカードを配置');
     }
     this.scoredWindowKeys=new Set(); this.turnInRound=1;
-    const forceFirst=GameState.relics.some(r=>r.relicEnhance==='ren_first');
+    const forceFirst=GameState.relics.some(r=>r.relicEnhance==='ren_first')&&this.relicActive();
     this.currentSide=forceFirst?'player':((GameState.round%2===1)?'player':'npc');
     this.selectedCardId=null; this.boardInfoCell=null; this.rerollMode=false;
     this.rerollSelected=new Set(); this.activeRelicId=null;
@@ -259,9 +261,9 @@ const GameMainScene = {
   endRound(){
     this.prevRoundScore=GameState.currentScore;
     // #7 レリック「ラウンド強化」：ラウンド終了時、最終加算補正+1000×n(n=現在ラウンド)
-    if(GameState.hasRelic('round_boost')){
+    if(GameState.hasRelic('round_boost')&&this.relicActive()){
       const add=1000*GameState.round;
-      GameData.FINAL_ADD+=add;
+      this.roundBoostAdd=(this.roundBoostAdd||0)+add; // #5 ステージ内で累積し、所持中のみ加算（以前は永久に累積していた）
       this.addLog(`ラウンド強化：最終加算補正+${add}（現在ラウンド${GameState.round}）`);
     }
     for(const cell of this.board){
@@ -272,10 +274,10 @@ const GameMainScene = {
       else this.pushToDiscard(c);
     }
     // #3 レリック「チャージ」：次ラウンドへ行く直前の手札の基礎点合計をnに加算。300を超えたらn=-10
-    if(GameState.hasRelic('charge')&&!this.hasBossEffect('no_relic')){
+    if(GameState.hasRelic('charge')&&this.relicActive()){
       const sum=GameState.hand.reduce((t,c)=>t+(c.baseScore||0),0);
       this.chargeN=(this.chargeN||0)+sum;
-      if(this.chargeN>300){ this.chargeN=-10; this.addLog('チャージ：nが300を超えたため n=-10 にリセット'); }
+      if(this.chargeN>150){ this.chargeN=-10; this.addLog('チャージ：nが150を超えたため n=-10 にリセット'); } // #7 上限150
       else this.addLog(`チャージ：手札の基礎点合計${sum}を加算（n=${this.chargeN}）`);
     }
     // #1 保留：手札にある場合は捨てずにそのまま次ラウンドの手札に残す
@@ -288,7 +290,7 @@ const GameMainScene = {
     });
     GameState.hand=keptHand;
     // #5 ドロー関連の効果は重複可能：所持数分ドローする
-    { const n=GameState.relics.filter(r=>r.relicEnhance==='ren_draw').length; for(let i=0;i<n;i++) this.drawOne(); }
+    { const n=this.relicActive()?GameState.relics.filter(r=>r.relicEnhance==='ren_draw').length:0; for(let i=0;i<n;i++) this.drawOne(); }
     this.chargeActive=false;
     if(GameState.currentScore>=GameState.targetScore){ this.finishStage('win'); return; }
     if(GameState.round>=GameState.effectiveMaxRounds()+(this.stageBonusRounds||0)){ this.finishStage('lose'); return; }
@@ -503,7 +505,7 @@ const GameMainScene = {
         else this.showCardChangeToast(changed);
       }
       // #9 レリック「趣味レリック集め」：ステージクリア時、クリア報酬の爆発アップグレードの前にレリックパックを1つ無料で獲得（所持数分）
-      const cHobby=GameState.relicCountOf('hobby_collect');
+      const cHobby=this.relicActive()?GameState.relicCountOf('hobby_collect'):0;
       ShopScene.pendingRelicPacks=0; ShopScene.pickingRelicPack=null;
       if(cHobby>0 && GameState.currentFloor<10){
         ShopScene.pendingRelicPacks=cHobby;
@@ -558,7 +560,7 @@ const GameMainScene = {
             if(!ShopScene.pickingPack) ShopScene.advancePackQueue();
           }
         }
-        GameState.lastReward={type:'clear',stageName:this.stage.name,gold:rd.total,breakdown:rd,debugLog:this.logs?this.logs.slice(-30):[],extra:clearBonusMsg};
+        GameState.lastReward={type:'clear',stageName:this.stage.name,gold:rd.total,breakdown:rd,/* #11 デバッグログは非表示（復活用に残す） debugLog:this.logs?this.logs.slice(-30):[], */extra:clearBonusMsg};
         this.addLog(`クリア報酬：G+${rd.total}（num=${rd.num}）${clearBonusMsg?'／'+clearBonusMsg:''}`);
         // #A ボスステージクリア時：記号パッシブを1つ選択
         if(this.stage.key==='boss'){
@@ -584,17 +586,18 @@ const GameMainScene = {
 
   // #7 クリア報酬G＝((基本G3)+(残りラウンド×1)+(残りリロール×1/2))×num＋レリック効果＋レリック強化効果
   //    num=1、階層6以上で+1、現在の点数が目標点数の2倍以上で+1（1≦num≦3）。端数は切り捨て
+  // #8 クリア報酬G＝(基本G5)×num＋(残りラウンド×1)＋(残りリロール×1/2)＋レリック効果＋レリック強化効果
+  //    num=2、階層6以上で+1、現在の点数が目標点数の2倍以上で+1（2≦num≦4）。端数は切り捨て
   calcClearReward(){
     const base=GameData.CLEAR_REWARD_BASE_G;
     const roundBonus=Math.max(0,GameState.effectiveMaxRounds()+(this.stageBonusRounds||0)-GameState.round);
     const rerollBonus=GameState.rerollCount/2;
-    let num=1;
+    let num=2;
     const floorBonus=GameState.currentFloor>=6; if(floorBonus) num++;
     const scoreBonus=GameState.currentScore>=GameState.targetScore*2; if(scoreBonus) num++;
-    num=Math.max(1,Math.min(3,num));
-    // #1 ボス効果「レリック使用不可」の時はレリック強化効果も含めすべて無効にする
+    num=Math.max(2,Math.min(4,num));
     const rg=GameState.rewardRelicGold(this.hasBossEffect('no_relic'));
-    const subtotal=Math.floor((base+roundBonus+rerollBonus)*num);
+    const subtotal=Math.floor(base*num+roundBonus+rerollBonus);
     const total=subtotal+rg.relic+rg.relicEnhance;
     return {base,roundBonus,rerollBonus,num,floorBonus,scoreBonus,subtotal,relicBonus:rg.relic,relicEnhanceBonus:rg.relicEnhance,total};
   },
@@ -603,8 +606,8 @@ const GameMainScene = {
   // #7 クリア報酬の内訳表示（リザルト画面・ショップで共通）
   clearRewardBreakdownText(b){
     const fmt=v=>Math.round(v*100)/100;
-    const numNote=[b.floorBonus?'階層6以上+1':'',b.scoreBonus?'目標点数の2倍以上+1':''].filter(Boolean).join('、');
-    return `(基本G${b.base} ＋ 残りラウンド${fmt(b.roundBonus)}×1 ＋ 残りリロール${fmt(b.rerollBonus*2)}×1/2) × num${b.num}${numNote?`（${numNote}）`:''} ＝ ${b.subtotal} ＋ レリック効果${b.relicBonus} ＋ レリック強化効果${b.relicEnhanceBonus}`;
+    const numNote=['基本2',b.floorBonus?'階層6以上+1':'',b.scoreBonus?'目標点数の2倍以上+1':''].filter(Boolean).join('、');
+    return `基本G${b.base}×num${b.num}（${numNote}） ＋ 残りラウンド${fmt(b.roundBonus)}×1 ＋ 残りリロール${fmt(b.rerollBonus*2)}×1/2 ＝ ${b.subtotal} ＋ レリック効果${b.relicBonus} ＋ レリック強化効果${b.relicEnhanceBonus}`;
   },
 
   drawToHandSize(){ const n=GameState.effectiveHandSize()-GameState.handCountForLimit(); for(let i=0;i<n;i++) this.drawOne(); },
@@ -630,7 +633,7 @@ const GameMainScene = {
     // #12 レリック「ギャンブル依存症」：効果量が常に+50か-50のどちらかのみになる
     if(card.enhance==='ギャンブル'){
       if(card._gambleDelta) card.baseScore-=card._gambleDelta;
-      const addicted=GameState.hasRelic('gambling_addict');
+      const addicted=GameState.hasRelic('gambling_addict')&&this.relicActive();
       const delta=addicted?(Math.random()<0.5?50:-50):Math.round(Math.random()*100-50);
       card.baseScore+=delta;
       card._gambleDelta=delta;
@@ -661,7 +664,7 @@ const GameMainScene = {
   queueJammingEffect(jamming,cellIdx){
     // #2 レリック「ジャミング増強」：ビンゴ阻害の効果を持つカードが盤面に配置された時、ビンゴ阻害自体の効果は変更せずそのまま残し、
     //    追加でスタンを発動する（手札上限・点数加算の仕様は変更なし）
-    if(jamming==='ビンゴ阻害'&&GameState.relics.some(r=>r.id==='jamming_boost')){
+    if(jamming==='ビンゴ阻害'&&GameState.relics.some(r=>r.id==='jamming_boost')&&this.relicActive()){ // #4 レリック使用不可中は発動しない
       const bonus=Math.round(GameState.targetScore*0.05);
       GameState.currentScore=Math.max(0,GameState.currentScore+bonus);
       this.effects.stunNextNpc=true;
@@ -796,7 +799,7 @@ const GameMainScene = {
       (this.pendingDelayedJamming=this.pendingDelayedJamming||[]).push({jamming:card.jamming,cellIdx,afterTurns:1});
     }
     // #8 ドロー強化：ネガティブカード配置時は発動させず、ターンが4の倍数になった時のみ発動する
-    if(!isNeg && this.turnInRound%4===0){ const n=GameState.relics.filter(r=>r.id==='draw_boost').length; for(let i=0;i<n&&GameState.handCountForLimit()<GameState.effectiveHandSize();i++) this.drawOne(); }
+    if(!isNeg && this.turnInRound%4===0){ const n=this.relicActive()?GameState.relics.filter(r=>r.id==='draw_boost').length:0; for(let i=0;i<n&&GameState.handCountForLimit()<GameState.effectiveHandSize();i++) this.drawOne(); }
     this.selectedCardId=null; this.boardInfoCell=null; this.activeRelicId=null; this.expandPending=null; this.paintPending=null;
     this.renderAll();
     // #演出 カード効果ごとの配置演出（ビンゴがある時だけ点数演出と重ならないよう短く待つ）
@@ -1030,6 +1033,11 @@ const GameMainScene = {
       const finalAdd=GameData.FINAL_ADD;
       // 山札強化
       let finalAddTotal=finalAdd;
+      // #5 補正基礎点強化・ラウンド強化：所持している時のみ加算
+      if(!noRelic){
+        const cBase=GameState.relicCountOf('base_boost'); if(cBase>0){const v=2000*cBase;finalAddTotal+=v;finalAddParts.push({label:'補正基礎点強化',op:'+',val:v,id:'base_boost'});markRelic('base_boost',v);}
+        if(GameState.hasRelic('round_boost')&&this.roundBoostAdd){const v=this.roundBoostAdd;finalAddTotal+=v;finalAddParts.push({label:'ラウンド強化',op:'+',val:v,id:'round_boost'});markRelic('round_boost',v);}
+      }
       if(!noRelic) GameState.relics.forEach(rel=>{if(rel.relicEnhance==='ren_draw_pile'){const v=GameState.drawPile.length*100;finalAddTotal+=v;finalAddParts.push({label:'山札強化',op:'+',val:v,id:rel.id});markRelic(rel.id,v);}});
       // #新規 セブンパッシブ3：デッキの枚数が7の倍数の時、最終加算補正+目標点数の7%
       if(GameState.symbolPassiveTier.Seven>=3 && GameState.currentDeck.length%7===0){
@@ -1409,7 +1417,7 @@ const GameMainScene = {
   async scheduleAIMove(){
     await this.sleep(500);
     if(this.currentSide!=='npc'||this.resultState) return;
-    const npcDouble=GameState.relics.some(r=>r.relicEnhance==='ren_npc');
+    const npcDouble=GameState.relics.some(r=>r.relicEnhance==='ren_npc')&&this.relicActive();
 
     // #A サンカクパッシブ1：遅延ジャミング再付与の処理
     if(this.pendingDelayedJamming&&this.pendingDelayedJamming.length>0){
@@ -1698,6 +1706,7 @@ const GameMainScene = {
           // #新規 セブンパッシブ2：フラグが立っていれば次のビンゴで最終乗算補正×7
           if(GameState.symbolPassiveTier.Seven>=2 && GameState.sevenPendingMultBoost) finalMul*=7;
           let finalAddTotal=GameData.FINAL_ADD;
+          if(!noRelic){ finalAddTotal+=2000*GameState.relicCountOf('base_boost'); if(GameState.hasRelic('round_boost')) finalAddTotal+=(this.roundBoostAdd||0); } // #5
           if(!noRelic) finalAddTotal+=GameState.drawPile.length*100*GameState.relics.filter(r=>r.relicEnhance==='ren_draw_pile').length;
           // #新規 セブンパッシブ3：デッキ枚数が7の倍数の時、最終加算補正+目標点数の7%
           if(GameState.symbolPassiveTier.Seven>=3 && GameState.currentDeck.length%7===0) finalAddTotal+=Math.round(GameState.targetScore*0.07);
@@ -1729,6 +1738,7 @@ const GameMainScene = {
     if(this.rerollMode){this.toggleRerollCard(id);return;}
     if(this.currentSide!=='player'||this.resultState) return;
     this.selectedCardId=(this.selectedCardId===id)?null:id;
+    this.handBubbleClosedFor=null; // #扇形 別のカードを選ぶ／選択解除で吹き出しを再表示
     this.boardInfoCell=null; this.activeRelicId=null; this.expandPending=null; this.paintPending=null;
     this.renderAll();
   },
@@ -1858,7 +1868,7 @@ const GameMainScene = {
       targets.forEach(ci=>{ (this.pendingDelayedJamming=this.pendingDelayedJamming||[]).push({jamming:card.jamming,cellIdx:ci,afterTurns:1}); });
     }
     // #8 ドロー強化：ネガティブカード配置時は発動させず、ターンが4の倍数になった時のみ発動する
-    if(!isNeg && this.turnInRound%4===0){ const n=GameState.relics.filter(r=>r.id==='draw_boost').length; for(let i=0;i<n&&GameState.handCountForLimit()<GameState.effectiveHandSize();i++) this.drawOne(); }
+    if(!isNeg && this.turnInRound%4===0){ const n=this.relicActive()?GameState.relics.filter(r=>r.id==='draw_boost').length:0; for(let i=0;i<n&&GameState.handCountForLimit()<GameState.effectiveHandSize();i++) this.drawOne(); }
     this.selectedCardId=null; this.boardInfoCell=null; this.activeRelicId=null; this.expandPending=null; this.paintPending=null;
     this.renderAll();
     // #演出 カード効果ごとの配置演出（ビンゴがある時だけ点数演出と重ならないよう短く待つ。それ以外は進行をブロックしない）
@@ -1906,7 +1916,7 @@ const GameMainScene = {
       case 'hand_boost': break; // #1
       case 'paint': this.removePaintRelic(); GameState.turnsBonus+=4; break; // #3 ターン減少を-4に緩和
       case 'jamming_boost': GameState.handSizeBonus+=3; break; // #7 手札上限-3の解除
-      case 'base_boost': GameData.FINAL_ADD=Math.max(0,GameData.FINAL_ADD-2000); break;
+      case 'base_boost': break; // #5 所持中のみ点数計算で加算するため除去処理は不要
       default: break;
     }
   },
@@ -1978,7 +1988,8 @@ const GameMainScene = {
     belowHand.appendChild(this.renderEffectsPanel());
     wrap.appendChild(belowHand);
     const hi=this.renderHandInfoPanel(); if(hi) wrap.appendChild(hi);
-    wrap.appendChild(this.renderLog());
+    // #10 ゲームメイン画面のログ表示は削除（ログ自体は this.logs に保持）
+    // wrap.appendChild(this.renderLog());
     this.container.appendChild(wrap);
     // #1 報酬画面／パッシブ選択はゲームメイン画面の上にオーバーレイ表示する（両方同時に出ても良いよう独立したifにする）
     if(this.resultState) this.container.appendChild(this.renderResult());
@@ -2000,6 +2011,7 @@ const GameMainScene = {
     if(this.multChangeToast) this.container.appendChild(this.renderMultChangeToast()); // #2
     // #9 レリック「ジョーカー」売却後のカード選択
     if(this.pendingJokerPick) this.container.appendChild(this.renderJokerPickModal());
+    this.layoutHandFan(); // #扇形 手札の弓形配置（DOM挿入後に実寸で計算）
     window.scrollTo(0,scrollY);
     this.placeHandBubble(); // #8
   },
@@ -2332,7 +2344,8 @@ const GameMainScene = {
 
   renderHand(){
     const area=document.createElement('div'); area.className='hand-area';
-    const row=document.createElement('div'); row.className='hand-row';
+    // #扇形 手札は弓形に展開する（配置用の回転・移動は .card-wrapper(.fan-slot)、選択の持ち上げは .card 側で行う：layoutHandFan）
+    const row=document.createElement('div'); row.className='hand-row fan-line';
 
     // #11 保留札を左側に分離表示
     if(GameState.reserve.length>0){
@@ -2340,7 +2353,7 @@ const GameMainScene = {
       reserveGroup.innerHTML='<div class="reserve-label">保留</div>';
       const reserveRow=document.createElement('div'); reserveRow.className='reserve-row';
       GameState.reserve.forEach(card=>{
-        const wrapper=document.createElement('div'); wrapper.className='card-wrapper';
+        const wrapper=document.createElement('div'); wrapper.className='card-wrapper fan-slot';
         const c=document.createElement('div'); c.className='card reserve-card'+(card.trait?` trait-${card.trait.replace(/[()]/g,'')}`:'');
         c.innerHTML=`${this.cardTagsHtml(card)}${this.cardSymbolHtml(card)}${this.cardScoreHtml(card,GameState.gold)}`;
         this.attachHoverTip(c,card);
@@ -2352,7 +2365,7 @@ const GameMainScene = {
     }
 
     for(const card of GameState.hand){
-      const wrapper=document.createElement('div'); wrapper.className='card-wrapper';
+      const wrapper=document.createElement('div'); wrapper.className='card-wrapper fan-slot';
       const c=document.createElement('div');
       const isSel=!this.rerollMode&&this.selectedCardId===card.id;
       const isRe=this.rerollMode&&this.rerollSelected.has(card.id);
@@ -2371,6 +2384,7 @@ const GameMainScene = {
 
         const startDrag=(x,y)=>{
           isDragging=true;
+          if(this.selectedCardId!==card.id) this.handBubbleClosedFor=null; // #扇形 別カードを掴んだら吹き出しの非表示を解除
           this.selectedCardId=card.id;
           this.expandPending=null; this.paintPending=null;
           dragGhost=c.cloneNode(true);
@@ -2472,15 +2486,28 @@ const GameMainScene = {
   // #6 手札カードもパッシブと同様に吹き出し表示にする（配置操作を妨げないよう、背景クリックでは閉じない）
   renderHandInfoPanel(){
     if(this.rerollMode||!this.selectedCardId) return null;
+    if(this.handBubbleClosedFor===this.selectedCardId) return null; // #扇形 ×で吹き出しだけ閉じた（カードは選択中のまま）
     const card=GameState.hand.find(c=>c.id===this.selectedCardId); if(!card) return null;
     // #8 選択したカードのすぐ上（入らなければ下）に吹き出しで表示する。位置は描画後に placeHandBubble() で決める
-    const panel=document.createElement('div'); panel.className='card-tooltip-panel hand-card-bubble';
+    return this.cardBubbleEl(card,()=>{ this.handBubbleClosedFor=this.selectedCardId; });
+  },
+  // #扇形 カード効果の吹き出し（×ボタン付き）。ゲームメイン手札・ショップの対象カード選択で共通。
+  // 吹き出し本体は pointer-events:none（盤面への配置操作を妨げない）で、×ボタンだけ押せる。onClose の後に吹き出しを取り除く
+  cardBubbleEl(card,onClose,extraCls){
+    const panel=document.createElement('div'); panel.className='card-tooltip-panel hand-card-bubble'+(extraCls?' '+extraCls:'');
     panel.innerHTML=`<div class="info-title sym-${card.symbol}">${GameData.SYMBOL_LABEL[card.symbol]} 基礎点${card.baseScore}</div>${this.cardInfoDescHtml(card)}`;
+    const x=document.createElement('button'); x.type='button'; x.className='bubble-close-btn'; x.setAttribute('aria-label','説明を閉じる'); x.textContent='×';
+    const stop=(e)=>e.stopPropagation();
+    x.addEventListener('pointerdown',stop); x.addEventListener('touchstart',stop,{passive:true}); x.addEventListener('mousedown',stop);
+    x.addEventListener('click',(e)=>{ e.stopPropagation(); e.preventDefault(); if(onClose) onClose(); panel.remove(); });
+    panel.appendChild(x);
     return panel;
   },
-  placeHandBubble(){
-    const panel=document.querySelector('.hand-card-bubble'); if(!panel) return;
-    const cardEl=document.querySelector('.hand-row .card.selected'); if(!cardEl){ panel.style.visibility='hidden'; return; }
+  // 吹き出しを対象カードの近く（上、入らなければ下）に置く。手札・ショップ共通
+  placeCardBubble(panel,cardEl){
+    if(!panel) return;
+    if(!cardEl){ panel.style.visibility='hidden'; return; }
+    panel.style.visibility='';
     const r=cardEl.getBoundingClientRect(); const vw=window.innerWidth, vh=window.innerHeight;
     const w=Math.min(300,vw-16); panel.style.width=w+'px';
     const h=panel.offsetHeight;
@@ -2490,7 +2517,61 @@ const GameMainScene = {
     if(top+h>vh-8) top=Math.max(8,vh-h-8);
     panel.style.left=left+'px'; panel.style.top=top+'px';
     panel.classList.toggle('below',below);
-    panel.style.setProperty('--tail-x',(r.left+r.width/2-left)+'px');
+    panel.style.setProperty('--tail-x',Math.max(14,Math.min(w-14,r.left+r.width/2-left))+'px');
+  },
+  placeHandBubble(){
+    const panel=document.querySelector('.game-screen .hand-card-bubble'); if(!panel) return;
+    this.placeCardBubble(panel,document.querySelector('.hand-row .card.selected'));
+  },
+
+  // ===== #扇形 手札の弓形（扇形）展開 =====
+  // 1行（.fan-line）内の .fan-slot（カードの外側ラッパー）に、位置に応じた回転角（--fan-rot）と沈み込み（--fan-y）を与える。
+  // 幅に収まらない時は隣り合うカードを重ねる（margin-left を負に）。transform は .fan-slot に、選択の持ち上げは内側の .card に掛けるので
+  // .card.selected / .reroll-selected / .card-draw-in の transform や traitFx の scale と干渉しない。
+  // opts={ width:利用可能幅(px), maxDeg:端の最大角度 }
+  fanLayoutLine(line,opts={}){
+    if(!line) return null;
+    const slots=Array.from(line.querySelectorAll('.fan-slot'));
+    const n=slots.length; if(!n) return null;
+    slots.forEach(s=>{ s.style.marginLeft=''; s.style.setProperty('--fan-rot','0deg'); s.style.setProperty('--fan-y','0px'); s.classList.remove('fan-front'); });
+    line.style.paddingBottom='';
+    const cw=slots[0].offsetWidth, ch=slots[0].offsetHeight;
+    const width=(opts.width!=null)?opts.width:line.clientWidth;
+    if(!cw||!width) return null; // 非表示中などで実寸が取れない
+    const maxDeg=(opts.maxDeg!=null)?opts.maxDeg:12;
+    const A=n<=1?0:Math.min(maxDeg,3+1.5*(n-1));
+    const rad=A*Math.PI/180;
+    // 端のカードは下辺中央を軸に回るので、上の角が外側へはみ出す分を左右に確保する
+    const pad=Math.ceil(ch*Math.sin(rad)+(cw/2)*(1-Math.cos(rad)))+2;
+    const avail=Math.max(cw,width-2*pad);
+    const natural=slots[n-1].getBoundingClientRect().right-slots[0].getBoundingClientRect().left;
+    const linkable=slots.filter(s=>s.previousElementSibling&&s.previousElementSibling.classList.contains('fan-slot'));
+    if(natural>avail&&linkable.length){
+      const ov=Math.min(cw*0.78,(natural-avail)/linkable.length);
+      linkable.forEach(s=>{ s.style.marginLeft=(-ov)+'px'; }); // flex の gap は残したまま負マージンで重ねる
+    }
+    const rects=slots.map(s=>s.getBoundingClientRect());
+    const c0=rects[0].left+rects[0].width/2, c1=rects[n-1].left+rects[n-1].width/2;
+    const mid=(c0+c1)/2, half=Math.max(1,(c1-c0)/2);
+    const drop=n<=1?0:Math.round(ch*0.17*(A/12));
+    slots.forEach((s,i)=>{
+      const cx=rects[i].left+rects[i].width/2;
+      const t=n<=1?0:Math.max(-1,Math.min(1,(cx-mid)/half));
+      s.style.setProperty('--fan-rot',(t*A).toFixed(2)+'deg');
+      s.style.setProperty('--fan-y',(t*t*drop).toFixed(1)+'px');
+      // 選択中のカードは前面に
+      if(s.querySelector('.card.selected,.card.reroll-selected,.pack-card-item.picked')) s.classList.add('fan-front');
+    });
+    line.style.paddingBottom=(drop+4)+'px';
+    return {cw,ch,A,n};
+  },
+  layoutHandFan(){
+    const row=this.container&&this.container.querySelector('.hand-row.fan-line'); if(!row) return;
+    const area=row.parentElement;
+    const res=this.fanLayoutLine(row,{width:(area&&area.clientWidth)||row.clientWidth,maxDeg:12});
+    // 非表示中で実寸が取れなかった場合は次フレームで再計算
+    if(!res&&!this._fanRetry){ this._fanRetry=true; requestAnimationFrame(()=>{ this._fanRetry=false; this.layoutHandFan(); this.placeHandBubble(); }); }
+    if(!this._fanResizeBound){ this._fanResizeBound=true; window.addEventListener('resize',()=>{ this.layoutHandFan(); this.placeHandBubble(); }); }
   },
 
   renderRelicRow(){
@@ -2762,7 +2843,9 @@ const GameMainScene = {
     const r=GameState.lastReward;
     const gr=(win&&r?.breakdown)?`<div class="gold-reveal-popup"><div class="gr-label">獲得ゴールド</div><div class="gr-total">+${r.gold}G</div><div class="gr-breakdown">${GameMainScene.clearRewardBreakdownText(r.breakdown)}</div>${r.extra?`<div class="gr-breakdown">追加報酬：${r.extra}</div>`:''}</div>`:'';
     // #3 ゲームメイン画面のデバッグ用ログを報酬画面にも表示
-    const debugHtml=(r?.debugLog&&r.debugLog.length>0)?`<div class="result-debug-log"><div class="result-debug-title">デバッグログ</div>${r.debugLog.map(l=>`<div class="result-debug-line">${l}</div>`).join('')}</div>`:'';
+    // #11 ステージクリア時のデバッグログ表示（復活用にコメントアウト）
+    //     const debugHtml=(r?.debugLog&&r.debugLog.length>0)?`<div class="result-debug-log"><div class="result-debug-title">デバッグログ</div>${r.debugLog.map(l=>`<div class="result-debug-line">${l}</div>`).join('')}</div>`:'';
+    const debugHtml='';
     const box=document.createElement('div'); box.className='result-box';
     // #1 ボスクリア時：ショップへ移動の代わりに「パッシブ報酬を受け取る」をタップさせる
     const hasPassiveChoice = win && this.stage.key==='boss' && this.pendingPassiveChoice && this.pendingPassiveChoice.length>0;

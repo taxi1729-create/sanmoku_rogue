@@ -880,3 +880,14 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 /* 図鑑：レリックはグレード演出の縁が出るよう枠線を持たせる */
 .gallery-item.gi-relic{border:1px solid transparent;}
 .gallery-item .rg-badge{margin-left:4px;vertical-align:1px;}
+
+/* #2 付与効果ドット（カード下部）に色付きの丸を確実に表示 */
+.card .card-dots-row{gap:3px;}
+.card .card-dot{display:inline-block;width:7px;height:7px;border-radius:50%;}
+.card .card-dot.dot-enhance{background:var(--gold);}
+.card .card-dot.dot-jamming{background:var(--success);}
+.card .card-dot.dot-trait{background:#60a5fa;}
+/* #3 レリックパック内訳 */
+.pb-grade-head{margin-top:6px;font-weight:900;color:var(--gold);}
+.pb-relic{display:inline-flex;align-items:center;gap:3px;margin:2px 6px 2px 0;font-size:11px;}
+.pb-relic .gi{font-size:15px;}

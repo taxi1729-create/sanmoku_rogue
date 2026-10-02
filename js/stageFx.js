@@ -607,24 +607,29 @@ const StageFX = (function(){
   // =====================================================================
   // 2. ボス効果：バッジ・吹き出し・付与演出
   // =====================================================================
+  // 一覧：ボス効果オブジェクト（GameData.bossEffectForFloor の結果。power=1 通常 / 2 強化版で name・desc 差し替え済み）をそのまま使う
   function bossList(scene){
     const list=[];
-    if(scene && scene.bossEffect) (scene.bossEffects||[scene.bossEffect]).forEach(be=>list.push({id:be.id,name:be.name,desc:be.desc}));
-    if(typeof GameState!=='undefined' && GameState.floor10SpecialBoss) list.push({id:'final',name:'最終決戦',desc:'5ターンごと（6,11,16…ターン目）は強制的にNPCの番になる'});
+    if(scene && scene.bossEffect) (scene.bossEffects||[scene.bossEffect]).forEach(be=>list.push({id:be.id,name:be.name,desc:be.desc,power:be.power||1}));
+    if(typeof GameState!=='undefined' && GameState.floor10SpecialBoss) list.push({id:'final',name:'最終決戦',desc:'5ターンごと（6,11,16…ターン目）は強制的にNPCの番になる',power:1,special:true});
     return list;
   }
   const BOSS_ICON = () => `<svg class="stfx-boss-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l3.5 4.5M20 4l-3.5 4.5"/><path d="M5 12a7 7 0 0 1 14 0v3.5a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z" fill="currentColor" fill-opacity=".25"/><path d="M9 13h.01M15 13h.01" stroke-width="3"/><path d="M10 17h4"/></svg>`;
+  const FLAME_ICON = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2c1 3.5 5 6 5 11a5 5 0 0 1-10 0c0-2.4 1.2-4 2.4-5.2.2 1.6.9 2.7 2 3.2C11 8.6 11.2 5 12 2z"/></svg>`;
+  const isPowered = b => (b && b.power||1)>=2;
+  const powerTag = (b, cls) => isPowered(b) ? `<span class="stfx-boss-pw ${cls||''}">${FLAME_ICON}強化</span>` : '';
 
   function bossBadge(list, open, onToggle){
     const wrap=el('div','stfx-boss-badge-wrap');
-    const btn=el('button','stfx-boss-badge'+(open?' open':'')+((bossUI&&!bossUI.lit)?' pending':''),`${BOSS_ICON()}<span>BOSS</span><b>×${list.length}</b>`);
-    btn.type='button'; btn.setAttribute('aria-label',`ボス効果 ${list.length}件（タップで一覧）`); btn.setAttribute('aria-expanded',open?'true':'false');
+    const anyPw=list.some(isPowered);
+    const btn=el('button','stfx-boss-badge'+(anyPw?' pw2':'')+(open?' open':'')+((bossUI&&!bossUI.lit)?' pending':''),`${BOSS_ICON()}<span>BOSS</span><b>×${list.length}</b>`);
+    btn.type='button'; btn.setAttribute('aria-label',`ボス効果 ${list.length}件${anyPw?'（強化あり）':''}（タップで一覧）`); btn.setAttribute('aria-expanded',open?'true':'false');
     btn.addEventListener('click',(e)=>{ e.stopPropagation(); onToggle&&onToggle(); });
     wrap.appendChild(btn);
     if(open){
       const bub=el('div','stfx-boss-bubble');
-      bub.innerHTML=`<div class="stfx-boss-bubble-title">${BOSS_ICON()}ボス効果一覧<span class="stfx-boss-bubble-close">タップで閉じる</span></div>`+
-        list.map(b=>`<div class="stfx-boss-entry"><div class="stfx-boss-entry-name">${esc(b.name)}</div><div class="stfx-boss-entry-desc">${esc(b.desc)}</div></div>`).join('');
+      bub.innerHTML=`<div class="stfx-boss-bubble-title">${BOSS_ICON()}ボス効果一覧（${list.length}）<span class="stfx-boss-bubble-close">タップで閉じる</span></div>`+
+        list.map(b=>`<div class="stfx-boss-entry${isPowered(b)?' pw2':''}${b.special?' special':''}"><div class="stfx-boss-entry-name">${esc(b.name)}${powerTag(b)}${b.special?'<span class="stfx-boss-sp">階層10</span>':''}</div><div class="stfx-boss-entry-desc">${esc(b.desc)}</div></div>`).join('');
       bub.addEventListener('click',(e)=>{ e.stopPropagation(); onToggle&&onToggle(); });
       wrap.appendChild(bub);
       // 吹き出しを画面内に収め、しっぽをバッジに向ける（absolute 配置。レイアウトに影響しない／スクロールにも追従）
@@ -640,15 +645,28 @@ const StageFX = (function(){
     return wrap;
   }
 
+  // ---------- ボス効果の文言・数値（be.name / be.desc / power から生成。ハードコードしない） ----------
+  const toHalf = s => String(s||'').replace(/[０-９]/g, d=>String.fromCharCode(d.charCodeAt(0)-0xFEE0)).replace(/[−－ー](?=\d)/g,'-').replace(/＋/g,'+');
+  // 名前→説明の順に「±数値」を探す（例：ターン制限-4 → "-4"）
+  function signedNum(be){
+    for(const s of [be.name, be.desc]){ const m=toHalf(s).match(/([+-])\s*(\d+)/); if(m) return m[1]+m[2]; }
+    return '';
+  }
+  function bigNum(be){ for(const s of [be.name, be.desc]){ const m=toHalf(s).match(/\d{3,}/); if(m) return m[0]; } return ''; }
+  function firstNum(be){ for(const s of [be.name, be.desc]){ const m=toHalf(s).match(/\d+/); if(m) return m[0]; } return ''; }
+  const fmtMinus = v => String(v).replace(/^-/,'−');
+
   let bossUI=null;
   function bossIntro(opts){
     const list=(opts&&opts.list)||[];
     if(!list.length) return Promise.resolve();
     endBoss(true);
     const R=reduced();
+    const n=list.length;
     const ov=el('div','stfx-boss'+(R?' stfx-reduced':''));
     ov.innerHTML=`<div class="stfx-boss-vig"></div><div class="stfx-boss-fx"></div>
-      <div class="stfx-boss-band"><div class="stfx-boss-band-stripe"></div><div class="stfx-boss-band-text"><b>BOSS</b><span>${opts.floor?`第${esc(opts.floor)}階層 `:''}ボスステージ</span></div><div class="stfx-boss-band-stripe"></div></div>
+      <div class="stfx-boss-band"><div class="stfx-boss-band-stripe"></div><div class="stfx-boss-band-text"><b>BOSS</b><span>${opts.floor?`第${esc(opts.floor)}階層 `:''}ボスステージ<em>ボス効果 ×${n}</em></span></div><div class="stfx-boss-band-stripe"></div></div>
+      ${n>1?`<div class="stfx-boss-steps">${list.map(b=>`<i class="${isPowered(b)?'pw2':''}"></i>`).join('')}</div>`:''}
       <div class="stfx-boss-hint">タップでスキップ</div>`;
     document.body.appendChild(ov);
     const ui=bossUI={ ov, skip:false, lit:false, fx:ov.querySelector('.stfx-boss-fx') };
@@ -664,34 +682,60 @@ const StageFX = (function(){
         const band=ov.querySelector('.stfx-boss-band');
         anim(band,[{transform:'translateX(-110%) skewX(-12deg)',opacity:1},{transform:'translateX(0) skewX(-12deg)',offset:.35},{transform:'translateX(0) skewX(-12deg)',offset:.75},{transform:'translateX(110%) skewX(-12deg)',opacity:1}],{duration:R?300:1500,easing:'cubic-bezier(.7,0,.3,1)',fill:'both'});
         await w(1150);
-        for(let i=0;i<list.length;i++){
+        // 効果1つ：じっくり見せる / 複数：1つずつ、前の効果の差分演出を片付けてから次を叩きつける（重ならない）
+        const hold = n===1 ? 1500 : 1050;
+        for(let i=0;i<n;i++){
           if(ui.skip) break;
-          await stampBoss(ui, list[i], i, list.length, w, R);
+          const dots=ov.querySelectorAll('.stfx-boss-steps i'); dots.forEach((d,k)=>d.classList.toggle('on',k===i));
+          await stampBoss(ui, list[i], i, n, w, R, hold);
+          if(dots[i]) dots[i].classList.add('done');
         }
       }catch(e){ console.error('StageFX.bossIntro', e); }
       await endBoss(false);
     })();
   }
-  async function stampBoss(ui, be, i, n, w, R){
+
+  // 刻印の置き場所：差分演出の対象（盤面のマス・UI）と重ならない位置を選ぶ
+  //   候補：盤面中央 → 盤面の下 → 盤面の上（画面内に収める）
+  function plateSpot(br, target, ph){
+    const vh=document.documentElement.clientHeight||innerHeight, vw=document.documentElement.clientWidth||innerWidth;
+    const cands=[ br.top+br.height/2, br.bottom+30+ph/2, br.top-30-ph/2 ];
+    const clampY=y=>Math.max(ph/2+8, Math.min(vh-ph/2-36, y));
+    const hit=(y)=>{ if(!target) return false; const t=y-ph/2, b=y+ph/2; return !(b<target.top-26 || t>target.bottom+26); };
+    for(const y of cands){ const yy=clampY(y); if(!hit(yy)) return {x:vw/2,y:yy}; }
+    return {x:vw/2, y:clampY(cands[1])};
+  }
+
+  async function stampBoss(ui, be, i, n, w, R, hold){
     const br=rectOf('.board'); if(!br) return;
-    const c=ctr(br);
-    const plate=el('div','stfx-boss-plate',`<div class="stfx-boss-plate-k">ボス効果${n>1?` ${i+1}/${n}`:''}</div><div class="stfx-boss-plate-n">${esc(be.name)}</div><div class="stfx-boss-plate-d">${esc(be.desc)}</div>`);
-    plate.style.left=c.x+'px'; plate.style.top=c.y+'px';
-    ui.ov.appendChild(plate);
+    const pw=isPowered(be);
+    // 前の効果の差分演出は退場させる（複数効果で重ならないように）
+    Array.from(ui.fx.children).forEach(g=>{ const a=anim(g,[{opacity:1},{opacity:0}],{duration:R?60:220,fill:'forwards'}); a.finished.catch(()=>{}).then(()=>g.remove()); });
+    const grp=el('div','stfx-boss-grp'); ui.fx.appendChild(grp);
+    const plan=bossPlan(be);
+    const kicker=`ボス効果${n>1?` ${i+1}/${n}`:''}${be.special?' ・ 階層10':''}`;
+    const plate=el('div','stfx-boss-plate'+(pw?' pw2':'')+(be.special?' special':''),
+      `${pw?`<div class="stfx-boss-plate-flame"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>`:''}`+
+      `<div class="stfx-boss-plate-k">${esc(kicker)}${powerTag(be,'onplate')}</div><div class="stfx-boss-plate-n">${esc(be.name)}</div><div class="stfx-boss-plate-d">${esc(be.desc)}</div>`);
+    plate.style.visibility='hidden'; ui.ov.appendChild(plate);
+    const ph=plate.offsetHeight||110;
+    const c=plateSpot(br, plan.target, ph);
+    plate.style.left=c.x+'px'; plate.style.top=c.y+'px'; plate.style.visibility='';
     await anim(plate,[{opacity:0,transform:'translate(-50%,-50%) scale(2.6) rotate(-4deg)'},{opacity:1,transform:'translate(-50%,-50%) scale(.94) rotate(0)',offset:.8},{opacity:1,transform:'translate(-50%,-50%) scale(1)'}],{duration:R?120:340,easing:'cubic-bezier(.7,0,.9,.6)',fill:'forwards'}).finished.catch(()=>{});
-    // 叩きつけの衝撃（オーバーレイ側を揺らす。盤面そのものは動かさない）
+    // 叩きつけの衝撃（オーバーレイ側を揺らす。盤面そのものは動かさない）。強化版は揺れ・衝撃波が強い
     if(!R){
-      anim(ui.ov,[{transform:'translate(0,0)'},{transform:'translate(-6px,4px)'},{transform:'translate(5px,-3px)'},{transform:'translate(-3px,2px)'},{transform:'translate(0,0)'}],{duration:280});
-      const sw=el('div','stfx-boss-shock'); sw.style.left=c.x+'px'; sw.style.top=c.y+'px'; ui.fx.appendChild(sw);
-      anim(sw,[{opacity:.9,transform:'translate(-50%,-50%) scale(.2)'},{opacity:0,transform:'translate(-50%,-50%) scale(2.4)'}],{duration:600,easing:'ease-out',fill:'forwards'});
-      for(let k=0;k<6;k++){
-        const cr=el('div','stfx-boss-crack'); cr.style.left=c.x+'px'; cr.style.top=c.y+'px';
-        const a=k*60+rnd(-15,15); cr.style.transform=`rotate(${a}deg)`; ui.fx.appendChild(cr);
+      const k=pw?1.6:1;
+      anim(ui.ov,[{transform:'translate(0,0)'},{transform:`translate(${-6*k}px,${4*k}px)`},{transform:`translate(${5*k}px,${-3*k}px)`},{transform:`translate(${-3*k}px,${2*k}px)`},{transform:'translate(0,0)'}],{duration:pw?380:280});
+      const sw=el('div','stfx-boss-shock'+(pw?' pw2':'')); sw.style.left=c.x+'px'; sw.style.top=c.y+'px'; grp.appendChild(sw);
+      anim(sw,[{opacity:.9,transform:'translate(-50%,-50%) scale(.2)'},{opacity:0,transform:`translate(-50%,-50%) scale(${pw?3:2.4})`}],{duration:600,easing:'ease-out',fill:'forwards'});
+      for(let q=0;q<(pw?8:6);q++){
+        const cr=el('div','stfx-boss-crack'+(pw?' pw2':'')); cr.style.left=c.x+'px'; cr.style.top=c.y+'px';
+        const a=q*(360/(pw?8:6))+rnd(-15,15); cr.style.transform=`rotate(${a}deg)`; grp.appendChild(cr);
         anim(cr,[{opacity:1,width:'0px'},{opacity:.9,width:rnd(60,120)+'px',offset:.3},{opacity:0,width:rnd(90,140)+'px'}],{duration:900,easing:'ease-out',fill:'forwards'});
       }
     }
-    bossFlourish(ui, be, R);
-    await w(920);
+    try{ plan.run(grp, R); }catch(e){ console.error('StageFX.bossFlourish', e); }
+    await w(hold);
     // 盤面に宿る：刻印がバッジへ吸い込まれる
     const badge=rectOf('.stfx-boss-badge');
     const t=badge?ctr(badge):{x:c.x,y:br.top};
@@ -701,44 +745,97 @@ const StageFX = (function(){
     const bdg=document.querySelector('.stfx-boss-badge');
     if(bdg){ bdg.classList.remove('pending'); anim(bdg,[{transform:'scale(1.35)',filter:'brightness(2)'},{transform:'scale(1)',filter:'brightness(1)'}],{duration:380,easing:'ease-out'}); }
   }
-  // 効果ごとの差分：盤面・UIへ効果が宿る
-  function bossFlourish(ui, be, R){
-    const fx=ui.fx; const dur=R?200:900;
-    const add=(cls,r,html)=>{ const e=el('div','stfx-bf '+cls,html||''); e.style.left=r.left+'px'; e.style.top=r.top+'px'; e.style.width=r.width+'px'; e.style.height=r.height+'px'; fx.appendChild(e); return e; };
-    const frame=(r,label)=>{ if(!r) return; const e=add('stfx-bf-frame',{left:r.left-4,top:r.top-4,width:r.width+8,height:r.height+8},label?`<span>${label}</span>`:''); anim(e,[{opacity:0,transform:'scale(1.15)'},{opacity:1,transform:'scale(1)',offset:.35},{opacity:1}],{duration:dur,fill:'forwards',easing:'ease-out'}); return e; };
-    const stampOn=(r,html,cls)=>{ if(!r) return; const c=ctr(r); const e=el('div','stfx-bf stfx-bf-stamp '+(cls||''),html); e.style.left=c.x+'px'; e.style.top=c.y+'px'; fx.appendChild(e); anim(e,[{opacity:0,transform:'translate(-50%,-50%) scale(2.2) rotate(-12deg)'},{opacity:1,transform:'translate(-50%,-50%) scale(1) rotate(-6deg)',offset:.4},{opacity:1,transform:'translate(-50%,-50%) scale(1) rotate(-6deg)'}],{duration:dur*.6,fill:'forwards',easing:'cubic-bezier(.6,0,.6,1.4)'}); return e; };
-    const chains=(r)=>{ if(!r) return; const e=add('stfx-bf-chains',{left:r.left-6,top:r.top+r.height/2-9,width:r.width+12,height:18},''); e.innerHTML=Array.from({length:Math.max(4,Math.round((r.width+12)/16))},()=>'<i></i>').join(''); anim(e,[{clipPath:'inset(0 100% 0 0)'},{clipPath:'inset(0 0 0 0)'}],{duration:dur*.6,fill:'forwards',easing:'ease-out'}); stampOn(r,SVG.lock,'lock'); };
+
+  // 効果ごとの差分：盤面・UIへ効果が宿る。{ target: 刻印を避ける矩形, run(grp,R): 演出 }
+  function bossPlan(be){
+    const pw=isPowered(be);
     const scene=(typeof GameMainScene!=='undefined')?GameMainScene:null;
     const bs=(typeof GameData!=='undefined')?GameData.BOARD_SIZE:4;
+    const dur0=R=>R?200:900;
+    let fx=null, R=false;
+    const add=(cls,r,html)=>{ const e=el('div','stfx-bf '+cls+(pw?' pw2':''),html||''); e.style.left=r.left+'px'; e.style.top=r.top+'px'; e.style.width=r.width+'px'; e.style.height=r.height+'px'; fx.appendChild(e); return e; };
+    const frame=(r,label,cls,delay)=>{ if(!r) return; const e=add('stfx-bf-frame '+(cls||''),{left:r.left-4,top:r.top-4,width:r.width+8,height:r.height+8},label?`<span>${label}</span>`:''); fitLabel(e); anim(e,[{opacity:0,transform:'scale(1.15)'},{opacity:1,transform:'scale(1)',offset:.35},{opacity:1}],{duration:dur0(R),delay:R?0:(delay||0),fill:'both',easing:'ease-out'}); return e; };
+    const stampOn=(r,html,cls,delay)=>{ if(!r) return; const c=ctr(r); const e=el('div','stfx-bf stfx-bf-stamp '+(cls||'')+(pw?' pw2':''),html); e.style.left=c.x+'px'; e.style.top=c.y+'px'; fx.appendChild(e); anim(e,[{opacity:0,transform:'translate(-50%,-50%) scale(2.2) rotate(-12deg)'},{opacity:1,transform:'translate(-50%,-50%) scale(1) rotate(-6deg)',offset:.4},{opacity:1,transform:'translate(-50%,-50%) scale(1) rotate(-6deg)'}],{duration:dur0(R)*.6,delay:R?0:(delay||0),fill:'both',easing:'cubic-bezier(.6,0,.6,1.4)'}); return e; };
+    const chains=(r,label)=>{ if(!r) return; const e=add('stfx-bf-chains',{left:r.left-6,top:r.top+r.height/2-9,width:r.width+12,height:18},''); e.innerHTML=Array.from({length:Math.max(4,Math.round((r.width+12)/16))},()=>'<i></i>').join(''); anim(e,[{clipPath:'inset(0 100% 0 0)'},{clipPath:'inset(0 0 0 0)'}],{duration:dur0(R)*.6,fill:'forwards',easing:'ease-out'}); if(label) frame(r,label,'thin'); stampOn(r,SVG.lock,'lock'); };
+    // 枠のラベルが画面外にはみ出さないよう左右に寄せる（transform の拡大中でも offset 系で測る）
+    const fitLabel=(e)=>{ const sp=e.querySelector('span'); if(!sp) return; const vw=document.documentElement.clientWidth||innerWidth;
+      const fl=parseFloat(e.style.left)||0, fw=parseFloat(e.style.width)||0, w=sp.offsetWidth||0; const l=fl+fw/2-w/2;
+      const dx=l<6?6-l:(l+w>vw-6?(vw-6)-(l+w):0); if(dx) sp.style.marginLeft=dx+'px';
+      const ft=parseFloat(e.style.top)||0; if(ft-10-(sp.offsetHeight||20)<4 && !e.classList.contains('below')) e.classList.add('below'); };
+    const P=(target, run)=>({ target, run:(g,r)=>{ fx=g; R=r; run(); } });
+    const boardR=()=>rectOf('.board');
     switch(be.id){
       case 'block_cells':{
+        // 実際に封鎖されたマス（GameMainScene.blockedCells）だけ
         const cells=scene?Array.from(scene.blockedCells||[]):[];
-        cells.forEach((ci,k)=>{ const r=cellRect(ci); if(!r) return; const e=add('stfx-bf-block',r,icon('cell_blocked')||SVG.lock); anim(e,[{opacity:0,transform:'scale(1.8)'},{opacity:1,transform:'scale(1)',offset:.5},{opacity:1}],{duration:R?120:420,delay:R?0:k*110,fill:'both',easing:'cubic-bezier(.6,0,.6,1.4)'}); });
-        break;
+        return P(boardR(), ()=>{
+          cells.forEach((ci,k)=>{ const r=cellRect(ci); if(!r) return; const e=add('stfx-bf-block',r,icon('cell_blocked')||SVG.lock); e.dataset.ci=ci; anim(e,[{opacity:0,transform:'scale(1.8)'},{opacity:1,transform:'scale(1)',offset:.5},{opacity:1}],{duration:R?120:420,delay:R?0:k*110,fill:'both',easing:'cubic-bezier(.6,0,.6,1.4)'}); });
+          const b=boardR(); if(b) frame(b,`${esc(be.name)}<small>封鎖 ${cells.length}マス</small>`,'ghost');
+        });
       }
       case 'cross_corner':{
-        [0,bs-1,bs*(bs-1),bs*bs-1].forEach((ci,k)=>{
-          const r=cellRect(ci); if(!r) return; const c=ctr(r);
-          const e=el('div','stfx-bf stfx-bf-fall sym-Cross',symSvg('Cross')); e.style.left=c.x+'px'; e.style.top=c.y+'px'; fx.appendChild(e);
-          anim(e,[{opacity:0,transform:`translate(-50%,calc(-50% - ${c.y+40}px)) rotate(-180deg)`},{opacity:1,transform:'translate(-50%,-50%) rotate(0) scale(1.3)',offset:.7},{opacity:1,transform:'translate(-50%,-50%) scale(1)'}],{duration:R?120:520,delay:R?0:k*120,fill:'both',easing:'cubic-bezier(.5,0,.8,.6)'});
-          const rg=el('div','stfx-boss-shock small'); rg.style.left=c.x+'px'; rg.style.top=c.y+'px'; fx.appendChild(rg);
-          anim(rg,[{opacity:0,transform:'translate(-50%,-50%) scale(.2)'},{opacity:.9,transform:'translate(-50%,-50%) scale(.3)',offset:.01},{opacity:0,transform:'translate(-50%,-50%) scale(1.2)'}],{duration:500,delay:R?0:k*120+360,fill:'both'});
+        // 実際に×が置かれた四隅（board の owner:'npc' かつ Cross）だけに×が降る
+        const corners=[0,bs-1,bs*(bs-1),bs*bs-1];
+        const placed=scene?corners.filter(ci=>{ const c=(scene.board||[])[ci]; return c&&c.owner==='npc'&&c.symbol==='Cross'; }):[];
+        return P(boardR(), ()=>{
+          placed.forEach((ci,k)=>{
+            const r=cellRect(ci); if(!r) return; const c=ctr(r);
+            const e=el('div','stfx-bf stfx-bf-fall sym-Cross'+(pw?' pw2':''),symSvg('Cross')); e.dataset.ci=ci; e.style.left=c.x+'px'; e.style.top=c.y+'px'; fx.appendChild(e);
+            anim(e,[{opacity:0,transform:`translate(-50%,calc(-50% - ${c.y+40}px)) rotate(-180deg)`},{opacity:1,transform:'translate(-50%,-50%) rotate(0) scale(1.3)',offset:.7},{opacity:1,transform:'translate(-50%,-50%) scale(1)'}],{duration:R?120:520,delay:R?0:k*120,fill:'both',easing:'cubic-bezier(.5,0,.8,.6)'});
+            const rg=el('div','stfx-boss-shock small'); rg.style.left=c.x+'px'; rg.style.top=c.y+'px'; fx.appendChild(rg);
+            anim(rg,[{opacity:0,transform:'translate(-50%,-50%) scale(.2)'},{opacity:.9,transform:'translate(-50%,-50%) scale(.3)',offset:.01},{opacity:0,transform:'translate(-50%,-50%) scale(1.2)'}],{duration:500,delay:R?0:k*120+360,fill:'both'});
+          });
+          const b=boardR(); if(b) frame(b,`${esc(be.name)}<small>× ${placed.length}マス</small>`,'ghost');
         });
-        break;
       }
-      case 'blackout': chains(rectOf('.status-top-row .passive-bar')); break;
-      case 'no_relic': chains(rectOf('.relic-display-row')); break;
-      case 'cross5000': frame(rectOf('.board'),'NPCの<b>×</b> = 5000'); break;
+      case 'blackout': { const r=rectOf('.status-top-row .passive-bar'); return P(r, ()=>chains(r, esc(be.name))); }
+      case 'no_relic': { const r=rectOf('.relic-display-row'); return P(r, ()=>chains(r, esc(be.name))); }
+      case 'cross5000':{
+        const v=bigNum(be);
+        return P(boardR(), ()=>{ const b=boardR(); frame(b,`NPCの<b>×</b> = <b>${esc(v)}</b>`); if(b) stampOn({left:b.left,top:b.top,width:b.width,height:b.height},`<span class="x">${symSvg('Cross')}</span><b>${esc(v)}</b>`,'num big',260); });
+      }
       case 'quad_only':{
-        const cs=[]; for(let c=0;c<Math.min(4,bs);c++) cs.push(cellRect(c)); const u=unionRect(cs); frame(u,'4列のみ'); break;
+        // プレイヤーは4列以上のみ／NPCは3列でもビンゴ可
+        const q=Math.min(+firstNum(be)||4, bs);
+        const base=Math.max(1, q-1);
+        return P(boardR(), ()=>{
+          const pr=unionRect(Array.from({length:q},(_,c)=>cellRect(c)));
+          const nr=unionRect(Array.from({length:base},(_,c)=>cellRect((bs-1)*bs+c)));
+          frame(pr,`あなた：<b>${q}</b>列以上でビンゴ`,'player');
+          frame(nr,`NPC：<b>${base}</b>列でもビンゴ`,'npc below',300);
+        });
       }
-      case 'unify': frame(rectOf('.mult-legend'),'倍率 ±'); break;
-      case 'turn_limit': frame(rectOf('.turn-count'),''); stampOn(rectOf('.turn-count'),'<b>10</b>','num'); break;
-      case 'reroll_limit': { const r=rectOf('.controls-row button'); frame(r,''); stampOn(r,'<b>0</b>','num'); break; }
-      case 'hand_limit': frame(rectOf('.hand-row'),'手札 −1'); break;
-      case 'discard_used': frame(rectOf('.board'),'使用カードは廃棄'); stampOn(rectOf('.board'),icon('btn_trash')||SVG.trash,'lock'); break;
-      case 'final': frame(rectOf('.turn-indicator'),''); stampOn(rectOf('.turn-indicator'),'6・11・16…','num wide'); break;
-      default: frame(rectOf('.board'),''); break;
+      case 'unify':{
+        const d=toHalf(be.desc); const up=(d.match(/\+\s*(\d+)/)||[])[1]||''; const dn=(d.match(/-\s*(\d+)/)||[])[1]||'';
+        // どの記号が上がったか（applyBossEffect が保存した元の値との差分から求める）
+        let sym=null;
+        try{ const rd=scene&&scene.unifyRestoreData; if(rd) sym=Object.keys(rd).find(s=>GameData.BINGO_MULTIPLIER_BASE[s]>rd[s])||null; }catch(e){}
+        const r=rectOf('.mult-legend');
+        return P(r, ()=>frame(r,`${esc(be.name)}：${sym?`<i class="sym">${symSvg(sym)}</i>`:''}<b>+${esc(up)}</b> ／ 他 <b>−${esc(dn)}</b>`));
+      }
+      case 'turn_limit':{
+        const v=signedNum(be); const r=rectOf('.turn-count');
+        return P(r, ()=>{ frame(r,esc(be.name)); stampOn(r,`<b>${esc(fmtMinus(v))}</b>`,'num',120); });
+      }
+      case 'reroll_limit':{
+        const v=signedNum(be); const ban=!v; // 強化版「リロール禁止」は数値なし → 0回
+        const r=rectOf('.controls-row button');
+        return P(r, ()=>{ frame(r,esc(be.name)); stampOn(r, ban?`<span class="ban"></span><b>0</b>`:`<b>${esc(fmtMinus(v))}</b>`, 'num'+(ban?' banned':''),120); });
+      }
+      case 'hand_limit':{
+        const v=signedNum(be); const r=rectOf('.hand-row');
+        return P(r, ()=>{ frame(r,`手札上限 <b>${esc(fmtMinus(v))}</b>`); });
+      }
+      case 'discard_used':{
+        return P(boardR(), ()=>{ const b=boardR(); frame(b,`${esc(be.name)}：使用カードはデッキに戻らない`); stampOn(b,icon('btn_trash')||SVG.trash,'lock',200); });
+      }
+      case 'final':{
+        const m=toHalf(be.desc).match(/[（(]([\d,、…・\s]+)ターン目[）)]/);
+        const seq=m?m[1].replace(/[,、]\s*/g,'・'):'';
+        const r=rectOf('.turn-indicator');
+        return P(r, ()=>{ frame(r,esc(be.name)); stampOn(r,esc(seq||be.name),'num wide',120); });
+      }
+      default: return P(boardR(), ()=>frame(boardR(),esc(be.name)));
     }
   }
   function endBoss(immediate){
@@ -774,12 +871,13 @@ const StageFX = (function(){
       return `<div class="stfx-res-line g-line ${l[3]}" data-g="${l[3]}" data-amt="${g.amount}" data-gname="${esc(g.name)}"><span><span class="stfx-res-gicons">${Array.from({length:Math.min(3,Math.max(1,g.count||1))},()=>`<i class="stfx-res-gico">${g.iconHtml}</i>`).join('')}</span>${l[0]}</span><b data-final="+${g.amount}">+0</b></div>`;
     };
     if(opts.win && b){
-      const numNote=[b.floorBonus?'階層6以上+1':'',b.scoreBonus?'目標点数の2倍以上+1':''].filter(Boolean).join('・');
+      // #8 新式：基本G×num ＋ 残りラウンド×1 ＋ 残りリロール×1/2 ＋ レリック効果 ＋ レリック強化効果
+      const numNote=['基本2',b.floorBonus?'階層6以上+1':'',b.scoreBonus?'目標点数の2倍以上+1':''].filter(Boolean).join('・');
       lines=[
-        ['基本G', `${b.base}`],
+        [`基本G${b.base} × num${b.num}<small>（${numNote}）</small>`, `${b.base*b.num}`],
         ['残りラウンド ×1', `+${fmt(b.roundBonus)}`],
         [`残りリロール${fmt(b.rerollBonus*2)} ×1/2`, `+${fmt(b.rerollBonus)}`],
-        [`× num${b.num}${numNote?`<small>（${numNote}）</small>`:''}`, `= ${b.subtotal}`, 'sub'],
+        ['小計（端数切り捨て）', `= ${b.subtotal}`, 'sub'],
         ['レリック効果', `+${b.relicBonus}`, b.relicBonus?'':'zero', gf&&gf.relic?'relic':null],
         ['レリック強化効果', `+${b.relicEnhanceBonus}`, b.relicEnhanceBonus?'':'zero', gf&&gf.ren?'ren':null],
       ];

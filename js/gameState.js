@@ -43,7 +43,7 @@ const GameState = {
     const base=GameData.SKIP_REWARD_BASE_G;
     const num=1+(this.currentFloor>=6?1:0);
     const rg=this.rewardRelicGold(false);
-    const total=base*num+rg.relic+rg.relicEnhance;
+    const total=base*num+rg.relic+rg.relicEnhance; // #9 (基本G8)×num＋レリック効果＋レリック強化効果（num=1、階層6以上で+1）
     return {base,num,relicBonus:rg.relic,relicEnhanceBonus:rg.relicEnhance,total};
   },
   effectiveMaxRounds(){ return GameData.MAX_ROUNDS + this.roundsBonus; },

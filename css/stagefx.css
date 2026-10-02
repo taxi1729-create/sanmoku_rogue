@@ -152,6 +152,68 @@
 .stfx-bf-chains i{flex:0 0 18px;height:10px;border:3px solid #d4d4d8;border-radius:6px;margin:0 -3px;box-shadow:0 0 0 1px #000;}
 .stfx-bf-chains i:nth-child(even){height:6px;flex-basis:14px;border-color:#a1a1aa;}
 
+/* ボス効果：最新仕様（効果数・強化版・効果ごとの実数値） */
+.stfx-boss-band-text span em{font-style:normal;margin-left:10px;padding:1px 8px;border:1px solid #f87171;border-radius:999px;color:#fee2e2;letter-spacing:.1em;}
+.stfx-boss-grp{position:absolute;inset:0;}
+.stfx-boss-steps{position:absolute;left:0;right:0;bottom:calc(40px + env(safe-area-inset-bottom));display:flex;justify-content:center;gap:8px;z-index:4;}
+.stfx-boss-steps i{width:22px;height:6px;border-radius:3px;background:rgba(248,113,113,.25);border:1px solid rgba(248,113,113,.6);transition:background .2s,box-shadow .2s;}
+.stfx-boss-steps i.on{background:#f87171;box-shadow:0 0 10px #ef4444;}
+.stfx-boss-steps i.done{background:#7f1d1d;}
+.stfx-boss-steps i.pw2{border-color:#fb923c;}
+.stfx-boss-steps i.pw2.on{background:linear-gradient(90deg,#ef4444,#fb923c,#fde047);box-shadow:0 0 12px #f97316;}
+/* 強化タグ（刻印・吹き出し共通） */
+.stfx-boss-pw{display:inline-flex;align-items:center;gap:2px;margin-left:6px;padding:1px 6px 1px 4px;border-radius:999px;vertical-align:middle;
+  font-size:10px;font-weight:900;letter-spacing:.08em;color:#fff7ed;background:linear-gradient(180deg,#f97316,#b91c1c);border:1px solid #fdba74;box-shadow:0 0 8px rgba(249,115,22,.8);}
+.stfx-boss-pw svg{width:10px;height:10px;color:#fde047;}
+.stfx-boss-pw.onplate{font-size:10px;letter-spacing:.1em;}
+.stfx-boss-sp{display:inline-block;margin-left:6px;padding:0 6px;border-radius:999px;font-size:10px;font-weight:900;color:#fde68a;border:1px solid #a16207;vertical-align:middle;}
+/* 強化版の刻印：赤く燃える縁 */
+.stfx-boss-plate.pw2{border-color:#f97316;background:linear-gradient(160deg,#4a0d06,#1f0603 60%,#3a0a04);
+  box-shadow:0 0 0 1px #000,0 0 18px #ef4444,0 0 36px rgba(249,115,22,.75),inset 0 0 22px rgba(239,68,68,.45),inset 0 1px 0 rgba(255,255,255,.1);animation:stfxBurn .5s ease-in-out infinite alternate;}
+.stfx-boss-plate.pw2::before{border-color:rgba(253,186,116,.6);}
+.stfx-boss-plate.pw2::after{content:'';position:absolute;inset:-3px;border-radius:8px;pointer-events:none;border:2px solid transparent;
+  background:linear-gradient(90deg,#ef4444,#f97316,#fde047,#f97316,#ef4444) border-box;background-size:200% 100%;
+  -webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:stfxBurnEdge 1.2s linear infinite;}
+.stfx-boss-plate.pw2 .stfx-boss-plate-n{color:#ffedd5;text-shadow:0 -1px 0 #000,0 0 10px #f97316,0 0 22px #ef4444;}
+.stfx-boss-plate-flame{position:absolute;left:6px;right:6px;top:-14px;height:18px;display:flex;justify-content:space-around;align-items:flex-end;pointer-events:none;}
+.stfx-boss-plate-flame i{width:10px;height:16px;border-radius:50% 50% 45% 45%/70% 70% 30% 30%;background:radial-gradient(ellipse at 50% 80%,#fde047 0%,#f97316 45%,rgba(239,68,68,.0) 75%);
+  filter:blur(.4px);transform-origin:50% 100%;animation:stfxFlame .45s ease-in-out infinite alternate;}
+.stfx-boss-plate-flame i:nth-child(2n){height:12px;animation-duration:.38s;animation-delay:-.2s;}
+.stfx-boss-plate-flame i:nth-child(3n){height:19px;animation-duration:.52s;animation-delay:-.1s;}
+@keyframes stfxBurn{from{filter:brightness(1);}to{filter:brightness(1.18);}}
+@keyframes stfxBurnEdge{to{background-position:200% 0;}}
+@keyframes stfxFlame{from{transform:scaleY(.75) translateX(-1px);opacity:.75;}to{transform:scaleY(1.15) translateX(1px);opacity:1;}}
+.stfx-boss-plate.special{border-color:#a16207;}
+.stfx-boss-shock.pw2{border-color:#f97316;box-shadow:0 0 24px #f97316,0 0 40px #ef4444;}
+.stfx-boss-crack.pw2{background:linear-gradient(90deg,#fde047,#f97316,transparent);box-shadow:0 0 8px #f97316;}
+/* 差分演出の追加バリエーション */
+.stfx-bf-frame span small{margin-left:6px;font-size:10.5px;font-weight:700;color:#fecaca;}
+.stfx-bf-frame span .sym{display:inline-flex;width:14px;height:14px;vertical-align:-2px;margin:0 2px;}
+.stfx-bf-frame span .sym svg,.stfx-bf-frame span .sym .gi{width:14px;height:14px;}
+.stfx-bf-frame.ghost{border-style:dashed;border-color:rgba(239,68,68,.55);box-shadow:none;background:transparent;}
+.stfx-bf-frame.thin{border-color:transparent;box-shadow:none;background:transparent;}
+.stfx-bf-frame.player{border-color:#38bdf8;box-shadow:0 0 16px #0ea5e9,inset 0 0 14px rgba(56,189,248,.35);background:rgba(14,165,233,.12);}
+.stfx-bf-frame.player span{background:#075985;border-color:#7dd3fc;}
+.stfx-bf-frame.npc{border-style:dashed;border-color:#f87171;}
+.stfx-bf-frame.below span{top:auto;bottom:-10px;transform:translate(-50%,100%);}
+.stfx-bf-frame.pw2:not(.ghost):not(.thin):not(.player){border-color:#f97316;box-shadow:0 0 16px #f97316,0 0 28px rgba(239,68,68,.6),inset 0 0 14px rgba(249,115,22,.4);}
+.stfx-bf-frame.pw2 span{background:linear-gradient(180deg,#c2410c,#7f1d1d);border-color:#fdba74;}
+.stfx-bf-stamp.num.big{height:40px;padding:0 10px;gap:4px;font-size:22px;}
+.stfx-bf-stamp.num .x{display:inline-flex;width:20px;height:20px;}
+.stfx-bf-stamp.num .x svg,.stfx-bf-stamp.num .x .gi{width:20px;height:20px;}
+.stfx-bf-stamp.num.banned{position:absolute;}
+.stfx-bf-stamp.num .ban{position:absolute;inset:-6px;border-radius:50%;border:3px solid #ef4444;}
+.stfx-bf-stamp.num .ban::after{content:'';position:absolute;left:50%;top:50%;width:100%;height:3px;background:#ef4444;transform:translate(-50%,-50%) rotate(-45deg);}
+.stfx-bf-stamp.pw2{color:#fb923c;filter:drop-shadow(0 0 6px #f97316) drop-shadow(0 0 12px #ef4444);}
+.stfx-bf-stamp.num.pw2{border-color:#f97316;color:#ffedd5;}
+.stfx-bf-block.pw2{box-shadow:inset 0 0 0 2px #f97316,0 0 16px #f97316;}
+.stfx-bf-fall.pw2{filter:drop-shadow(0 0 8px #f97316) drop-shadow(0 0 14px #ef4444);}
+/* バッジ・吹き出し：強化版あり */
+.stfx-boss-badge.pw2{border-color:#fb923c;background:linear-gradient(180deg,#7c2d12,#2a0909);}
+.stfx-boss-badge.pw2 .stfx-boss-ic{color:#fb923c;}
+.stfx-boss-entry.pw2 .stfx-boss-entry-name{color:#fb923c;}
+.stfx-boss-entry.special .stfx-boss-entry-name{color:#fca5a5;}
+
 /* ===================== 1. 報酬受け取り ===================== */
 .stfx-result{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;background:rgba(6,7,12,0);padding:12px;cursor:pointer;}
 .stfx-res-box{position:relative;overflow-x:hidden;overflow-y:auto;background:var(--panel,#1c2030);border:1px solid #3a3050;border-radius:16px;padding:18px 20px;text-align:center;
@@ -255,7 +317,7 @@
 
 /* ===================== reduced motion ===================== */
 @media (prefers-reduced-motion: reduce){
-  .stfx-pv-halo::after,.stfx-pv-pillar,.stfx-pv-motes i,.stfx-pv-card::after,.stfx-pv-emblem-ring,.stfx-boss-band-stripe,.stfx-boss-badge,.stfx-res-next.ready,.stfx-res-wallet.pulse,.passive-icon.stfx-pv-land{animation:none !important;}
+  .stfx-pv-halo::after,.stfx-pv-pillar,.stfx-pv-motes i,.stfx-pv-card::after,.stfx-pv-emblem-ring,.stfx-boss-band-stripe,.stfx-boss-badge,.stfx-boss-plate.pw2,.stfx-boss-plate.pw2::after,.stfx-boss-plate-flame i,.stfx-res-next.ready,.stfx-res-wallet.pulse,.passive-icon.stfx-pv-land{animation:none !important;}
   .stfx-pv-motes{display:none;}
 }
 
