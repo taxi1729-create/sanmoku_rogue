@@ -2,15 +2,13 @@ const MapSelectScene = {
   container:null, pendingReward:null, activeRelicId:null, // #11 マップ画面でのレリック選択・並び替え
   render(container){
     this.container=container;
-    // #6 階層10：初回のみ10Gを受け取り、固定ラインナップの最終ショップへ直行する
-    if(GameState.currentFloor>=10&&!GameState.finalShopDone){
-      GameState.finalShopDone=true;
-      GameState.gold+=10;
-      App.saveGame();
-      ShopScene.fixedFinalShop=true;
-      App.showShop();
-      return;
+    // 一時撤退中（ミニショップを出る前にリロード・ロードした場合）はミニショップへ復帰する
+    if(GameState.retreat && typeof ShopScene!=='undefined' && !ShopScene.miniShop){
+      ShopScene.miniShop=true; ShopScene.offers=null;
+      App.showShop(); return;
     }
+    // #6 階層10：初回のみ10Gを受け取り、固定ラインナップの最終ショップへ直行する
+    // #7 階層10：自動でショップへ飛ばさず、マップ上で「最終決戦前の商店」へ誘導する（商店で買い物後に最終決戦を選択）
     this._initBossEffect();
     // 魔神イベント：階層侵入時にハイレベルが魔神イベントになるか判定（判定済みなら保存値を使う）
     if(typeof MajinEvent!=='undefined') MajinEvent.ensureDecided(GameState.currentFloor);
@@ -46,7 +44,7 @@ const MapSelectScene = {
     topRow.appendChild(GameMainScene.renderPassiveBar(()=>this.renderAll()));
     el.appendChild(topRow);
     const header=document.createElement('div'); header.className='map-header';
-    header.innerHTML=`<span>所持G：${GameState.gold}</span><span>第${GameState.currentFloor}階層</span>`;
+    header.innerHTML=`<span>所持G：${GameState.gold}</span><span>第${GameState.currentFloor}階層</span><span class="lives-badge lives-badge-map" title="残機"><span class="lives-label">残機</span>${GameState.livesIconsHtml()}</span>`;
     // #2(B) デバッグ促進用：タップで20000G付与するボタン
     //const debugGoldBtn=document.createElement('button'); debugGoldBtn.className='debug-gold-btn'; debugGoldBtn.textContent='🐞+20000G';
     //debugGoldBtn.addEventListener('click',()=>{ GameState.gold+=20000; this.renderAll(); });
@@ -60,10 +58,28 @@ const MapSelectScene = {
     el.appendChild(this.renderRelicSection());
     const path=document.createElement('div'); path.className='map-path';
     const stages=GameData.buildFloorStages(GameState.currentFloor);
+    // #7 階層10：最終決戦の前に「最終決戦前の商店」へ誘導する（商店に入るまで最終決戦はロック）
+    const isFinalFloor=GameState.currentFloor>=10;
+    if(isFinalFloor){
+      const shopCard=document.createElement('div');
+      shopCard.className='stage-card final-shop-card'+(GameState.finalShopDone?' visited':' guide');
+      shopCard.innerHTML=GameState.finalShopDone
+        ? `<div class="stage-tag">SHOP</div><div class="stage-name">最終決戦前の商店</div><div class="stage-goal">買い物を済ませた。最終決戦へ挑め</div><div class="stage-actions"><div class="stage-done-tag">訪問済み</div></div>`
+        : `<div class="stage-tag">SHOP</div><div class="stage-name">最終決戦前の商店</div><div class="stage-goal">最終決戦の前に、ここで支度を整えよう（入店時に10G獲得）</div><div class="stage-actions"><button class="challenge-btn final-shop-btn">商店へ向かう</button></div>`;
+      const fb=shopCard.querySelector('.final-shop-btn');
+      if(fb) fb.addEventListener('click',()=>{
+        GameState.finalShopDone=true;
+        GameState.gold+=10;
+        App.saveGame();
+        ShopScene.fixedFinalShop=true;
+        App.showShop();
+      });
+      path.appendChild(shopCard);
+    }
     stages.forEach((stage,i)=>{
       const clearedBefore=i===0||GameState.clearedStages.includes(stages[i-1].key);
       const isCleared=GameState.clearedStages.includes(stage.key);
-      const locked=!clearedBefore;
+      const locked=!clearedBefore||(isFinalFloor&&!GameState.finalShopDone);
       // 魔神イベント：ハイレベルが魔神イベントに変わった階層は専用のステージカードを表示する
       if(stage.key==='high'&&typeof MajinEvent!=='undefined'&&MajinEvent.isMajinFloor(GameState.currentFloor)){
         path.appendChild(MajinEvent.buildStageCard(stage,locked,isCleared));
@@ -148,16 +164,8 @@ const MapSelectScene = {
           // 最高クリア記録更新
           if(GameState.currentFloor-1>GameState.maxClearedFloor){ GameState.maxClearedFloor=GameState.currentFloor-1; GameState.maxClearedStage='ボス'; }
           App.saveGame();
-          // #4 第10階層への移動時は、経由するレンダリングを1回挟まず直接最終ショップへ向かう
-          if(GameState.currentFloor>=10 && !GameState.finalShopDone){
-            GameState.finalShopDone=true;
-            GameState.gold+=10;
-            App.saveGame();
-            ShopScene.fixedFinalShop=true;
-            App.showShop();
-          }else{
-            App.showMapSelect();
-          }
+          // #7 第10階層もマップへ遷移し、マップ上の「最終決戦前の商店」から買い物をしてから最終決戦を選ぶ
+          App.showMapSelect();
         });
         const t=el.querySelector('#btn-back-title');
         if(t) t.addEventListener('click',()=>App.showTitle());
@@ -250,8 +258,8 @@ const MapSelectScene = {
           effectPool = GlobalFunctions.shuffle(unused).slice(0, Math.min(2, unused.length));
         }
       }else{
-        const pool = GameData.NORMAL_SELECT_POOL.filter(e=>{ if(e.rarity) return Math.random()<e.rarity; return true; });
-        const finalPool = pool.length>0 ? pool : GameData.NORMAL_SELECT_POOL.filter(e=>!e.rarity);
+        const pool = GameData.normalSelectPool().filter(e=>{ if(e.rarity) return Math.random()<e.rarity; return true; });
+        const finalPool = pool.length>0 ? pool : GameData.normalSelectPool().filter(e=>!e.rarity);
         effectPool = GlobalFunctions.shuffle(finalPool).slice(0, Math.min(3, finalPool.length));
       }
       // #8 通常のショップ購入と同じ「効果→カード」選択モーダルをショップ画面側で開かせる

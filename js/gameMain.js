@@ -66,7 +66,8 @@ const GameMainScene = {
     // #1 ゲーム開始時のパッシブ選択は廃止し、代わりに？カードパックを1パック無料で獲得できるようにする
     if(!GameState.initialPassiveGranted){
       GameState.initialPassiveGranted=true;
-      this.pendingInitialCardPack=[GameData.generateShopCard(),GameData.generateShopCard()];
+      // #8 階層1コモン侵入時の無料？カードパックは廃止（スタートイベント「神の寵愛」に置き換え）
+      // this.pendingInitialCardPack=[GameData.generateShopCard(),GameData.generateShopCard()];
     }
     this.startRound();
     // #演出 ボスステージ開始時：ボス効果が盤面に付与される演出（初回描画後。タップで早送り）
@@ -445,6 +446,7 @@ const GameMainScene = {
   },
 
   finishStage(result){
+    if(result==='lose'&&this.resultState==='lose') return; // 二重の失敗処理で残機を2つ消費しないためのガード
     this._clearFx=[];
     // #3 ゲームスコア最高得点を記録
     GlobalFunctions.saveHighScoreIfBetter(GameState.currentScore);
@@ -575,11 +577,34 @@ const GameMainScene = {
       // #8 クリア時セーブ
       App.saveGame();
     } else if(result==='lose'){
-      // #5 失敗時：開放済みのレリック・カード強化効果をタイトルの図鑑（デッキ確認）に反映し、進行中のデータを破棄する
-      GameState.relics.forEach(r=>GlobalFunctions.recordRelic(r.id));
-      GameState.currentDeck.forEach(c=>GlobalFunctions.recordCard(c));
-      if(typeof App!=='undefined') GlobalFunctions.deleteSlot(App.currentSaveSlot);
-      this.addLog('ステージ失敗：発見済みの効果・レリックを図鑑に記録し、進行中のセーブデータを破棄しました');
+      this.retreatInfo=null;
+      if((GameState.lives||0)>0){
+        // 残機あり：残機を1つ消費して「一時撤退」。セーブは破棄せず、撤退Gを得てミニショップ→マップで同じステージに再挑戦できる
+        const livesBefore=GameState.lives;
+        GameState.lives=livesBefore-1;
+        const rr=GameState.calcRetreatReward(GameState.currentScore,GameState.targetScore);
+        this._rewardGoldBefore=GameState.gold;
+        GameState.gold+=rr.total;
+        // ボス効果は applyBossEffect で pendingBossEffect から取り出して null にしているため、再挑戦で同じ効果になるよう戻す
+        if(this.stage&&this.stage.key==='boss'&&this.bossEffects&&this.bossEffects.length>0){
+          GameState.pendingBossEffect=this.bossEffects.length>1?this.bossEffects.slice():this.bossEffects[0];
+        }
+        GameState.lastReward=null;
+        GameState.retreat={ floor:GameState.currentFloor, stageKey:this.stage?this.stage.key:'', stageName:this.stage?this.stage.name:'',
+          score:GameState.currentScore, target:GameState.targetScore, ratio:rr.ratio, num:rr.num, gold:rr.total,
+          livesBefore, livesLeft:GameState.lives, offers:null };
+        this.retreatInfo=GameState.retreat;
+        this.addLog(`ステージ失敗：残機を1つ消費して一時撤退（撤退G+${rr.total}、残機${GameState.lives}）`);
+        // 一時撤退時セーブ（retreat を保存するので、ここでリロードしてもマップ表示時にミニショップへ復帰する）
+        if(typeof App!=='undefined') App.saveGame();
+      }else{
+        // #5 残機0での失敗：開放済みのレリック・カード強化効果をタイトルの図鑑（デッキ確認）に反映し、進行中のデータを破棄する
+        GameState.relics.forEach(r=>GlobalFunctions.recordRelic(r.id));
+        GameState.currentDeck.forEach(c=>GlobalFunctions.recordCard(c));
+        GameState.retreat=null;
+        if(typeof App!=='undefined') GlobalFunctions.deleteSlot(App.currentSaveSlot);
+        this.addLog('ゲームオーバー：発見済みの効果・レリックを図鑑に記録し、進行中のセーブデータを破棄しました');
+      }
     }
     this.renderAll();
   },
@@ -2036,7 +2061,7 @@ const GameMainScene = {
     topRow.appendChild(passiveBar);
     bar.appendChild(topRow);
     const scoreBox=document.createElement('div'); scoreBox.className='stat score-combined-stat';
-    scoreBox.innerHTML=`<div class="label">現在の点数 / 目標点数</div><div class="value${sparkle?' sparkle':''}">${GlobalFunctions.formatScore(live)} / ${GlobalFunctions.formatScore(GameState.targetScore)}</div>`;
+    scoreBox.innerHTML=`<div class="label">現在の点数 / 目標点数</div><div class="value${sparkle?' sparkle':''}">${GlobalFunctions.formatScore(live)} / ${GlobalFunctions.formatScore(GameState.targetScore)}</div><div class="lives-badge lives-badge-status" title="残機"><span class="lives-label">残機</span>${GameState.livesIconsHtml()}</div>`; // 残機（ハート）
     bar.appendChild(scoreBox);
     // #演出刷新 計算過程は吹き出し（ScoreFX）で表示するため、ステータスバーには何も差し込まない（レイアウトシフト防止）
     holder.appendChild(bar);
@@ -2849,7 +2874,15 @@ const GameMainScene = {
     const box=document.createElement('div'); box.className='result-box';
     // #1 ボスクリア時：ショップへ移動の代わりに「パッシブ報酬を受け取る」をタップさせる
     const hasPassiveChoice = win && this.stage.key==='boss' && this.pendingPassiveChoice && this.pendingPassiveChoice.length>0;
-    const btnLabel = hasPassiveChoice ? 'パッシブ報酬を受け取る' : (goShop?'ショップへ':'マップに戻る');
+    // 敗北：残機があれば「一時撤退」（ミニショップへ）、残機0なら GAME OVER（タイトルへ）
+    const retreat = !win ? this.retreatInfo : null;
+    const gameOver = !win && !retreat;
+    const btnLabel = hasPassiveChoice ? 'パッシブ報酬を受け取る' : (win ? (goShop?'ショップへ':'マップに戻る') : (retreat?'ミニショップで体制を整える':'タイトルへ'));
+    const goLose=()=>{
+      if(typeof StageFX!=='undefined') StageFX.clearAll();
+      if(retreat){ ShopScene.miniShop=true; App.showShop(); }
+      else { App.showTitle(); }
+    };
     // #演出 報酬の受け取り演出（STAGE CLEAR→内訳→金貨が所持Gへ→追加報酬）。body 直下の永続要素で描画するため、
     //   renderAll() で作り直されても巻き戻らない。ここではプレースホルダーだけを返す
     if(typeof StageFX!=='undefined'){
@@ -2863,16 +2896,21 @@ const GameMainScene = {
           relic:r.breakdown.relicBonus>0?{amount:r.breakdown.relicBonus, count:GameState.relicCountOf('gold_boost'), iconHtml:GameIcons.relic('gold_boost'), name:'G獲得'}:null,
           ren:r.breakdown.relicEnhanceBonus>0?{amount:r.breakdown.relicEnhanceBonus, count:r.breakdown.relicEnhanceBonus, iconHtml:GameIcons.svg('ren_gold'), name:'G獲得（レリック強化）'}:null,
         }:null,
+        retreat:retreat?{ gold:retreat.gold, num:retreat.num, ratio:retreat.ratio, livesBefore:retreat.livesBefore, livesLeft:retreat.livesLeft, maxLives:GameState.MAX_LIVES, floor:retreat.floor, stageName:retreat.stageName }:null,
+        gameOver,
         onNext:()=>{
+          if(!win){ goLose(); return; }
           if(hasPassiveChoice){ this.passiveModalOpen=true; this.renderAll(); }
           else{ StageFX.clearAll(); if(goShop){ App.showShop(); } else { App.showMapSelect(); } }
         },
       });
       const ph=document.createElement('div'); ph.className='stfx-result-placeholder'; ph.hidden=true; return ph;
     }
-    box.innerHTML=`<div class="result-title ${win?'win':'lose'}">${win?'STAGE CLEAR':'GAME OVER'}</div><div>最終点数：${GlobalFunctions.formatScore(GameState.currentScore)} / ${GlobalFunctions.formatScore(GameState.targetScore)}</div>${gr}${debugHtml}<button id="btn-next">${btnLabel}</button>`;
+    const retreatHtml=retreat?`<div class="gold-reveal-popup"><div class="gr-label">撤退G</div><div class="gr-total">+${retreat.gold}G</div><div class="gr-breakdown">残機 ${retreat.livesLeft} / ${GameState.MAX_LIVES}</div></div>`:'';
+    box.innerHTML=`<div class="result-title ${win?'win':'lose'}">${win?'STAGE CLEAR':(retreat?'一時撤退':'GAME OVER')}</div><div>最終点数：${GlobalFunctions.formatScore(GameState.currentScore)} / ${GlobalFunctions.formatScore(GameState.targetScore)}</div>${gr}${retreatHtml}${debugHtml}<button id="btn-next">${btnLabel}</button>`;
     el.appendChild(box);
     setTimeout(()=>{el.querySelector('#btn-next').addEventListener('click',()=>{
+      if(!win){ goLose(); return; }
       if(hasPassiveChoice){ this.passiveModalOpen=true; this.renderAll(); }
       else if(goShop){ App.showShop(); } else { App.showMapSelect(); }
     });});

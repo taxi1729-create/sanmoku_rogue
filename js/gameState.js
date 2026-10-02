@@ -21,6 +21,11 @@ const GameState = {
   finalShopDone:false, floor10SpecialBoss:false, // #6 階層10特殊構成
   gameMode:'normal', // #9 ゲームモード（normal=通常デッキ／tengame=テンゲーム）
   initialPassiveGranted:false, // #6 ゲーム開始時パッシブ選択（3択）を既に提示したかどうか
+  // 残機：ステージ失敗時に1つ消費して「一時撤退」（セーブは残る）。0の時に失敗するとゲームオーバー
+  MAX_LIVES:2, lives:2,
+  // 一時撤退中の情報（null=撤退中でない）。ミニショップを出るまで保持し、リロード時はマップ表示時にミニショップへ復帰する
+  //   { floor, stageKey, stageName, score, target, ratio, num, gold, livesLeft, offers }
+  retreat:null,
 
   // #13 シカクパッシブ1の手札上限+1は廃止（パック選択枚数+1に変更）
   effectiveHandSize(){ return GameData.HAND_SIZE + this.handSizeBonus; },
@@ -45,6 +50,22 @@ const GameState = {
     const rg=this.rewardRelicGold(false);
     const total=base*num+rg.relic+rg.relicEnhance; // #9 (基本G8)×num＋レリック効果＋レリック強化効果（num=1、階層6以上で+1）
     return {base,num,relicBonus:rg.relic,relicEnhanceBonus:rg.relicEnhance,total};
+  },
+  // 一時撤退G＝floor(10×num×ratio)（num=1、階層6以上で+1。ratio=現在の点数/目標点数。クランプせず実数のまま。負・非数は0）
+  calcRetreatReward(score, target){
+    const sc=(score==null)?this.currentScore:score, tg=(target==null)?this.targetScore:target;
+    let ratio=Number(sc)/Number(tg);
+    if(!Number.isFinite(ratio)||ratio<0) ratio=0;
+    const num=1+(this.currentFloor>=6?1:0);
+    const total=Math.max(0,Math.floor(10*num*ratio+1e-9));
+    return {base:10,num,ratio,total};
+  },
+  // 残機をハートアイコンで表現する（所持=赤ハート、失った枠=点線ハート）。innerHTML で描画すること
+  livesIconsHtml(opts){
+    const o=opts||{}; const max=Math.max(this.MAX_LIVES,this.lives||0);
+    let h='';
+    for(let i=0;i<max;i++) h+=`<span class="life-ico${i<this.lives?' on':' off'}">${GIcon(i<this.lives?'life_heart':'life_heart_empty',o.title?{title:o.title}:undefined)}</span>`;
+    return h;
   },
   effectiveMaxRounds(){ return GameData.MAX_ROUNDS + this.roundsBonus; },
   effectiveTurnsPerRound(){ return GameData.TURNS_PER_ROUND + this.turnsBonus; },
@@ -114,6 +135,7 @@ const GameState = {
     this.mana={ A:false, B:false, C:0, D:[], E:false };
     this.majin={ decided:{}, done1:false, done2:false, usedMajin:[], cleared:{} };
     this.passiveSuspended=null;
+    this.lives=this.MAX_LIVES; this.retreat=null; // 残機・一時撤退
     this.bingoCountThisStage=0;
     this.totalBingoCount=0; this.sevenPendingMultBoost=false;
     GameData.BINGO_MULTIPLIER_BASE={...GameData.BINGO_MULTIPLIER_BASE_ORIGINAL};
@@ -159,6 +181,7 @@ const GameState = {
       finalShopDone:this.finalShopDone,
       gameMode:this.gameMode,
       initialPassiveGranted:this.initialPassiveGranted,
+      lives:this.lives, retreat:this.retreat,
       multBase:{...GameData.BINGO_MULTIPLIER_BASE},
       corrBase:GameData.CORRECTION_BASE_SCORE,
       savedFloorStage: (this.currentStage?this.currentStage.key:''),
@@ -190,6 +213,9 @@ const GameState = {
     this.finalShopDone=d.finalShopDone||false;
     this.gameMode=d.gameMode||'normal';
     this.initialPassiveGranted=d.initialPassiveGranted||false;
+    // 残機（旧セーブは残機フィールドが無いので最大値2）・一時撤退中の情報
+    this.lives=(typeof d.lives==='number'&&Number.isFinite(d.lives))?Math.max(0,d.lives):this.MAX_LIVES;
+    this.retreat=(d.retreat&&typeof d.retreat==='object')?d.retreat:null;
     this.migrateCards();
     if(d.multBase) Object.assign(GameData.BINGO_MULTIPLIER_BASE,d.multBase);
     if(d.corrBase!=null) GameData.CORRECTION_BASE_SCORE=d.corrBase;

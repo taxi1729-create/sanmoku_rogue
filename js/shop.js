@@ -7,11 +7,23 @@ const ShopScene = {
   cardRevealPopup: null,
   message: null,
   activeRelicId: null, // #25 ショップ内レリック確認
+  miniShop: false, // 一時撤退中のミニショップ（陳列＝レリックパック・カードフォーカス固定＋ランダム2つ）。leaveShop でリセット
 
   sleep(ms){ return new Promise(res => setTimeout(res, ms)); },
 
   render(container){
     this.container = container;
+    // 一時撤退中のミニショップ：陳列は GameState.retreat.offers に保存（リロードしても同じ品揃え・購入状態で復帰する）
+    if(this.miniShop){
+      if(!this.offers || !this.offers.mini){
+        const saved = GameState.retreat && GameState.retreat.offers;
+        if(saved && saved.mini){ this.offers = saved; }
+        else{
+          this.offers = this.generateMiniOffers();
+          if(GameState.retreat){ GameState.retreat.offers = this.offers; if(typeof App!=='undefined') App.saveGame(); }
+        }
+      }
+    } else
     // #6 階層10：固定ラインナップの最終ショップ（更新なし）
     if(this.fixedFinalShop && !this.offers){
       this.offers = { fixedRelics:[], fixedCardPack:[], fixedUpgrade:[],
@@ -40,6 +52,21 @@ const ShopScene = {
     return { fixedRelics, fixedCardPack, fixedUpgrade, randomSlots };
   },
 
+  // ミニショップ：レリックパック・カードフォーカスパック（固定）＋ランダム商品2つ（通常ショップと同じ重み付き抽選）
+  //   品揃え更新しても構成は同じ（固定2枠は未購入で復活し、ランダム2枠だけ再抽選）
+  generateMiniOffers(){
+    const miniFixed = [{ type:'relic_pack', miniFixed:true }, { type:'card_focus', miniFixed:true }];
+    const randomSlots = [];
+    for(let i = 0; i < 2; i++){
+      const slot = { type: GameData.pickWeightedType() };
+      // セーブに陳列を残すため、表示時に抽選する内容（ピックアップのレリック・効果）もここで確定させる
+      if(slot.type==='pickup_relic') slot._relic = this.pickRelic();
+      if(slot.type==='pickup_upgrade') slot._single = GlobalFunctions.randChoice(GameData.normalSelectPool().filter(e=>!e.rarity));
+      randomSlots.push(slot);
+    }
+    return { mini:true, fixedRelics:[], fixedCardPack:[], fixedUpgrade:[], miniFixed, randomSlots };
+  },
+
   pickRelic(){
     const base = GameData.pickRelicBaseByGrade(); // #5 グレード別の排出確率
     // #1 魔力ステージE：ピックアップレリックには必ずレリック強化効果が付与される
@@ -65,7 +92,7 @@ const ShopScene = {
 
   // #1(B) ブラックカードは重複所持不可
   canAcquireRelic(relic){
-    if(relic.relicEnhance==='ren_black' && GameState.relics.some(r=>r.relicEnhance==='ren_black')) return false;
+    // #1 ブラックカードは複数所持できる（効果は重複しない：shopPriceOf は所持の有無だけで半額判定）
     return GameState.canAddRelic(relic);
   },
 
@@ -77,7 +104,7 @@ const ShopScene = {
     if(GameState.gold<price){ this.message='Gが足りません'; this.renderAll(); return; }
     // #1(B) 倍化/3倍化は2枠・3枠消費。上限を超える場合は購入不可。ブラックカードは重複不可
     if(!this.canAcquireRelic(relic)){
-      this.message = (relic.relicEnhance==='ren_black' && GameState.relics.some(r=>r.relicEnhance==='ren_black')) ? 'ブラックカードは重複所持できません' : `レリックは最大${GameState.effectiveMaxRelics()}枠まで`;
+      this.message = `レリックは最大${GameState.effectiveMaxRelics()}枠まで`;
       this.renderAll(); return;
     }
     GameState.gold-=price;
@@ -90,7 +117,7 @@ const ShopScene = {
     this.renderAll();
   },
 
-  relicPrice(relic){ return GameState.shopPriceOf(GameData.SHOP_PRICES.relic + (relic.relicEnhance ? 3 : 0)); },
+  relicPrice(relic){ return GameState.shopPriceOf(GameData.relicBasePrice(relic)); }, // #4 グレード別価格（強化付き+3G）
 
   // #11 基礎点が50を超える場合+2、性質変化：ディスカードを所持している場合+5
   calcCashGain(card){ return 1 + (card.enhance ? 2 : 0) + (card.jamming ? 1 : 0) + ((card.trait&&card.trait!=='塗りつぶし(レリック)') ? 3 : 0) + (card.baseScore>50 ? 2 : 0) + (card.trait==='ディスカード' ? 5 : 0); },
@@ -118,7 +145,7 @@ const ShopScene = {
     const price = this.relicPrice(relic);
     if(GameState.gold < price){ this.message = 'Gが足りません'; this.renderAll(); return; }
     if(!this.canAcquireRelic(relic)){
-      this.message = (relic.relicEnhance==='ren_black' && GameState.relics.some(r=>r.relicEnhance==='ren_black')) ? 'ブラックカードは重複所持できません' : `レリックは最大${GameState.effectiveMaxRelics()}枠まで`;
+      this.message = `レリックは最大${GameState.effectiveMaxRelics()}枠まで`;
       this.renderAll(); return;
     }
     GameState.gold -= price;
@@ -175,7 +202,7 @@ const ShopScene = {
     const price = GameState.shopPriceOf(slotType === 'special' ? GameData.SHOP_PRICES.specialUpgrade : GameData.SHOP_PRICES.normalUpgrade);
     if(GameState.gold < price || GameState.currentDeck.length === 0) return;
 
-    let pool = GameData.NORMAL_SELECT_POOL;
+    let pool = GameData.normalSelectPool(); // #5
     if(slotType === 'special'){
       pool = GameData.SPECIAL_SELECT_POOL.filter(e => !GameState.usedSpecialEffectIds.includes(e.id));
       if(pool.length === 0){ this.message = '特別セレクトの効果はすべて入手済みです'; this.renderAll(); return; }
@@ -186,7 +213,7 @@ const ShopScene = {
         if(e.rarity) return Math.random() < e.rarity;
         return true;
       });
-      if(pool.length === 0) pool = GameData.NORMAL_SELECT_POOL.filter(e => !e.rarity);
+      if(pool.length === 0) pool = GameData.normalSelectPool().filter(e => !e.rarity);
     }
     GameState.gold -= price;
     slotRef.used = true;
@@ -201,8 +228,8 @@ const ShopScene = {
 
   // #6/#7 爆発通常アップグレードのパック内容を生成する共通処理（ショップ購入・スキップ報酬・クリア報酬から共通で使う）
   buildExplosiveUpgradePack(slotRef){
-    let pool = GameData.NORMAL_SELECT_POOL.filter(e => { if(e.rarity) return Math.random() < e.rarity; return true; });
-    if(pool.length === 0) pool = GameData.NORMAL_SELECT_POOL.filter(e => !e.rarity);
+    let pool = GameData.normalSelectPool().filter(e => { if(e.rarity) return Math.random() < e.rarity; return true; });
+    if(pool.length === 0) pool = GameData.normalSelectPool().filter(e => !e.rarity);
     const pickCount = Math.min(GameState.packCardCount(true), GameState.currentDeck.length); // #11 爆発アップグレードは9枚（＋シカクパッシブ1・特別アップグレード）
     const cardIndexes = GlobalFunctions.shuffle(GameState.currentDeck.map((_,idx)=>idx)).slice(0, pickCount);
     const targetCards = cardIndexes.map(i=>GameState.currentDeck[i]);
@@ -437,7 +464,7 @@ const ShopScene = {
     const p = this.pickingRelicPack; if(!p) return;
     const relic = p.candidates[idx]; if(!relic) return;
     if(!this.canAcquireRelic(relic)){
-      this.message = (relic.relicEnhance==='ren_black' && GameState.relics.some(r=>r.relicEnhance==='ren_black')) ? 'ブラックカードは重複所持できません。売却してから選択してください' : 'レリック上限です。売却してから選択してください';
+      this.message = 'レリック上限です。売却してから選択してください';
       this.renderAll(); return;
     }
     GameState.relics.push(relic);
@@ -492,9 +519,21 @@ const ShopScene = {
   },
 
   // #4 ホシパッシブ1を取得するまでショップの品揃え更新は解放されない
-  rerollOffers(){ const price=GameState.shopPriceOf(GameData.SHOP_PRICES.reroll); if(GameState.gold<price||GameState.symbolPassiveTier.Hoshi<1) return; GameState.gold-=price; this.offers=this.generateOffers(); this.message='品揃えを更新した'; this.renderAll(); },
+  rerollOffers(){
+    const price=GameState.shopPriceOf(GameData.SHOP_PRICES.reroll); if(GameState.gold<price||GameState.symbolPassiveTier.Hoshi<1) return;
+    GameState.gold-=price;
+    if(this.miniShop){
+      // ミニショップ：構成は変えずにランダム2枠だけ再抽選（固定2枠は復活）。品揃えと所持Gを保存
+      this.offers=this.generateMiniOffers();
+      if(GameState.retreat){ GameState.retreat.offers=this.offers; App.saveGame(); }
+    } else this.offers=this.generateOffers();
+    this.message='品揃えを更新した'; this.renderAll();
+  },
 
-  leaveShop(){ if(typeof PackFX!=='undefined'&&PackFX.isPlaying()) PackFX.skip&&PackFX.skip(); this._fxPack=null; this.packQueue=[]; this.pendingRelicPacks=0; this.pickingRelicPack=null; this.packBreakdownOpen=false; this.packBreakdownSelected=null; if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup(); this.offers=null; this.fixedFinalShop=false; this.pickingPack=null; this.pickingCardPack=null; this.cardRevealPopup=null; this.message=null; this.activeRelicId=null; this.relicListOpen=false; this.packActiveRelicId=null; this.packRelicListOpen=false; GameState.lastReward=null; App.showMapSelect(); },
+  leaveShop(){ if(typeof PackFX!=='undefined'&&PackFX.isPlaying()) PackFX.skip&&PackFX.skip(); this._fxPack=null; this.packQueue=[]; this.pendingRelicPacks=0; this.pickingRelicPack=null; this.packBreakdownOpen=false; this.packBreakdownSelected=null; if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup(); this.offers=null; this.fixedFinalShop=false; this.pickingPack=null; this.pickingCardPack=null; this.cardRevealPopup=null; this.message=null; this.activeRelicId=null; this.relicListOpen=false; this.packActiveRelicId=null; this.packRelicListOpen=false; GameState.lastReward=null;
+    // ミニショップを出たら一時撤退を終了し、マップ（失敗したステージは未クリアのまま）へ戻る。リロードで再びミニショップに入らないよう保存
+    if(this.miniShop){ this.miniShop=false; GameState.retreat=null; App.saveGame(); }
+    App.showMapSelect(); },
 
   // ===== パック開封演出（PackFX） =====
   // 表示順（レリックパック→カードパック→アップグレード）で最初の未開封パックを返す
@@ -539,7 +578,10 @@ const ShopScene = {
     el.appendChild(topRow);
     const header = document.createElement('div'); header.className='shop-header';
     // #13 ショップ文字列のすぐ下の報酬内訳は不要。デッキ確認・マップ一覧・所持Gを直下に並べる
-    header.innerHTML = `<h2>ショップ</h2>`;
+    header.innerHTML = this.miniShop
+      ? `<h2 class="mini-shop-title">${GIcon('btn_retreat',{cls:'gi-gap'})}ミニショップ<small>（一時撤退中）</small></h2>`
+      : `<h2>ショップ</h2>`;
+    if(this.miniShop) header.appendChild(this.renderRetreatBanner());
     // #2 ショップ画面でデッキ・マップ一覧を確認できるようにする
     const shopViewBtns = document.createElement('div'); shopViewBtns.style.cssText='display:flex;gap:8px;justify-content:center;margin-top:6px;';
     const deckBtn2 = document.createElement('button'); deckBtn2.textContent=`デッキ確認(${GameState.currentDeck.length})`; deckBtn2.addEventListener('click',()=>GameMainScene.showDeckModal('deck'));
@@ -568,6 +610,10 @@ const ShopScene = {
     }
     el.appendChild(relicArea);
 
+    if(this.miniShop){
+      // ミニショップ：常設（レリックパック・カードフォーカス）＋ランダム2枠を1段に並べる
+      el.appendChild(this.renderRandomSlots([...(this.offers.miniFixed||[]), ...this.offers.randomSlots], '商品一覧'));
+    } else {
     // #4 陳列：上段4枠（確定ピックアップレリック2＋？カードパック＋ピックアップアップグレード）・下段4枠（ランダム）
     const fixedSec = this.renderFixedRelicSection();
     const fixedRow = fixedSec.querySelector('.shop-row');
@@ -575,6 +621,7 @@ const ShopScene = {
     el.appendChild(fixedSec);
     // ランダム4枠
     el.appendChild(this.renderRandomSlots());
+    }
 
     // 既存レリック販売枠
 
@@ -588,7 +635,7 @@ const ShopScene = {
       const rerollLocked=GameState.symbolPassiveTier.Hoshi<1;
       const rerollBtn = document.createElement('button'); rerollBtn.innerHTML=rerollLocked?'品揃え更新'+GIcon('btn_lock',{cls:'gi-gap-l',title:'ロック中'}):`品揃え更新（${GameState.shopPriceOf(GameData.SHOP_PRICES.reroll)}G）`; rerollBtn.disabled=rerollLocked||GameState.gold<GameState.shopPriceOf(GameData.SHOP_PRICES.reroll); rerollBtn.addEventListener('click',()=>this.rerollOffers()); actions.appendChild(rerollBtn);
     }
-    const backBtn = document.createElement('button'); backBtn.textContent='マップに戻る'; backBtn.addEventListener('click',()=>this.leaveShop()); actions.appendChild(backBtn);
+    const backBtn = document.createElement('button'); backBtn.textContent=this.miniShop?'マップに戻って再挑戦':'マップに戻る'; backBtn.addEventListener('click',()=>this.leaveShop()); actions.appendChild(backBtn);
     el.appendChild(actions);
     this.container.appendChild(el);
     // #19 パック内訳モーダル
@@ -679,6 +726,8 @@ const ShopScene = {
     sec.innerHTML = '';
     const row = document.createElement('div'); row.className='shop-row shop-row-4';
     // カードパック
+    // #7 階層10の最終ショップは固定枠（？カードパック・ピックアップアップグレード）が無いので何も描かない（以前はここで例外→画面が真っ暗）
+    if(!this.offers.fixedCardPack||!this.offers.fixedCardPack[0]){ sec.appendChild(row); return sec; }
     const cpSlot = this.offers.fixedCardPack[0];
     const cpEl = document.createElement('div'); cpEl.className='shop-slot'+(cpSlot.used?' sold':'');
     if(cpSlot.used){ cpEl.innerHTML='<div class="slot-title">SOLD OUT</div>'; }
@@ -690,7 +739,7 @@ const ShopScene = {
     row.appendChild(cpEl);
     // ピックアップアップグレード（#5 1つの効果を抽選して陳列・即時発動）
     if(!this.offers.fixedUpgrade[0]._single){
-      const pool=GameData.NORMAL_SELECT_POOL.filter(e=>!e.rarity);
+      const pool=GameData.normalSelectPool().filter(e=>!e.rarity);
       this.offers.fixedUpgrade[0]._single=GlobalFunctions.randChoice(pool);
     }
     const puSlot = this.offers.fixedUpgrade[0];
@@ -717,11 +766,20 @@ const ShopScene = {
     sec.appendChild(row); return sec;
   },
 
-  renderRandomSlots(){
-    const sec = document.createElement('div'); sec.className='shop-section';
-    sec.innerHTML = '<h3>ランダム商品</h3>';
+  // 一時撤退中の案内（撤退したステージ・獲得した撤退G・残機）
+  renderRetreatBanner(){
+    const rt = GameState.retreat || {};
+    const b = document.createElement('div'); b.className='retreat-banner';
+    b.innerHTML = `<div class="retreat-banner-main"><span class="retreat-banner-stage">第${rt.floor||GameState.currentFloor}階層「${rt.stageName||'ステージ'}」から撤退</span>${rt.gold!=null?`<span class="retreat-banner-gold">撤退G +${rt.gold}</span>`:''}</div>`
+      + `<div class="retreat-banner-lives"><span class="lives-label">残機</span><span class="lives-badge">${GameState.livesIconsHtml()}</span><span class="retreat-banner-note">体制を整えて再挑戦しよう</span></div>`;
+    return b;
+  },
+
+  renderRandomSlots(slotsArg, titleArg){
+    const sec = document.createElement('div'); sec.className='shop-section'+(slotsArg?' mini-shop-section':'');
+    sec.innerHTML = `<h3>${titleArg||'ランダム商品'}</h3>`;
     const row = document.createElement('div'); row.className='shop-row shop-row-4';
-    this.offers.randomSlots.forEach((slot) => {
+    (slotsArg||this.offers.randomSlots).forEach((slot) => {
       const el = document.createElement('div');
       const isDream = slot.type === 'dream_card';
       const isSpecial = slot.type === 'special_upgrade';
@@ -745,7 +803,7 @@ const ShopScene = {
       // #1 pickup_upgrade: 1効果を事前抽選して表示
       if(slot.type==='pickup_upgrade'){
         if(!slot._single){
-          const pool=GameData.NORMAL_SELECT_POOL.filter(e=>!e.rarity);
+          const pool=GameData.normalSelectPool().filter(e=>!e.rarity);
           slot._single=GlobalFunctions.randChoice(pool);
         }
         const eff=slot._single;
@@ -769,6 +827,8 @@ const ShopScene = {
       el.querySelector('.buy-btn').addEventListener('click', () => this.handleRandomSlot(slot));
       row.appendChild(el);
     });
+    // ミニショップ：常設／ランダムの区別タグ
+    if(slotsArg) Array.from(row.children).forEach((el,i)=>{ const sl=slotsArg[i]; if(!sl||sl.used) return; const t=document.createElement('div'); t.className='mini-slot-tag'+(sl.miniFixed?' fixed':''); t.textContent=sl.miniFixed?'常設':'ランダム'; el.insertBefore(t, el.firstChild); });
     sec.appendChild(row); return sec;
   },
 

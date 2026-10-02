@@ -851,11 +851,41 @@ const StageFX = (function(){
   // 1. ステージクリア報酬の受け取り演出
   // =====================================================================
   let resultUI=null;
-  // opts: { win, title, scoreText, reward(GameState.lastReward|null), goldBefore, goldAfter, btnLabel, onNext, formulaText, debugHtml }
+  // opts: { win, title, scoreText, reward(GameState.lastReward|null), goldBefore, goldAfter, btnLabel, onNext, formulaText, debugHtml,
+  //         retreat({gold,num,ratio,livesBefore,livesLeft,maxLives}|null：一時撤退), gameOver(bool：残機0の敗北) }
+  // 残機アイコン（i番目が on / breaking / off）
+  function livesRowHtml(max, on, breakingIdx){
+    let h='';
+    for(let i=0;i<max;i++){
+      const st=i===breakingIdx?'breaking':(i<on?'on':'off');
+      h+=`<span class="stfx-rt-heart ${st}" data-i="${i}">${icon(st==='off'?'life_heart_empty':'life_heart')}</span>`;
+    }
+    return h;
+  }
+  // 残機が砕ける：揺れ→割れたハートへ差し替え→破片が飛び散る
+  async function shatterHeart(ui, node, R, w){
+    if(!node) return;
+    if(!R) await anim(node,[{transform:'translateX(0) scale(1)'},{transform:'translateX(-4px) scale(1.15)'},{transform:'translateX(4px) scale(1.15)'},{transform:'translateX(-3px) scale(1.1)'},{transform:'translateX(0) scale(1.2)',filter:'brightness(2.2)'}],{duration:ui.skip?1:460,easing:'ease-in-out'}).finished.catch(()=>{});
+    node.classList.remove('breaking'); node.classList.add('broken');
+    node.innerHTML=icon('life_heart_broken');
+    if(!R && !ui.skip){
+      const r=node.getBoundingClientRect(); const c=ctr(r);
+      for(let i=0;i<9;i++){
+        const sh=el('div','stfx-rt-shard'); sh.style.left=c.x+'px'; sh.style.top=c.y+'px'; ui.rl.appendChild(sh);
+        const a=rnd(0,Math.PI*2), d=rnd(26,60);
+        anim(sh,[{opacity:1,transform:'translate(-50%,-50%) rotate(0) scale(1)'},{opacity:0,transform:`translate(calc(-50% + ${Math.cos(a)*d}px),calc(-50% + ${Math.sin(a)*d+18}px)) rotate(${rnd(-200,200)}deg) scale(.5)`}],{duration:rnd(520,820),easing:'cubic-bezier(.2,.7,.4,1)',fill:'forwards'})
+          .finished.catch(()=>{}).then(()=>sh.remove());
+      }
+      anim(node,[{transform:'scale(1.25)',opacity:1},{transform:'scale(1)',opacity:.75}],{duration:420,fill:'forwards',easing:'ease-out'});
+    }
+    await w(380);
+  }
   function showResult(opts){
     if(resultUI && document.body.contains(resultUI.ov)){ resultUI.opts.onNext=opts.onNext; return; }
     const R=reduced();
-    const ov=el('div','stfx-result'+(opts.win?' win':' lose')+(R?' stfx-reduced':''));
+    const rt=(!opts.win&&opts.retreat)?opts.retreat:null;
+    const go=(!opts.win&&!rt);
+    const ov=el('div','stfx-result'+(opts.win?' win':' lose')+(rt?' retreat':'')+(go?' gameover':'')+(R?' stfx-reduced':''));
     const box=el('div','stfx-res-box');
     const r=opts.reward;
     const b=r&&r.breakdown;
@@ -884,10 +914,37 @@ const StageFX = (function(){
     }
     const extras=(opts.win&&r&&r.extra)?String(r.extra).split('／').filter(Boolean):[];
     const hasGold=!!(opts.win&&r&&b);
+    // 一時撤退：残機が1つ砕ける → 撤退G（10×num×達成率）を獲得 → 残り残機
+    const pct=rt?Math.round((rt.ratio||0)*1000)/10:0;
+    const rtHtml=rt?`
+      <div class="stfx-rt">
+        <div class="stfx-rt-sub">${icon('btn_retreat')}残機を1つ消費して一時撤退</div>
+        <div class="stfx-rt-lives">${livesRowHtml(Math.max(rt.maxLives||2,rt.livesBefore||0), rt.livesLeft, rt.livesLeft)}</div>
+        <div class="stfx-rt-left">残り残機 <b>${rt.livesLeft}</b><small> / ${rt.maxLives||2}</small></div>
+      </div>
+      <div class="stfx-res-wallet"><span class="stfx-coin static">G</span>所持G <b class="stfx-res-wallet-v">${opts.goldBefore}</b></div>
+      <div class="stfx-res-panel stfx-rt-panel">
+        <div class="gr-label">撤退G</div>
+        <div class="stfx-res-lines">
+          <div class="stfx-res-line"><span>基本G10 × num${rt.num}<small>（基本1${rt.num>1?'・階層6以上+1':''}）</small></span><b>${10*rt.num}</b></div>
+          <div class="stfx-res-line"><span>× 達成率（点数 / 目標点数）</span><b>${pct}%</b></div>
+          <div class="stfx-res-line sub"><span>端数切り捨て</span><b>= ${rt.gold}</b></div>
+        </div>
+        <div class="stfx-res-total">+<span class="stfx-res-total-v" data-final="${rt.gold}">0</span>G</div>
+        <div class="stfx-res-formula">撤退G ＝ floor(10 × num × 現在の点数 / 目標点数)</div>
+      </div>
+      <div class="stfx-rt-note">ミニショップで体制を整え、同じステージに再挑戦できます</div>`:'';
+    const goHtml=go?`
+      <div class="stfx-rt stfx-go">
+        <div class="stfx-rt-lives">${livesRowHtml(2,0,-1)}</div>
+        <div class="stfx-rt-left">残機がありません</div>
+        <div class="stfx-rt-note">発見した効果・レリックは図鑑に記録されました</div>
+      </div>`:'';
     box.innerHTML=`
       <div class="stfx-res-rays"></div>
-      <div class="stfx-res-title ${opts.win?'win':'lose'}">${(opts.win?'STAGE CLEAR':'GAME OVER').split('').map(ch=>`<span>${ch===' '?'&nbsp;':ch}</span>`).join('')}</div>
+      <div class="stfx-res-title ${opts.win?'win':(rt?'lose retreat':'lose')}">${(opts.win?'STAGE CLEAR':(rt?'一時撤退':'GAME OVER')).split('').map(ch=>`<span>${ch===' '?'&nbsp;':ch}</span>`).join('')}</div>
       <div class="stfx-res-score">${opts.scoreText}</div>
+      ${rtHtml}${goHtml}
       ${rfx.length?`<div class="stfx-res-relics"><div class="stfx-res-relics-h">発動した効果<small>タップで確認</small></div><div class="stfx-res-rchips">${rfx.map((f,i)=>`<button type="button" class="stfx-res-rchip${f.grade?' rg-'+f.grade:''}" data-i="${i}"><span class="stfx-res-rchip-ico">${f.iconHtml}</span>${esc(f.name)}</button>`).join('')}</div></div>`:''}
       ${hasGold?`<div class="stfx-res-wallet"><span class="stfx-coin static">G</span>所持G <b class="stfx-res-wallet-v">${opts.goldBefore}</b><span class="stfx-res-wallet-d"></span></div>
       <div class="stfx-res-panel">
@@ -923,7 +980,9 @@ const StageFX = (function(){
       box.querySelectorAll('[data-final]').forEach(n=>{ n.textContent=n.dataset.final; });
       box.querySelectorAll('.g-line').forEach(n=>n.classList.add('lit'));
       const wv=box.querySelector('.stfx-res-wallet-v'); if(wv) wv.textContent=opts.goldAfter;
-      const wd=box.querySelector('.stfx-res-wallet-d'); if(wd && opts.goldBefore+(r?r.gold:0)!==opts.goldAfter){ wd.textContent=`（${opts.goldAfter-(opts.goldBefore+r.gold)}G 消費）`; }
+      // 一時撤退：砕ける途中でスキップされても、残機は割れた状態にそろえる
+      box.querySelectorAll('.stfx-rt-heart.breaking').forEach(n=>{ n.classList.remove('breaking'); n.classList.add('broken'); n.innerHTML=icon('life_heart_broken'); });
+      const wd=box.querySelector('.stfx-res-wallet-d'); if(wd && r && opts.goldBefore+r.gold!==opts.goldAfter){ wd.textContent=`（${opts.goldAfter-(opts.goldBefore+r.gold)}G 消費）`; }
       btn.disabled=false; btn.classList.add('ready');
       const hint=box.querySelector('.stfx-res-hint'); if(hint) hint.remove();
     };
@@ -934,6 +993,7 @@ const StageFX = (function(){
       try{
         anim(ov,[{backgroundColor:'rgba(6,7,12,0)'},{backgroundColor:'rgba(6,7,12,.84)'}],{duration:R?100:(opts.win?350:900),fill:'forwards'});
         anim(box,[{opacity:0,transform:'translateY(16px) scale(.96)'},{opacity:1,transform:'none'}],{duration:R?100:(opts.win?320:700),fill:'both',easing:'ease-out'});
+        if(rt){ await retreatSeq(ui, box, rt, R, w); finish(); return; }
         if(!opts.win){ await w(500); finish(); return; }
         // STAGE CLEAR の登場
         box.querySelectorAll('.stfx-res-title span').forEach((sp,i)=>anim(sp,[{opacity:0,transform:'translateY(-30px) scale(1.8)'},{opacity:1,transform:'translateY(0) scale(1)'}],{duration:R?60:380,delay:R?0:120+i*45,fill:'both',easing:'cubic-bezier(.3,1.6,.5,1)'}));
@@ -999,6 +1059,34 @@ const StageFX = (function(){
       }catch(e){ console.error('StageFX.showResult', e); }
       finish();
     })();
+  }
+  // 一時撤退の演出シーケンス
+  async function retreatSeq(ui, box, rt, R, w){
+    try{
+      box.querySelectorAll('.stfx-res-title span').forEach((sp,i)=>anim(sp,[{opacity:0,transform:'translateY(-18px)'},{opacity:1,transform:'none'}],{duration:R?60:420,delay:R?0:200+i*110,fill:'both',easing:'ease-out'}));
+      await w(760);
+      const sc=box.querySelector('.stfx-res-score'); anim(sc,[{opacity:0},{opacity:1}],{duration:220,fill:'both'});
+      const blk=box.querySelector('.stfx-rt'); anim(blk,[{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}],{duration:260,fill:'both'});
+      await w(520);
+      if(!ui.skip) await shatterHeart(ui, box.querySelector('.stfx-rt-heart.breaking'), R, w);
+      const left=box.querySelector('.stfx-rt-left'); anim(left,[{opacity:0},{opacity:1}],{duration:240,fill:'both'});
+      await w(300);
+      const wal=box.querySelector('.stfx-res-wallet'); anim(wal,[{opacity:0,transform:'translateY(-6px)'},{opacity:1,transform:'none'}],{duration:240,fill:'both'});
+      const panel=box.querySelector('.stfx-rt-panel'); anim(panel,[{opacity:0},{opacity:1}],{duration:200,fill:'both'});
+      await w(240);
+      for(const row of box.querySelectorAll('.stfx-rt-panel .stfx-res-line')){
+        if(ui.skip) break;
+        anim(row,[{opacity:0,transform:'translateX(-14px)'},{opacity:1,transform:'none'}],{duration:220,fill:'both',easing:'ease-out'});
+        await w(240);
+      }
+      const tot=box.querySelector('.stfx-rt-panel .stfx-res-total'); const tv=box.querySelector('.stfx-rt-panel .stfx-res-total-v');
+      anim(tot,[{opacity:0,transform:'scale(2)'},{opacity:1,transform:'scale(.95)',offset:.7},{opacity:1,transform:'scale(1)'}],{duration:380,fill:'both',easing:'cubic-bezier(.6,0,.6,1.4)'});
+      await countTo(ui, tv, 0, rt.gold, R?40:420);
+      await w(200);
+      if(!ui.skip && rt.gold>0) await coinFlow(ui, tot, box.querySelector('.stfx-res-wallet-v'), ui.opts.goldBefore, ui.opts.goldAfter, R);
+      const note=box.querySelector('.stfx-rt-note'); if(note) anim(note,[{opacity:0},{opacity:1}],{duration:260,fill:'both'});
+      await w(200);
+    }catch(e){ console.error('StageFX.retreat', e); }
   }
   function countTo(ui, node, from, to, ms, fmt){
     const F=fmt||(v=>v);

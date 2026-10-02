@@ -86,6 +86,12 @@ const App = {
     this.currentSaveSlot=slotIndex;
     GameState.initNewGame(this.selectedGameMode);
     GameState.currentFloor=1;
+    // スタートイベント（神の寵愛）：新規ゲームのみ、マップへ行く前に発生する（完了時に StartEvent 側で saveGame 済み）
+    if(typeof StartEvent!=='undefined'){
+      this.container.innerHTML='';
+      StartEvent.open().catch(e=>console.error(e)).then(()=>this.showMapSelect());
+      return;
+    }
     this.showMapSelect();
   },
 

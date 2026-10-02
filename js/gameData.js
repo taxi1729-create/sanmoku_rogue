@@ -267,7 +267,7 @@ const GameData = {
     { id:'ren_npc', name:'NPC強化',       desc:'NPCが2回行動。補正基礎点×5' },
     { id:'ren_draw_pile', name:'山札強化',      desc:'ビンゴ時、山札数×100を最終加算補正に追加' },
     { id:'ren_disc_pile', name:'捨て札強化',    desc:'ビンゴ時補正基礎点+n（n=捨て札数）' },
-    { id:'ren_black', name:'ブラックカード', desc:'ショップ金額が半額（切り上げ）。購入時即時反映' },
+    { id:'ren_black', name:'ブラックカード', desc:'ショップ金額が半額（切り上げ）。購入時即時反映。複数所持しても効果は重複しない' },
     { id:'ren_first', name:'手番高速',      desc:'全ラウンドで最初の手番がプレイヤーになる' },
     { id:'ren_grade', name:'グレードオール', desc:'ビンゴ時補正倍率+n（n=デッキの強化/ジャミング/性質変化の総数）' },
   ],
@@ -424,6 +424,11 @@ const GameData = {
     const pool=this.RELIC_POOL.filter(x=>this.relicGrade(x)===grade);
     return GlobalFunctions.randChoice(pool.length?pool:this.RELIC_POOL);
   },
+  // #4 レリックの価格（グレード別）。レリック強化効果付きは+3G
+  RELIC_GRADE_PRICE: { normal:3, rare:6, super:9, legend:12 },
+  relicBasePrice(relic){ return (this.RELIC_GRADE_PRICE[this.relicGrade(relic)]||3) + (relic&&relic.relicEnhance?3:0); },
+  // #5 通常セレクトの抽選プール：ジャミング優遇強化はサンカクパッシブLv1取得時のみ出現
+  normalSelectPool(){ return this.NORMAL_SELECT_POOL.filter(e=>e.id!=='jam_favor'||((typeof GameState!=='undefined')&&GameState.symbolPassiveTier?.Triangle>=1)); },
   RELIC_ENHANCE_RATE: 0.3, // #4 レリック強化効果の付与確率30%
   RELIC_POOL: [
     { id:'bingo', name:'ビンゴ',           desc:'ビンゴした時、補正基礎点+30' },
@@ -569,7 +574,7 @@ const GameData = {
   SHOP_PRICES: { relic:5, cardPack:2, normalUpgrade:3, specialUpgrade:10, reroll:1,
                  cardFocus:6, bingoFocus:4, dreamCard:20, pickupUpgrade:3,
                  // #9 新商品価格（各4G）
-                 enhancePack:4, jammingPack:4, relicPack:4,
+                 enhancePack:4, jammingPack:4, relicPack:5, // #4 レリックパック5G
                  // #6 爆発通常アップグレード
                  normalExplosiveUpgrade:10 },
 
@@ -588,7 +593,7 @@ const GameData = {
     { id:'grant_enhance', name:`${GIcon('rarity_normal')}カード強化付与`,    desc:'カードを1枚選択しランダムなカード強化を付与', targetMin:1, targetMax:1 },
     { id:'grant_jamming', name:`${GIcon('rarity_jamming')}ジャミング効果付与`,desc:'カードを1枚選択しランダムなジャミングを付与', targetMin:1, targetMax:1 },
     // #5/#6 ジャミング優遇強化：パックに並んだ選択可能カードのうち、ジャミング付きカード全ての基礎点+4（アイコンはジャミング効果付与と同じ）
-    { id:'jam_favor', name:`${GIcon('rarity_jamming')}ジャミング優遇強化`, desc:'選択可能なカードの中でジャミング効果が付与されているカード全てに対してカード基礎点+4', targetMin:0, targetMax:0, showCards:true },
+    { id:'jam_favor', name:`${GIcon('rarity_jamming')}ジャミング優遇強化`, desc:'選択可能なカードの中でジャミング効果が付与されているカード全てに対してカード基礎点+4（サンカクパッシブLv1取得時のみ出現）', targetMin:0, targetMax:0, showCards:true },
     { id:'all_mult_up1', name:`${GIcon('rarity_normal')}オールビンゴ強化`,  desc:'全記号のビンゴ倍率を+1する',          targetMin:0, targetMax:0 },
     // #8: 1%で性質変化付与
     // #18 性質変化のレア枠出現率を3%に変更

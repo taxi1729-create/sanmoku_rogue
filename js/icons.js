@@ -332,6 +332,22 @@ const GameIcons = (function(){
       + `<path d="M11 2.5l.3 2.2"${s(C.blue)}/><path d="M20.5 3.5l-1.5 1.8"${s(C.green)}/>`
       + `<circle cx="16" cy="3" r="1.2"${F(C.pink)}/><circle cx="21" cy="8.5" r="1.1"${F(C.blue)}/><circle cx="18.8" cy="15.5" r="1.1"${F(C.gold)}/>` },
 
+    /* ---------------- 新規：残機 / 一時撤退 ---------------- */
+    // 残機（あり）：赤いハート＋ハイライト
+    life_heart:{ label:'残機', tint:'fixed', body:
+        `<path d="M12 20.5C6.2 16.6 3 13.4 3 9.4 3 6.6 5.1 4.5 7.7 4.5c1.8 0 3.3 1 4.3 2.5 1-1.5 2.5-2.5 4.3-2.5 2.6 0 4.7 2.1 4.7 4.9 0 4-3.2 7.2-9 11.1z"${s(C.redD)}${tf(C.red,0.9)} stroke-width="1.6"/>`
+      + `<path d="M6.6 8.2c.4-1 1.2-1.5 2.1-1.5"${s(C.redL)} stroke-width="1.6"/>` },
+    // 残機（失った枠）：くすんだ線のみ
+    life_heart_empty:{ label:'失った残機', tint:'fixed', body:
+        `<path d="M12 20.5C6.2 16.6 3 13.4 3 9.4 3 6.6 5.1 4.5 7.7 4.5c1.8 0 3.3 1 4.3 2.5 1-1.5 2.5-2.5 4.3-2.5 2.6 0 4.7 2.1 4.7 4.9 0 4-3.2 7.2-9 11.1z" stroke="#64748b" fill="#64748b" fill-opacity=".12" stroke-width="1.6" stroke-dasharray="2.6 2.2"/>` },
+    // 砕けた残機：左右に割れたハート
+    life_heart_broken:{ label:'砕けた残機', tint:'fixed', body:
+        `<path d="M11 19.6C5.8 16 3 13.1 3 9.4 3 6.6 5.1 4.5 7.7 4.5c1.6 0 2.9.8 3.9 2l-1.4 3.2 2.2 2.2-1.6 3.2z"${s(C.redD)}${tf(C.red,0.55)} stroke-width="1.5"/>`
+      + `<path d="M13.4 19.6C18.4 16 21 13.1 21 9.4c0-2.8-2.1-4.9-4.7-4.9-1.5 0-2.8.7-3.7 1.8l-1.2 3.4 2.2 2.2-1.4 3.3z"${s(C.redD)}${tf(C.red,0.55)} stroke-width="1.5"/>` },
+    // 一時撤退：戻り矢印＋旗
+    btn_retreat:{ label:'一時撤退', tint:'current', body:
+        `<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>` },
+
     /* ---------------- 新規：魔力 / 魔神 ---------------- */
     passive_mana:{ label:'魔力', tint:'fixed', body:
         `<path d="M12 2.5C9 7 5.5 10 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 10 15 7 12 2.5z"${s(C.violet)}${tf(C.violet,0.3)}/>`
@@ -342,6 +358,17 @@ const GameIcons = (function(){
       + `<path d="M12 5.5l6.5 3.5v6.5L12 21l-6.5-5.5V9z"${s(C.purple)}${tf(C.purple,0.3)}/>`
       + `<path d="M8.4 11.4l2.6 1.2M15.6 11.4L13 12.6"${s('#fecaca')} stroke-width="2.2"/>`
       + `<path d="M10 16.8l2 1.4 2-1.4"${s(C.purple)} stroke-width="1.6"/>` },
+    // スタートイベント（神の寵愛）：光輪＋放射光＋聖なるキラ
+    divine_favor:{ label:'神の寵愛', tint:'fixed', body:
+        `<ellipse cx="12" cy="4.6" rx="5.6" ry="1.9"${s(C.goldL)} stroke-width="1.6"/>`
+      + `<path d="M12 8.4v1.8M5.6 10.6l1.3 1.2M18.4 10.6l-1.3 1.2M3.2 16h1.9M18.9 16h1.9"${s(C.gold)} stroke-width="1.6"/>`
+      + star4(12,16,5.4,F(C.goldL))
+      + star4(12,16,2,F('#ffffff')) },
+    // 金貨（G）
+    gold_coin:{ label:'金貨', tint:'fixed', body:
+        `<circle cx="12" cy="12" r="8.6"${s(C.gold)}${tf(C.gold,0.45)}/>`
+      + `<circle cx="12" cy="12" r="6"${s(C.goldL)} stroke-width="1.1" stroke-opacity=".7"/>`
+      + `<path d="M14.4 9.8a3.1 3.1 0 1 0 .5 3.6H12.6"${s(C.goldL)} stroke-width="1.8"/>` },
 
     /* ---------------- カード強化（黄）追加 ---------------- */
     enh_draw:{ label:'ドロー', tint:'fixed', body:
