@@ -371,7 +371,7 @@ const ShopScene = {
       case 'duplicate': { const i=targetIndexes[0]; const src=deck[i]; if(!src) return []; const clone={...src,id:'dup_'+Date.now()+'_'+Math.floor(Math.random()*100000)}; GameState.currentDeck.push(clone); this.message='複製した'; return [clone]; }
       // #21 付与効果は対象カードに現在付与されているもの以外から抽選する
       //     （副次効果は付与した種類のみ適用し、既存の強化／性質変化の即時加算が二重にかからないようにする）
-      case 'grant_enhance': { const i=targetIndexes[0]; const c=deck[i]; if(!c) return []; c.enhance=GameData.pickDifferent(GameData.ENHANCE_NAME_POOL, c.enhance); GameData.applyGrantSideEffects(c, GameState.gold, 'enhance'); this.message=`カード強化「${c.enhance}」付与`; return [c]; }
+      case 'grant_enhance': { const i=targetIndexes[0]; const c=deck[i]; if(!c) return []; GameData.setEnhance(c, GameData.pickDifferent(GameData.ENHANCE_NAME_POOL, c.enhance), GameState.gold); /* #5 旧強化の即時加算を戻す */ this.message=`カード強化「${c.enhance}」付与`; return [c]; }
       case 'grant_jamming': { const i=targetIndexes[0]; const c=deck[i]; if(!c) return []; c.jamming=GameData.pickDifferent(Object.keys(GameData.JAMMING_DESC), c.jamming); this.message=`ジャミング「${c.jamming}」付与`; return [c]; }
       case 'grant_trait': case 'grant_trait_rare': { const i=targetIndexes[0]; const c=deck[i]; if(!c) return []; c.trait=GameData.pickDifferent(GameData.TRAIT_NAME_POOL, c.trait); GameData.applyGrantSideEffects(c, GameState.gold, 'trait'); this.message=`性質変化「${c.trait}」付与`; return [c]; }
       case 'hand_up2':       GameState.handSizeBonus+=2; this.message='手札上限+2'; return [];
@@ -532,7 +532,7 @@ const ShopScene = {
 
   leaveShop(){ if(typeof PackFX!=='undefined'&&PackFX.isPlaying()) PackFX.skip&&PackFX.skip(); this._fxPack=null; this.packQueue=[]; this.pendingRelicPacks=0; this.pickingRelicPack=null; this.packBreakdownOpen=false; this.packBreakdownSelected=null; if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup(); this.offers=null; this.fixedFinalShop=false; this.pickingPack=null; this.pickingCardPack=null; this.cardRevealPopup=null; this.message=null; this.activeRelicId=null; this.relicListOpen=false; this.packActiveRelicId=null; this.packRelicListOpen=false; GameState.lastReward=null;
     // ミニショップを出たら一時撤退を終了し、マップ（失敗したステージは未クリアのまま）へ戻る。リロードで再びミニショップに入らないよう保存
-    if(this.miniShop){ this.miniShop=false; GameState.retreat=null; App.saveGame(); }
+    if(this.miniShop){ this.miniShop=false; this._miniSaveSig=null; GameState.retreat=null; App.saveGame(); }
     App.showMapSelect(); },
 
   // ===== パック開封演出（PackFX） =====
@@ -561,7 +561,18 @@ const ShopScene = {
   },
 
   // ===== Render =====
+  // v10 #7 ミニショップでの購入・売却・パック選択確定のたびにセーブ（パック選択中は確定後にセーブ）
+  miniShopAutoSave(){
+    if(!this.miniShop||!GameState.retreat||!this.offers) return;
+    if(this.pickingPack||this.pickingCardPack||this.pickingRelicPack||this._fxPack||(this.packQueue&&this.packQueue.length)||this.pendingRelicPacks) return;
+    let sig; try{ sig=JSON.stringify([GameState.gold,GameState.currentDeck,GameState.relics,this.offers]); }catch(e){ return; }
+    if(sig===this._miniSaveSig) return;
+    this._miniSaveSig=sig;
+    GameState.retreat.offers=this.offers;
+    App.saveGame();
+  },
   renderAll(){
+    try{ this.miniShopAutoSave(); }catch(e){}
     // #4 タップのたびに画面が一番上に戻る不具合を防ぐ：スクロール位置を保持
     const scrollY = window.scrollY;
     // #1 カード変化アニメーション終了時などの再描画で、パック選択モーダル内のスクロール位置も保持する

@@ -221,7 +221,7 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .card-reveal-popup{background:var(--panel);border:1px solid var(--gold);border-radius:16px;padding:22px 28px;text-align:center;}
 /* #7 カード変化ポップアップは画面右側に固定表示し、裏側のショップ操作をブロックしない */
 .card-reveal-toast{ position:fixed; top:50%; right:8px; transform:translateY(-50%); z-index:70; pointer-events:none; max-width:180px; }
-.card-reveal-toast .card-reveal-popup{ pointer-events:auto; padding:14px 12px; box-shadow:0 6px 22px rgba(0,0,0,.5); }
+.card-reveal-toast .card-reveal-popup{ pointer-events:auto; touch-action:none; cursor:grab; padding:14px 12px; box-shadow:0 6px 22px rgba(0,0,0,.5); }
 .card-reveal-toast .pack-card-grid{ max-height:none; }
 /* #3 カード変化中に他の操作があった場合、変化中のカードと枠を50%の不透明度にする */
 .card-reveal-toast.interrupted .card-reveal-popup{ opacity:.5; transition:opacity .2s ease; }

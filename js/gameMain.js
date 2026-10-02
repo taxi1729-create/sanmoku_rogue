@@ -2847,7 +2847,7 @@ const GameMainScene = {
           item.addEventListener('click',()=>{
             if(!swapSelected){ swapSelected=card; rebuildGrid(); return; }
             if(swapSelected===card){ swapSelected=null; rebuildGrid(); return; }
-            const tmp=swapSelected.enhance; swapSelected.enhance=card.enhance; card.enhance=tmp;
+            const tmp=swapSelected.enhance; const tmp2=card.enhance; GameData.setEnhance(swapSelected,tmp2); GameData.setEnhance(card,tmp); // #5 入れ替え時も即時加算を付け替える
             swapSelected=null; rebuildGrid();
           });
         }

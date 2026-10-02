@@ -398,8 +398,8 @@ const MajinEvent = (function(){
     const key=await api.pickList(pool.map(n=>({ key:n, label:n, desc:descs[n]||'', disabled:(target[kind]===n)?'付与済み':null, cls: kind==='enhance'?'k-enhance':'k-jamming' })),
       {title: kind==='enhance'?'刻むカード強化を選べ（20種）':'刻むジャミング効果を選べ（10種）', preview:target});
     const before=clone(target);
-    target[kind]=key;
-    if(kind==='enhance') GameData.applyGrantSideEffects(target, G().gold, 'enhance');
+    if(kind==='enhance') GameData.setEnhance(target, key, G().gold); // #5 旧強化の即時加算を戻してから付与
+    else target[kind]=key;
     GlobalFunctions.recordCard(target);
     return lostHtml([lost])+beforeAfterHtml(before,target);
   }

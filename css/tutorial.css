@@ -1,0 +1,150 @@
+/* tutorial.css — 初回チュートリアル（js/tutorial.js）。クラスはすべて tut- プレフィックス
+ * スタートイベント（startevent.css）と調和する神聖テーマ：羊皮紙色の吹き出し・金の縁・聖なる声の名札
+ * body 直下の position:fixed。ゲーム画面のレイアウトは動かさない */
+.tut-root{
+  --tut-gold:#fcd34d; --tut-gold-d:#b8862b; --tut-ink:#1e2a44; --tut-sky:#7dd3fc; --tut-dim:rgba(3,6,16,.74);
+  position:fixed; inset:0; z-index:95; overflow:hidden; cursor:pointer;
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:none;
+  font-family:'Noto Sans JP',sans-serif; opacity:0; transition:opacity .28s ease;
+}
+.tut-root.tut-in{ opacity:1; }
+.tut-root.tut-out{ opacity:0; transition:opacity .22s ease; }
+
+/* スポットライト：巨大な box-shadow で周囲を暗くし、対象だけを切り抜く */
+.tut-spot{
+  position:fixed; left:50%; top:50%; width:0; height:0; border-radius:12px; pointer-events:none;
+  box-shadow:0 0 0 200vmax var(--tut-dim), 0 0 0 1.5px var(--tut-gold), 0 0 18px 2px rgba(253,230,138,.55);
+  transition:left .38s cubic-bezier(.3,.7,.3,1), top .38s cubic-bezier(.3,.7,.3,1), width .38s cubic-bezier(.3,.7,.3,1), height .38s cubic-bezier(.3,.7,.3,1), box-shadow .3s ease;
+}
+.tut-root.tut-no-target .tut-spot{ box-shadow:0 0 0 200vmax rgba(3,6,16,.8), 0 0 0 0 transparent, 0 0 0 0 transparent; }
+.tut-spot-ring{ position:absolute; inset:-5px; border-radius:15px; border:1px solid rgba(253,230,138,.55); opacity:0; animation:tutRing 2.2s ease-out infinite; }
+.tut-root.tut-no-target .tut-spot-ring{ display:none; }
+@keyframes tutRing{ 0%{ opacity:.85; transform:scale(1); } 70%{ opacity:0; transform:scale(1.06); } 100%{ opacity:0; transform:scale(1.06); } }
+
+/* 吹き出し（羊皮紙＋金の縁） */
+.tut-bubble{
+  position:fixed; left:0; top:0; width:max-content; max-width:360px; min-width:min(260px, calc(100vw - 20px));
+  max-height:calc(100vh - 20px); max-height:calc(100dvh - 20px);
+  padding:18px 14px 8px; border-radius:12px; cursor:pointer; color:var(--tut-ink);
+  background:linear-gradient(180deg, rgba(255,253,245,.98), rgba(244,238,220,.97));
+  border:1px solid #e8c873;
+  box-shadow:0 0 0 1px rgba(255,255,255,.4) inset, 0 0 22px rgba(253,230,138,.35), 0 8px 22px rgba(0,0,0,.5);
+  transition:left .32s cubic-bezier(.3,.7,.3,1), top .32s cubic-bezier(.3,.7,.3,1);
+}
+.tut-bubble::before{ content:''; position:absolute; inset:4px; border:1px solid rgba(184,134,43,.35); border-radius:9px; pointer-events:none; }
+.tut-bubble.tut-pop{ animation:tutPop .3s ease both; }
+@keyframes tutPop{ 0%{ opacity:.0; transform:translateY(6px); } 100%{ opacity:1; transform:none; } }
+
+/* しっぽ（対象側を指す） */
+.tut-tail{ position:absolute; width:14px; height:14px; margin:-7px 0 0 -7px; background:#fbf7ea; border:1px solid #e8c873; transform:rotate(45deg); display:none; }
+.tut-bubble[data-side="top"] .tut-tail{ display:block; top:0; border-right:0; border-bottom:0; }
+.tut-bubble[data-side="bottom"] .tut-tail{ display:block; top:100%; background:#f4eedc; border-left:0; border-top:0; }
+.tut-bubble[data-side="left"] .tut-tail{ display:block; left:0; border-top:0; border-right:0; }
+.tut-bubble[data-side="right"] .tut-tail{ display:block; left:100%; border-left:0; border-bottom:0; }
+
+/* 名札（聖なる声） */
+.tut-plate{ position:absolute; left:10px; top:-12px; display:flex; align-items:center; gap:6px; padding:2px 12px 2px 8px; border-radius:6px;
+  background:linear-gradient(90deg, #b8862b, #f5d27a 60%, #fff3c4); border:1px solid #fff7d6; box-shadow:0 0 10px rgba(253,230,138,.6); white-space:nowrap; }
+.tut-plate .gi{ width:15px; height:15px; }
+.tut-plate b{ font-size:12.5px; color:#2a1a00; letter-spacing:.12em; }
+.tut-plate small{ font-size:10px; color:#5b3d06; }
+
+.tut-head{ display:flex; align-items:center; gap:6px; margin:2px 0 4px; }
+.tut-head-ico{ display:inline-flex; width:20px; height:20px; color:var(--tut-gold-d); flex:0 0 auto; }
+.tut-head-ico:empty{ display:none; }
+.tut-head-ico .gi{ width:100%; height:100%; }
+.tut-head-title{ font-size:14px; font-weight:900; letter-spacing:.08em; color:#3b2a06; flex:1 1 auto; }
+.tut-count{ font-family:'Space Mono',monospace; font-size:10.5px; color:#8a6a2a; flex:0 0 auto; }
+
+/* 本文：非表示の全文コピーで高さを確定し、その上にタイプライターの文字を重ねる */
+.tut-text{ position:relative; font-family:'Noto Serif JP','Hiragino Mincho ProN','Yu Mincho','YuMincho',serif; font-weight:700;
+  font-size:13.5px; line-height:1.72; letter-spacing:.02em; }
+.tut-text-size{ visibility:hidden; }
+.tut-text-live{ position:absolute; inset:0; }
+.tut-text b{ color:#8a4b00; background:linear-gradient(transparent 62%, rgba(252,211,77,.45) 62%); }
+
+/* 図解 */
+.tut-aside{ margin:8px 0 2px; padding:8px; border-radius:9px; background:linear-gradient(180deg, rgba(14,28,60,.92), rgba(8,16,36,.94)); color:#e0f2fe;
+  border:1px solid rgba(253,230,138,.45); box-shadow:inset 0 0 14px rgba(125,211,252,.08); font-size:11px; }
+.tut-aside[hidden]{ display:none; }
+.tut-flow{ display:flex; align-items:center; justify-content:center; gap:4px; flex-wrap:wrap; }
+.tut-flow i{ width:12px; height:2px; background:#fde68a; opacity:.7; }
+.tut-chip{ display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(125,211,252,.14); border:1px solid rgba(125,211,252,.45); color:#e0f2fe; white-space:nowrap; }
+.tut-chip.boss{ background:rgba(248,113,113,.16); border-color:rgba(248,113,113,.6); color:#fecaca; }
+.tut-dots-legend{ display:flex; justify-content:center; gap:14px; flex-wrap:wrap; }
+.tut-dots-legend span{ display:inline-flex; align-items:center; gap:5px; font-weight:700; }
+.tut-dot{ display:inline-block; width:9px; height:9px; border-radius:50%; box-shadow:0 0 0 1px rgba(0,0,0,.45), 0 0 6px currentColor; }
+.tut-dot.d-enh{ background:var(--gold,#fbbf24); color:#fbbf24; }
+.tut-dot.d-jam{ background:var(--success,#4ade80); color:#4ade80; }
+.tut-dot.d-trait{ background:#60a5fa; color:#60a5fa; }
+.tut-bingo{ display:flex; align-items:center; justify-content:center; gap:12px; }
+.tut-mini{ display:grid; grid-template-columns:repeat(3,18px); gap:2px; }
+.tut-mini b{ width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:12px; border-radius:3px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14); }
+.tut-mini b.on{ background:rgba(125,211,252,.2); border-color:#7dd3fc; box-shadow:0 0 6px rgba(125,211,252,.5); }
+.tut-mini b.npc{ background:rgba(248,113,113,.12); border-color:rgba(248,113,113,.5); }
+.tut-bingo-txt{ display:flex; flex-direction:column; gap:3px; }
+.tut-sym{ display:inline-flex; }
+.tut-sym.sym-Circle{ color:var(--circle,#7dd3fc); } .tut-sym.sym-Triangle{ color:var(--triangle,#4ade80); }
+.tut-sym.sym-Square{ color:var(--square,#facc15); } .tut-sym.sym-Cross{ color:var(--cross,#f87171); }
+.tut-formula{ display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:3px 4px; }
+.tut-term{ display:inline-flex; align-items:center; gap:2px; padding:2px 6px; border-radius:6px; background:rgba(253,230,138,.12); border:1px solid rgba(253,230,138,.45); color:#fff7d6; font-weight:700; font-size:10.5px; white-space:nowrap; }
+.tut-term em{ font-style:normal; color:#fde68a; }
+.tut-op{ color:#fde68a; font-weight:900; font-size:12px; }
+.tut-ctl-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:4px 8px; }
+.tut-ctl-grid span{ display:inline-flex; align-items:center; gap:4px; white-space:nowrap; font-weight:700; }
+.tut-ctl-grid .gi{ width:15px; height:15px; color:#fde68a; }
+.tut-grades{ display:flex; justify-content:center; gap:4px; flex-wrap:wrap; }
+.tut-grade{ display:inline-flex; flex-direction:column; align-items:center; padding:2px 6px; border-radius:6px; font-size:10px; font-weight:700; border:1px solid; min-width:52px; }
+.tut-grade b{ font-family:'Space Mono',monospace; font-size:11px; }
+.tut-grade.g-normal{ color:#e2e8f0; border-color:rgba(226,232,240,.5); }
+.tut-grade.g-rare{ color:#7dd3fc; border-color:rgba(125,211,252,.6); }
+.tut-grade.g-super{ color:#f0abfc; border-color:rgba(240,171,252,.6); }
+.tut-grade.g-legend{ color:#fde68a; border-color:rgba(253,230,138,.7); box-shadow:0 0 8px rgba(253,230,138,.3); }
+.tut-sub{ text-align:center; color:#c7d6f2; font-size:10px; margin-top:4px; }
+
+/* 操作列 */
+.tut-nav{ display:flex; align-items:center; gap:6px; margin-top:10px; }
+.tut-btn{ flex:0 0 auto; white-space:nowrap; font-family:'Noto Sans JP',sans-serif; font-size:12px; font-weight:700; padding:7px 12px; border-radius:999px; line-height:1.2; cursor:pointer; min-height:34px; }
+.tut-btn:hover:not(:disabled){ transform:none; }
+.tut-btn:disabled{ opacity:.35; cursor:default; }
+.tut-skip{ background:rgba(11,22,48,.86); color:#e0f2fe; border:1px solid rgba(125,211,252,.6); }
+.tut-skip:hover:not(:disabled){ background:rgba(20,40,80,.9); }
+.tut-prev{ background:rgba(255,255,255,.6); color:#5b3d06; border:1px solid #d9b45c; }
+.tut-prev:hover:not(:disabled){ background:#fff; }
+.tut-next{ background:linear-gradient(90deg, #b8862b, #f5d27a 60%, #fff3c4); color:#2a1a00; border:1px solid #fff7d6; box-shadow:0 0 10px rgba(253,230,138,.5); min-width:64px; }
+.tut-next:hover:not(:disabled){ background:linear-gradient(90deg, #c69434, #f8db8c 60%, #fff6d2); }
+.tut-nav-sp{ flex:1 1 auto; }
+.tut-foot{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:6px; }
+.tut-dots{ display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:4px; }
+.tut-dots i{ flex:0 0 auto; width:6px; height:6px; border-radius:50%; background:rgba(184,134,43,.25); }
+.tut-dots i.done{ background:rgba(184,134,43,.6); }
+.tut-dots i.on{ background:#b8862b; box-shadow:0 0 5px #f5d27a; transform:scale(1.25); }
+.tut-taphint{ font-size:9.5px; color:#8a6a2a; letter-spacing:.1em; white-space:nowrap; }
+.tut-btn:focus-visible{ outline:2px solid #7dd3fc; outline-offset:2px; }
+
+/* 横向き・低い画面：吹き出しを詰める */
+@media (max-height:520px){
+  .tut-bubble{ padding:15px 12px 6px; }
+  .tut-text{ font-size:12.5px; line-height:1.6; }
+  .tut-head{ margin:0 0 2px; }
+  .tut-head-title{ font-size:13px; }
+  .tut-aside{ margin:5px 0 0; padding:5px 6px; }
+  .tut-nav{ margin-top:6px; }
+  .tut-foot{ margin-top:4px; }
+  .tut-btn{ padding:5px 10px; min-height:30px; }
+  .tut-taphint{ display:none; }
+}
+@media (max-width:360px){
+  .tut-text{ font-size:12.5px; }
+  .tut-btn{ padding:6px 9px; font-size:11.5px; }
+}
+
+/* 動きを減らす */
+@media (prefers-reduced-motion: reduce){
+  .tut-root, .tut-spot, .tut-bubble{ transition:none; }
+  .tut-spot-ring{ animation:none; display:none; }
+  .tut-bubble.tut-pop{ animation:none; }
+}
+.tut-root.tut-reduced .tut-spot, .tut-root.tut-reduced .tut-bubble{ transition:none; }
+.tut-root.tut-reduced .tut-spot-ring{ display:none; }
+.tut-root.tut-reduced .tut-bubble.tut-pop{ animation:none; }
