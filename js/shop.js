@@ -78,9 +78,7 @@ const ShopScene = {
   shopSellRelic(idx){
     const relic=GameState.relics[idx]; if(!relic) return;
     const ren=GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance);
-    let price=1;
-    if(relic.relicEnhance==='ren_discard_sell') price=Math.floor(GameState.currentDeck.length/2);
-    else if(ren) price+=2;
+    const price=GameData.relicSellPrice(relic);
     // #3 ショップでの売却時もレリック効果を確実に除去する（ペイント等の永続効果が残るバグ修正）
     if(typeof GameMainScene!=='undefined') GameMainScene.removeRelicEffect(relic);
     GameState.relics.splice(idx,1);
@@ -1046,7 +1044,7 @@ const ShopScene = {
     // #扇形 タップしたカードの効果吹き出し（×で吹き出しだけ閉じる。選択状態はそのまま）
     const pb = this.pickBubble;
     if(pb && pb.pack===p && !pb.closed && GameState.currentDeck[pb.idx] && p.cardIndexes.includes(pb.idx)){
-      const bubble = GameMainScene.cardBubbleEl(GameState.currentDeck[pb.idx], ()=>{ pb.closed=true; }, 'pick-card-bubble');
+      const bubble = GameMainScene.cardBubbleEl(GameState.currentDeck[pb.idx], ()=>{ pb.closed=true; }, 'pick-card-bubble', pb); // pb は1回の表示ごとに作り直されるので自動フェードのタイマーキーに使う
       overlay.appendChild(bubble);
       // モーダル内スクロールに吹き出しを追従させる
       modal.addEventListener('scroll', ()=>this.placePickBubble(overlay), {passive:true});

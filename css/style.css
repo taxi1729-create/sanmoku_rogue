@@ -704,6 +704,21 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .effects-bubble{position:absolute;right:0;bottom:calc(100% + 10px);width:min(340px,90vw);max-height:55vh;overflow-y:auto;background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:10px 12px;z-index:45;box-shadow:0 8px 28px rgba(0,0,0,.6);cursor:default;animation:scoringBubblePopPlain .2s ease;}
 .effects-bubble::after{content:'';position:absolute;right:30px;top:100%;border:8px solid transparent;border-top-color:var(--accent);}
 .effects-bubble-title{font-size:12px;font-weight:900;margin-bottom:6px;color:var(--text);}
+/* #盤面効果刷新：現在ラウンド／次ターンの2区分・件数バッジ */
+.eff-count-badge{display:inline-block;min-width:16px;padding:0 5px;margin-left:5px;border-radius:9px;background:var(--accent);color:#fff;font-size:10px;font-weight:900;line-height:16px;text-align:center;letter-spacing:0;}
+.eff-count-badge.zero{background:var(--panel-2);color:var(--text-dim);}
+.eff-sum-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.eff-sum-lbl{display:inline-block;font-size:9px;font-weight:900;padding:0 4px;margin-right:4px;border-radius:4px;background:var(--panel-2);color:var(--text);}
+.eff-section{margin-bottom:8px;}
+.eff-section:last-child{margin-bottom:0;}
+.eff-section-title{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:900;padding:3px 0 4px;margin-bottom:5px;border-bottom:1px solid var(--panel-2);}
+.eff-sec-round .eff-section-title{color:#ffd166;}
+.eff-sec-next .eff-section-title{color:#7cc8ff;}
+.eff-section-title .eff-cnt{color:var(--text-dim);}
+.eff-cnt{margin-left:4px;font-size:10px;color:var(--gold);}
+.eff-ic{display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;flex:none;}
+.eff-ic svg{width:18px;height:18px;}
+.eff-where{font-size:10px;opacity:.85;margin-top:2px;}
 @keyframes scoringBubblePopPlain{0%{transform:scale(.8);opacity:0;}100%{transform:scale(1);opacity:1;}}
 
 /* #5 レリックの大きさ（所持枠数）を赤丸アイコン（GameIcons relic_size_dot）で表示 */
@@ -903,3 +918,8 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 /* #3 カード基礎点の数値を明るく（点数計算中のマスは金色） */
 .card .card-number{color:#e8eaf2;}
 .cell.scoring-cell .card-number{color:var(--gold);}
+
+/* #バツ実効倍率 倍率表：バツパッシブLv2/3で変化したバツ倍率を青色で表示（元の値は小さく打ち消し線） */
+.mult-legend .mult-eff-cell{white-space:nowrap;}
+.mult-legend .mult-orig{font-size:.75em;color:var(--text-dim);margin-right:2px;}
+.mult-legend .mult-eff-blue{color:#5fb8ff;font-weight:900;}

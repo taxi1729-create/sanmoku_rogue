@@ -86,3 +86,6 @@
   .pack-breakdown-modal .pack-breakdown-detail{ grid-column:2; grid-row:3; margin-top:0; }
   .pack-breakdown-modal > button{ margin-top:8px !important; }
 }
+
+/* #吹き出し自動消去 カード効果の吹き出しは10秒後に1秒かけてフェードアウト */
+@keyframes cardBubbleAutoFade{from{opacity:1;}to{opacity:0;}}

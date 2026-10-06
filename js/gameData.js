@@ -78,56 +78,56 @@ const GameData = {
     '誘導':'image/card/j009.png',
   },
   JAMMING_DESC: {
-    'スタン':   '次のNPCターン、NPC行動を封じる',
-    'サンダー': '配置時、盤面のバツを全て取り除く',
-    '混乱':     '次のNPCターン、最低点マスに配置する',
-    'ブレイク': 'このカードが盤面にある間、バツのビンゴが起きてもラウンドは終了しない',
-    '延命':     '盤面にある間、バツは4列ビンゴのみ有効',
-    'ビンゴ阻害':'盤面n枚で段階的にNPCのバツビンゴを制限する（1枚:縦不可 / 2枚:縦横不可 / 3枚以上:不可）',
-    'リンク':   '次のNPCターン、このカードの十字マスにしか置けない。置けない場合スタン',
-    '引き直し': '配置時、直前のNPCが置いたバツを取り除く。次のNPCターン、そのマス以外に置けない。他に置けない場合スタン',
-    '封印':     '次のNPCターン、このカードの周囲8マスに置けない。他に置けない場合スタン',
-    '誘導':     '次のNPCターン、盤面中央（4×4なら2×2、5×5なら中央1マス）にしか置けない。他に置けない場合スタン',
+    'スタン':   '①次のNPCターン、NPC行動を封じる',
+    'サンダー': '①配置時、盤面のバツを全て取り除く',
+    '混乱':     '①次のNPCターン、最低点マスに配置する',
+    'ブレイク': '①この効果を使用した次のターンまで、バツでビンゴしてもラウンドが終了しない',
+    '延命':     '①盤面にある間、バツは4列ビンゴのみ有効',
+    'ビンゴ阻害':'①盤面n枚で段階的にNPCのバツビンゴを制限する（1枚:縦不可 / 2枚:縦横不可 / 3枚以上:不可）',
+    'リンク':   '①次のNPCターン、このカードの十字マスにしか置けない。置けない場合スタン',
+    '引き直し': '①配置時、直前のNPCが置いたバツを取り除く。次のNPCターン、そのマス以外に置けない。他に置けない場合スタン',
+    '封印':     '①次のNPCターン、このカードの周囲8マスに置けない。他に置けない場合スタン',
+    '誘導':     '①次のNPCターン、盤面中央（4×4なら2×2、5×5なら中央1マス）にしか置けない。他に置けない場合スタン',
   },
 
   ENHANCE_DESC: {
-    '数値強化':     'カード基礎点+15点',
-    '拡大':         '配置マス・右・上・右上の2×2マスで配置。塗りつぶし付きの場合も使用可',
-    '横拡張':       '配置マスと右のマスへ1×2で配置。塗りつぶし付きの場合も使用可',
-    '縦拡張':       '配置マスと上のマスへ2×1で配置。塗りつぶし付きの場合も使用可',
-    'マルマルチ':   'マル記号扱いにもなる。元の記号がマルの場合、基礎点に+20',
-    'サンカクマルチ':'サンカク記号扱いにもなる。元の記号がサンカクの場合、基礎点に+20',
-    'シカクマルチ': 'シカク記号扱いにもなる。元の記号がシカクの場合、基礎点に+20',
-    'バツマルチ':   'バツ記号扱いにもなる（元のカードがバツの場合、付与時に基礎点+20）',
-    'ハブ':         'ビンゴ時、2つ以上のビンゴに関わるマスはカード基礎点×1.5',
-    '連鎖':         '盤面の連鎖カード数nに応じビンゴ時カード基礎点+30n',
-    'オールマルチ': 'マル・サンカク・シカク記号扱いになる',
-    '巨大化':       '盤面にある間、ターン消費ごとに基礎点+3',
-    '肥大化':       '盤面にある間、ターン消費ごとに「カード基礎点/2×ビンゴ倍率」点を現在の点数に加算',
-    'ブルジョワ':   'カード基礎点+4×現在G',
-    'ドロー':       '盤面配置時にカードを1枚ドロー',
+    '数値強化':     '①カード基礎点+15点',
+    '拡大':         '①配置マス・右・上・右上の2×2マスで配置。塗りつぶし付きの場合も使用可',
+    '横拡張':       '①配置マスと右のマスへ1×2で配置。塗りつぶし付きの場合も使用可',
+    '縦拡張':       '①配置マスと上のマスへ2×1で配置。塗りつぶし付きの場合も使用可',
+    'マルマルチ':   '①マル記号扱いにもなる。元の記号がマルの場合、基礎点に+20',
+    'サンカクマルチ':'①サンカク記号扱いにもなる。元の記号がサンカクの場合、基礎点に+20',
+    'シカクマルチ': '①シカク記号扱いにもなる。元の記号がシカクの場合、基礎点に+20',
+    'バツマルチ':   '①バツ記号扱いにもなる（元のカードがバツの場合、付与時に基礎点+20）',
+    'ハブ':         '①ビンゴ時、2つ以上のビンゴに関わるマスはカード基礎点×1.5',
+    '連鎖':         '①盤面の連鎖カード数nに応じビンゴ時カード基礎点+30n',
+    'オールマルチ': '①マル・サンカク・シカク記号扱いになる',
+    '巨大化':       '①盤面にある間、ターン消費ごとに基礎点+3',
+    '肥大化':       '①盤面にある間、ターン消費ごとに「カード基礎点/2×ビンゴ倍率」点を現在の点数に加算',
+    'ブルジョワ':   '①カード基礎点+4×現在G',
+    'ドロー':       '①盤面配置時にカードを1枚ドロー',
     // #4 新規強化効果5種
-    'エクステンド': 'このカードを置いたターンはビンゴしていてもラウンドが終了せず、ビンゴ計算も行われない。次に自分がカードを配置した時に効果が解除される',
-    '加重':         'カード基礎点+n（n=デッキ内のこのカードと同じ記号のカードの数）',
-    'ギャンブル':   '手札に来るたび、カード基礎点に-50〜+50のランダムな値を加算。捨て札に行く、またはゲーム終了時にリセットされる',
-    'トップスピード':'カード基礎点+5。ゲーム開始時、このカードをデッキの一番上に配置する',
-    '重ね掛け':     '盤面に置かれている、このカードと同じ記号のカードの上に上書き配置できる。上書きされたカードの基礎点のみ、このカードの基礎点に加算される。ただし、盤面上の重ね掛けが付与されているカードの上には載せられない',
+    'エクステンド': '①このカードを置いたターンはビンゴしていてもラウンドが終了せず、ビンゴ計算も行われない。次に自分がカードを配置した時に効果が解除される',
+    '加重':         '①カード基礎点+n（n=デッキ内のこのカードと同じ記号のカードの数）',
+    'ギャンブル':   '①手札に来るたび、カード基礎点に-50〜+50のランダムな値を加算。捨て札に行く、またはゲーム終了時にリセットされる',
+    'トップスピード':'①カード基礎点+5。ゲーム開始時、このカードをデッキの一番上に配置する',
+    '重ね掛け':     '①盤面に置かれている、このカードと同じ記号のカードの上に上書き配置できる。上書きされたカードの基礎点のみ、このカードの基礎点に加算される。ただし、盤面上の重ね掛けが付与されているカードの上には載せられない',
   },
   ENHANCE_NAME_POOL: ['数値強化','拡大','横拡張','縦拡張','マルマルチ','サンカクマルチ','シカクマルチ','バツマルチ','ハブ','連鎖','オールマルチ','巨大化','肥大化','ブルジョワ','ドロー','エクステンド','加重','ギャンブル','トップスピード','重ね掛け'],
 
   TRAIT_DESC: {
-    '塗りつぶし':         '使用中マスを含む好きなマスに配置できる（1タップで対象選択、2タップ目で確定）',
-    '塗りつぶし(レリック)':'使用中マスを含む好きなマスに配置できる(1タップで対象選択、2タップ目で確定)',
-    '指令官':       'ターン7〜10でビンゴした時、補正倍率×1.2',
-    'ネガティブ':   '使用してもターンが終了せず追加ターンになる',
-    'ネガティブ(パッシブ)': '使用してもターンが終了せず追加ターンになる（マルパッシブ2により付与）',
-    'ディスカード': '捨て札になった時2G得る',
-    'レリック特攻': '基礎点+10n n=レリック所持数',
-    'ミニマム':     'ビンゴ時、盤面最少記号の数n×20を補正倍率に加算',
-    'マキシマム':   'ビンゴ時、最多記号とビンゴ記号が同じなら、盤面最多記号の数n×10を補正倍率に加算',
-    '将軍':         'ビンゴ時、手札にある場合最終乗算補正×1.1',
-    '保留':         'ラウンド終了時に手札にある場合、捨て札にならず次のラウンドの手札に残る。残ったカードは次のラウンドの手札上限に数えない',
-    '竜頭蛇尾':     'ゲーム開始時カード基礎点+300。手札に来るたびに-100。補正が0になったら性質変化は解除される',
+    '塗りつぶし':         '①使用中マスを含む好きなマスに配置できる（1タップで対象選択、2タップ目で確定）',
+    '塗りつぶし(レリック)':'①使用中マスを含む好きなマスに配置できる(1タップで対象選択、2タップ目で確定)',
+    '指令官':       '①ターン7〜10でビンゴした時、補正倍率×1.2',
+    'ネガティブ':   '①使用してもターンが終了せず追加ターンになる',
+    'ネガティブ(パッシブ)': '①使用してもターンが終了せず追加ターンになる（マルパッシブ2により付与）',
+    'ディスカード': '①捨て札になった時2G得る',
+    'レリック特攻': '①基礎点+10n n=レリック所持数',
+    'ミニマム':     '①ビンゴ時、盤面最少記号の数n×20を補正倍率に加算',
+    'マキシマム':   '①ビンゴ時、最多記号とビンゴ記号が同じなら、盤面最多記号の数n×10を補正倍率に加算',
+    '将軍':         '①ビンゴ時、手札にある場合最終乗算補正×1.1',
+    '保留':         '①ラウンド終了時に手札にある場合、捨て札にならず次のラウンドの手札に残る。残ったカードは次のラウンドの手札上限に数えない',
+    '竜頭蛇尾':     '①ゲーム開始時カード基礎点+300。手札に来るたびに-100。補正が0になったら性質変化は解除される',
   },
   TRAIT_NAME_POOL: ['塗りつぶし','指令官','ネガティブ','ディスカード','レリック特攻','ミニマム','マキシマム','将軍','保留','竜頭蛇尾'],
 
@@ -218,8 +218,8 @@ const GameData = {
       2: { name:'チェック・コーナー', desc:'ゲーム開始時、盤面の4隅にマル・シカク・サンカクのいずれかランダムな記号（基礎点100）と、ランダムなマルチ強化（マルマルチ/シカクマルチ/サンカクマルチ/オールマルチ）が付いたカードを配置する',
         live(){ return '盤面4隅に基礎点100・オールマルチのマルカードを配置'; } },
       // #20 チェックパッシブ3：同じ記号のビンゴが2回目になるまで、盤面がエクステンド状態（ビンゴしてもラウンドが終了しない）
-      3: { name:'チェック・エクステンド', desc:'各ラウンド、同じ記号のビンゴが2回目になるまで盤面がカード強化「エクステンド」が付与された状態になる（ビンゴしてもラウンドが終了しない。ビンゴの点数計算は通常通り行われる）。同じ記号のビンゴが2回目になった時点で解除され、そのビンゴでラウンドが終了する',
-        live(){ const gm=(typeof GameMainScene!=='undefined')?GameMainScene:null; const cnt=(gm&&gm.bingoSymbolCountThisRound)||{}; const mx=Math.max(0,...Object.values(cnt)); return (gm&&gm.isCheckExtendActive&&gm.isCheckExtendActive())?`エクステンド状態：有効（同じ記号のビンゴ最大${mx}/2回）`:'エクステンド状態：このラウンドは解除済み'; } },
+      3: { name:'チェック・エクステンド', desc:'①同じ記号のビンゴが2回目になるまで、盤面にジャミング効果「オールブレイク」を付与。オールブレイク効果：どの記号でビンゴしてもラウンドが終了しない',
+        live(){ const gm=(typeof GameMainScene!=='undefined')?GameMainScene:null; const cnt=(gm&&gm.bingoSymbolCountThisRound)||{}; const mx=Math.max(0,...Object.values(cnt)); return (gm&&gm.isCheckExtendActive&&gm.isCheckExtendActive())?`オールブレイク：有効（同じ記号のビンゴ最大${mx}/2回）`:'オールブレイク：このラウンドは解除済み'; } },
     },
     Triangle: {
       1: { name:'サンカク・レシオ', desc:'デッキ内のサンカクカード比率nを計算し、サンカクカードの基礎点に(1+n)を乗算する。また、アップグレードに「ジャミング優遇強化」が出現するようになる',
@@ -269,27 +269,27 @@ const GameData = {
 
 
   RELIC_ENHANCE_POOL: [
-    { id:'ren_discard', name:'廃棄強化',     desc:'捨て札は廃棄札へ。最終乗算補正×1.5' },
-    { id:'ren_circle', name:'マルオール',   desc:'ビンゴ時補正基礎点+n（n=デッキのマルカード数）' },
-    { id:'ren_square', name:'シカクオール',  desc:'ビンゴ時補正基礎点+n（n=デッキのシカクカード数）' },
-    { id:'ren_triangle', name:'サンカクオール',desc:'ビンゴ時補正基礎点+n（n=デッキのサンカクカード数）' },
-    { id:'ren_only_one', name:'オンリーワン',  desc:'レリック所持数が1つの時、補正倍率+20' },
-    { id:'ren_pair', name:'ペアルック',    desc:'同じレリックを持っている時、カード基礎点+40' },
-    { id:'ren_negative', name:'ネガティブ',    desc:'このレリックは所持数に加算されない' },
-    { id:'ren_discard_sell', name:'ディスカード', desc:'売却時デッキ枚数/2（切捨て）Gを得る' },
-    { id:'ren_general', name:'将軍',          desc:'ビンゴ時、最終乗算補正×1.1' },
-    { id:'ren_all_link', name:'オールリンク',  desc:'プレイヤーが配置するカードに常にジャミング効果「リンク」が付与されている状態になる（他のジャミング効果と重複する）' },
-    { id:'ren_gold', name:'G獲得',         desc:'ステージクリア時追加で1G得る' },
-    { id:'ren_draw', name:'ドロー強化',    desc:'ラウンド終了時カードを1枚ドロー' },
-    { id:'ren_double', name:'倍化',          desc:'2個分とカウント。最終乗算補正×1.5' },
-    { id:'ren_triple', name:'3倍化',         desc:'3個分とカウント。最終乗算補正×2' },
-    { id:'ren_cross', name:'バツ強化',      desc:'バツビンゴ時、ビンゴ倍率を2倍にする' },
-    { id:'ren_npc', name:'NPC強化',       desc:'NPCが2回行動。補正基礎点×5' },
-    { id:'ren_draw_pile', name:'山札強化',      desc:'ビンゴ時、山札数×100を最終加算補正に追加' },
-    { id:'ren_disc_pile', name:'捨て札強化',    desc:'ビンゴ時補正基礎点+n（n=捨て札数）' },
-    { id:'ren_black', name:'ブラックカード', desc:'ショップ金額が半額（切り上げ）。購入時即時反映。複数所持しても効果は重複しない' },
-    { id:'ren_first', name:'手番高速',      desc:'全ラウンドで最初の手番がプレイヤーになる' },
-    { id:'ren_grade', name:'グレードオール', desc:'ビンゴ時補正倍率+n（n=デッキの強化/ジャミング/性質変化の総数）' },
+    { id:'ren_discard', name:'廃棄強化',     desc:'①捨て札は廃棄札へ。最終乗算補正×1.5' },
+    { id:'ren_circle', name:'マルオール',   desc:'①ビンゴ時補正基礎点+n（n=デッキのマルカード数）' },
+    { id:'ren_square', name:'シカクオール',  desc:'①ビンゴ時補正基礎点+n（n=デッキのシカクカード数）' },
+    { id:'ren_triangle', name:'サンカクオール',desc:'①ビンゴ時補正基礎点+n（n=デッキのサンカクカード数）' },
+    { id:'ren_only_one', name:'オンリーワン',  desc:'①レリック所持数が1つの時、補正倍率+20' },
+    { id:'ren_pair', name:'ペアルック',    desc:'①同じレリックを持っている時、カード基礎点+40' },
+    { id:'ren_negative', name:'ネガティブ',    desc:'①このレリックは所持数に加算されない' },
+    { id:'ren_discard_sell', name:'ディスカード', desc:'①売却時デッキ枚数/2（切捨て）Gを得る' },
+    { id:'ren_general', name:'将軍',          desc:'①ビンゴ時、最終乗算補正×1.1' },
+    { id:'ren_all_link', name:'オールリンク',  desc:'①プレイヤーが配置するカードに常にジャミング効果「リンク」が付与されている状態になる（他のジャミング効果と重複する）' },
+    { id:'ren_gold', name:'G獲得',         desc:'①ステージクリア時追加で1G得る' },
+    { id:'ren_draw', name:'ドロー強化',    desc:'①ラウンド終了時カードを1枚ドロー' },
+    { id:'ren_double', name:'倍化',          desc:'①2個分とカウント。最終乗算補正×1.5' },
+    { id:'ren_triple', name:'3倍化',         desc:'①3個分とカウント。最終乗算補正×2' },
+    { id:'ren_cross', name:'バツ強化',      desc:'①バツビンゴ時、ビンゴ倍率を2倍にする' },
+    { id:'ren_npc', name:'NPC強化',       desc:'①NPCが2回行動。補正基礎点×5' },
+    { id:'ren_draw_pile', name:'山札強化',      desc:'①ビンゴ時、山札数×100を最終加算補正に追加' },
+    { id:'ren_disc_pile', name:'捨て札強化',    desc:'①ビンゴ時補正基礎点+n（n=捨て札数）' },
+    { id:'ren_black', name:'ブラックカード', desc:'①ショップ金額が半額（切り上げ）。購入時即時反映。複数所持しても効果は重複しない' },
+    { id:'ren_first', name:'手番高速',      desc:'①全ラウンドで最初の手番がプレイヤーになる' },
+    { id:'ren_grade', name:'グレードオール', desc:'①ビンゴ時補正倍率+n（n=デッキの強化/ジャミング/性質変化の総数）' },
   ],
 
   // #8 レリックをタップした時に、現在の効果量を具体的な数値で表示する（例：リロール強化→補正基礎点:50）
@@ -299,6 +299,7 @@ const GameData = {
     switch(relic.id){
       case 'reroll_boost': return `補正基礎点:${GameState.rerollCount*10}`;
       case 'bingo': return '補正基礎点:+30';
+      case 'onko_chishin': return `補正基礎点:+${10*GameState.relicCount()}（m=${GameState.relicCount()}）／補正倍率:+${10*GameState.passiveCount()}（n=${GameState.passiveCount()}）`;
       case 'charge': return `補正倍率:+${gm?(gm.chargeN||0):0}（n=${gm?(gm.chargeN||0):0}、150超でn=-10）`;
       case 'odd_boost': return '補正基礎点:+15（奇数加算時）';
       case 'even_boost': return '補正基礎点:+15（偶数加算時）';
@@ -349,6 +350,7 @@ const GameData = {
     { id:'dream_card', label:'ドリームカードパック' },
     { id:'jamming_pack', label:'ジャミングカードパック' },
     { id:'relic_pack', label:'レリックパック' },
+    { id:'pickup_relic', label:'ピックアップレリック' },
     { id:'enhance_pack', label:'強化カードパック' },
   ],
   getPackBreakdown(packId){
@@ -387,17 +389,18 @@ const GameData = {
     }
     // #3 レリックパック：グレード別排出率・レリック強化付与率・全レリックの内訳
     if(packId==='relic_pack'||packId==='pickup_relic'){
-      const lines=['レリック3つから1つ選択（各レリックは次の確率で抽選）'];
+      const lines=[packId==='pickup_relic'?'ランダムなレリック1つを購入（次の確率で抽選）':'レリック3つから1つ選択（各レリックは次の確率で抽選）'];
       const gs=Object.entries(this.RELIC_GRADES).filter(([g,v])=>v.weight>0);
       const total=gs.reduce((t,[g,v])=>t+v.weight,0);
       gs.forEach(([g,v])=>lines.push(`<b>${v.name}：${Math.round(v.weight/total*1000)/10}%</b>`));
       lines.push(`レリック強化効果の付与確率：${Math.round(this.RELIC_ENHANCE_RATE*100)}%（魔力ステージE所持時は100%）`);
       gs.forEach(([g,v])=>{
-        const list=this.RELIC_POOL.filter(r=>this.relicGrade(r)===g);
+        const list=this.RELIC_POOL.filter(r=>this.relicGrade(r)===g&&r.id!=='majin_seal');
         const each=list.length?Math.round(v.weight/total/list.length*10000)/100:0;
         lines.push(`<div class="pb-grade-head">【${v.name}】${list.length}種（1種あたり${each}%）</div>`);
         list.forEach(r=>lines.push(`<span class="pb-relic">${typeof GameIcons!=='undefined'?GameIcons.relic(r):''}${r.name}</span>`));
       });
+      lines.push('※魔神のお墨付きは排出されない（魔神イベントでのみ入手）');
       return lines;
     }
     return ['（内訳情報なし）'];
@@ -427,14 +430,14 @@ const GameData = {
     'gold_boost':'image/relic/r020.png',
   },
   // #5 レリックのグレード（ノーマル/レア/スーパーレア/レジェンド）。ピックアップレリック・レリックパックはノーマル80%・レア15%・スーパーレア5%で抽選（レジェンドは排出されない）
-  RELIC_GRADES: { normal:{name:'ノーマル',weight:80}, rare:{name:'レア',weight:15}, super:{name:'スーパーレア',weight:5}, legend:{name:'レジェンド',weight:0} },
+  RELIC_GRADES: { normal:{name:'ノーマル',weight:80}, rare:{name:'レア',weight:15}, super:{name:'スーパーレア',weight:4}, legend:{name:'レジェンド',weight:1} },
   RELIC_GRADE_OF: {
     combo:'normal', relic_boost:'normal', base_boost:'normal', hand_boost:'normal', round_boost:'normal', odd_boost:'normal', even_boost:'normal',
     circle_boost:'normal', triangle_boost:'normal', square_boost:'normal', bingo:'normal', empty_boost:'normal', last_stand:'normal', reroll_boost:'normal',
     draw_boost:'normal', big_explosion:'normal', hobby_collect:'normal', gambling_addict:'normal', gold_boost:'normal', all_bingo_gain:'normal',
     num_boost3:'rare', ten_stage:'rare', double:'rare', paint:'rare', turn_boost:'rare', passive_unneeded:'rare',
     jamming_boost:'super', pinnacle:'super', joker:'super', charge:'super',
-    majin_seal:'legend',
+    majin_seal:'legend', onko_chishin:'legend',
   },
   relicGrade(relicOrId){ const id=typeof relicOrId==='string'?relicOrId:relicOrId?.id; return this.RELIC_GRADE_OF[id]||'normal'; },
   // グレードの重みで抽選し、そのグレードのレリックから等確率で1つ選ぶ
@@ -442,47 +445,55 @@ const GameData = {
     const gs=Object.entries(this.RELIC_GRADES).filter(([g,v])=>v.weight>0);
     const total=gs.reduce((t,[g,v])=>t+v.weight,0); let r=Math.random()*total, grade=gs[0][0];
     for(const [g,v] of gs){ r-=v.weight; if(r<=0){ grade=g; break; } }
-    const pool=this.RELIC_POOL.filter(x=>this.relicGrade(x)===grade);
+    const pool=this.RELIC_POOL.filter(x=>this.relicGrade(x)===grade&&x.id!=='majin_seal'); // v12 #5 魔神のお墨付きは排出しない
     return GlobalFunctions.randChoice(pool.length?pool:this.RELIC_POOL);
   },
   // #4 レリックの価格（グレード別）。レリック強化効果付きは+3G
   RELIC_GRADE_PRICE: { normal:3, rare:6, super:9, legend:12 },
+  // v11 #4 売却額：ノーマル1G・レア2G・スーパーレア3G（レジェンド4G）、レリック強化付きは+2G（ディスカード強化はデッキ枚数/2）
+  RELIC_GRADE_SELL: { normal:1, rare:2, super:3, legend:4 },
+  relicSellPrice(relic){
+    if(!relic) return 0;
+    if(relic.relicEnhance==='ren_discard_sell') return Math.floor(GameState.currentDeck.length/2);
+    return (this.RELIC_GRADE_SELL[this.relicGrade(relic)]||1) + (relic.relicEnhance?2:0);
+  },
   relicBasePrice(relic){ return (this.RELIC_GRADE_PRICE[this.relicGrade(relic)]||3) + (relic&&relic.relicEnhance?3:0); },
   // #5 通常セレクトの抽選プール：ジャミング優遇強化はサンカクパッシブLv1取得時のみ出現
   normalSelectPool(){ return this.NORMAL_SELECT_POOL.filter(e=>e.id!=='jam_favor'||((typeof GameState!=='undefined')&&GameState.symbolPassiveTier?.Triangle>=1)); },
   RELIC_ENHANCE_RATE: 0.3, // #4 レリック強化効果の付与確率30%
   RELIC_POOL: [
-    { id:'bingo', name:'ビンゴ',           desc:'ビンゴした時、補正基礎点+30' },
-    { id:'charge', name:'チャージ',         desc:'補正倍率+n（ゲーム開始時n=0。次ラウンドに行く直前の手札のカード基礎点の合計をnに加算。nが150を超えるとn=-10になる）' },
-    { id:'double', name:'ダブル',           desc:'同一ターンにビンゴが2つ以上ある時、最終乗算補正×1.5' },
-    { id:'odd_boost', name:'奇数補正',         desc:'ビンゴで加算される基礎点が奇数の度に補正基礎点+15' },
-    { id:'even_boost', name:'偶数補正',         desc:'ビンゴで加算される基礎点が偶数の度に補正基礎点+15' },
-    { id:'circle_boost', name:'マル補正',         desc:'マルでビンゴした時、補正基礎点+60' },
-    { id:'triangle_boost', name:'サンカク補正',     desc:'サンカクでビンゴした時、補正基礎点+60' },
-    { id:'square_boost', name:'シカク補正',       desc:'シカクでビンゴした時、補正基礎点+60' },
-    { id:'combo', name:'コンボ',           desc:'前ラウンドと異なる記号でビンゴした時、最終乗算補正+1.5' },
-    { id:'relic_boost', name:'レリック強化',     desc:'レリック所持数nに応じ、補正基礎点+5+8n' },
-    { id:'paint', name:'ペイント',         desc:'ゲーム開始時、ランダムな記号が一つ選ばれその記号のカードは塗りつぶし(レリック)を付与。1ラウンドのターン数-4' },
-    { id:'turn_boost', name:'ターン強化',       desc:'ビンゴ時、経過ターン数nに応じて最終乗算補正×1.01^n' },
+    { id:'bingo', name:'ビンゴ',           desc:'①ビンゴした時、補正基礎点+30' },
+    { id:'charge', name:'チャージ',         desc:'①補正倍率+n（ゲーム開始時n=0。全てのビンゴ計算が終わりラウンドが上がる時に、手札のカード基礎点の合計をnに加算（ブレイク・オールブレイク中のビンゴなどラウンドが上がらない時は変化しない）。nが150を超えるとn=-10になる）' },
+    { id:'double', name:'ダブル',           desc:'①同一ターンにビンゴが2つ以上ある時、最終乗算補正×1.5' },
+    { id:'odd_boost', name:'奇数補正',         desc:'①ビンゴで加算される基礎点が奇数の度に補正基礎点+15' },
+    { id:'even_boost', name:'偶数補正',         desc:'①ビンゴで加算される基礎点が偶数の度に補正基礎点+15' },
+    { id:'circle_boost', name:'マル補正',         desc:'①マルでビンゴした時、補正基礎点+60' },
+    { id:'triangle_boost', name:'サンカク補正',     desc:'①サンカクでビンゴした時、補正基礎点+60' },
+    { id:'square_boost', name:'シカク補正',       desc:'①シカクでビンゴした時、補正基礎点+60' },
+    { id:'combo', name:'コンボ',           desc:'①前ラウンドと異なる記号でビンゴした時、最終乗算補正+1.5' },
+    { id:'relic_boost', name:'レリック強化',     desc:'①レリック所持数nに応じ、補正基礎点+5+8n' },
+    { id:'paint', name:'ペイント',         desc:'①ゲーム開始時、ランダムな記号が選ばれその記号のカードに塗りつぶし(レリック)付与。②1ラウンドのターン-4' },
+    { id:'turn_boost', name:'ターン強化',       desc:'①ビンゴ時、経過ターン数nに応じて最終乗算補正×1.01^n' },
     { id:'jamming_boost', name:'ジャミング増強',   desc:'①ビンゴ阻害の効果を持つカードが盤面に配置された時スタン効果を追加。現在の点数に目標点数5%を加算。②ブレイクの効果を持つカードが盤面に配置された時、現在のラウンドの補正倍率+20③手札上限-3' },
-    { id:'empty_boost', name:'空きマス強化',     desc:'ビンゴ時、空きマス数nに応じ補正倍率+6n+5' },
-    { id:'draw_boost', name:'ドロー強化',       desc:'ターン数が4の倍数になった時、カードを1枚ドローする' },
-    { id:'last_stand', name:'背水の陣',         desc:'4ラウンド以降、最終乗算補正×2' },
-    { id:'base_boost', name:'補正基礎点強化',   desc:'最終加算補正+2000' },
-    { id:'round_boost', name:'ラウンド強化',     desc:'ラウンド終了時、最終加算補正+1000×n（n=現在ラウンド）' },
-    { id:'reroll_boost', name:'リロール強化',     desc:'ビンゴ時、残りリロール回数n×10を補正基礎点に加算' },
-    { id:'hand_boost', name:'手札強化',         desc:'ビンゴ時、手札の数×3を補正倍率に加算' },
-    { id:'gold_boost', name:'G獲得',            desc:'ステージクリア時、追加でG+3を得る' },
+    { id:'empty_boost', name:'空きマス強化',     desc:'①ビンゴ時、空きマス数nに応じ補正倍率+6n+5' },
+    { id:'draw_boost', name:'ドロー強化',       desc:'①ターン数が4の倍数になった時、カードを1枚ドローする' },
+    { id:'last_stand', name:'背水の陣',         desc:'①4ラウンド以降、最終乗算補正×2' },
+    { id:'base_boost', name:'補正基礎点強化',   desc:'①最終加算補正+2000' },
+    { id:'round_boost', name:'ラウンド強化',     desc:'①ラウンド終了時、最終加算補正+1000×n（n=現在ラウンド）' },
+    { id:'reroll_boost', name:'リロール強化',     desc:'①ビンゴ時、残りリロール回数n×10を補正基礎点に加算' },
+    { id:'hand_boost', name:'手札強化',         desc:'①ビンゴ時、手札の数×3を補正倍率に加算' },
+    { id:'gold_boost', name:'G獲得',            desc:'①ステージクリア時、追加でG+3を得る' },
     // #12 新規レリック9種
-    { id:'all_bingo_gain', name:'オールビンゴ獲得', desc:'ステージクリア時、マル・サンカク・シカク・バツすべてのビンゴ倍率+1する' },
-    { id:'num_boost3', name:'数値強化1獲得',     desc:'ステージクリア時、デッキ内のランダムなカード1枚の基礎点+10する' },
-    { id:'hobby_collect', name:'趣味レリック集め', desc:'このレリックはレリック所持3個分になる。ステージクリア時、クリア報酬の爆発アップグレードの前にレリックパックを1つ無料で手に入れる' },
-    { id:'passive_unneeded', name:'パッシブ不要理論', desc:'最終乗算補正にmを加算する。m=(4.5-n)（nは所持している記号パッシブの種類数）。mが0未満の場合は加算しない' },
-    { id:'ten_stage', name:'テンステージ',       desc:'ビンゴ時、加算される基礎点が10の倍数のカード1枚につき補正基礎点+30。ビンゴ時のターンが10の時、補正倍率+30' },
-    { id:'joker', name:'ジョーカー',            desc:'このレリックを売却した時、デッキから好きなカードを1枚選び、基礎点+10した上で記号をマル・サンカク・シカク・バツの中から好きなものに変更する' },
-    { id:'gambling_addict', name:'ギャンブル依存症', desc:'カード強化効果「ギャンブル」の効果量が、常に+50か-50のどちらかのみになる' },
-    { id:'big_explosion', name:'大爆発',         desc:'ステージクリア時、所持G が10G以上（レリック強化「ブラックカード」所持時は5G以上）ならその分を消費し、爆発通常アップグレードをもう1パック追加で獲得する' },
-    { id:'pinnacle', name:'極みの境地',          desc:'このレリックはレリック所持数上限分の大きさを持つ。補正基礎点+150、補正倍率+150' },
+    { id:'all_bingo_gain', name:'オールビンゴ獲得', desc:'①ステージクリア時、マル・サンカク・シカク・バツすべてのビンゴ倍率+1する' },
+    { id:'num_boost3', name:'数値強化1獲得',     desc:'①ステージクリア時、デッキ内のランダムなカード1枚の基礎点+10する' },
+    { id:'hobby_collect', name:'趣味レリック集め', desc:'①このレリックはレリック3個分である。②ステージクリア時、レリックパックを入手' },
+    { id:'passive_unneeded', name:'パッシブ不要理論', desc:'①最終乗算補正にmを加算する。m=(4.5-n)（nは所持している記号パッシブの種類数）。mが0未満の場合は加算しない' },
+    { id:'ten_stage', name:'テンステージ',       desc:'①ビンゴ時に加算される基礎点が10の倍数の時、補正基礎点+30②ビンゴ時のターンが10ターンの時、補正倍率+30' },
+    { id:'joker', name:'ジョーカー',            desc:'①このレリックを売却した時、デッキから好きなカードを1枚選び、基礎点+10した上で記号をマル・サンカク・シカク・バツの中から好きなものに変更する' },
+    { id:'gambling_addict', name:'ギャンブル依存症', desc:'①カード強化効果「ギャンブル」の効果量が、常に+50か-50のどちらかのみになる' },
+    { id:'big_explosion', name:'大爆発',         desc:'①ステージクリア時、所持G が10G以上（レリック強化「ブラックカード」所持時は5G以上）ならその分を消費し、爆発通常アップグレードをもう1パック追加で獲得する' },
+    { id:'pinnacle', name:'極みの境地',          desc:'①このレリックはレリック所持数上限分の大きさを持つ。②補正基礎点+150③補正倍率+150' },
+    { id:'onko_chishin', name:'温故知新',        desc:'①補正基礎点+10m（m=レリック所持数）②補正倍率+10n（n=パッシブ所持数）' }, // v12 #2 レジェンド
   ],
 
   BOSS_EFFECT_POOL: [
@@ -595,7 +606,7 @@ const GameData = {
   SHOP_PRICES: { relic:5, cardPack:2, normalUpgrade:3, specialUpgrade:10, reroll:1,
                  cardFocus:6, bingoFocus:4, dreamCard:20, pickupUpgrade:3,
                  // #9 新商品価格（各4G）
-                 enhancePack:4, jammingPack:4, relicPack:5, // #4 レリックパック5G
+                 enhancePack:4, jammingPack:4, relicPack:6, // v11 #10 レリックパック6G
                  // #6 爆発通常アップグレード
                  normalExplosiveUpgrade:10 },
 

@@ -533,6 +533,15 @@ const GameIcons = (function(){
       + `<path d="M7.2 11.3L9 8.2l1.8 2.9-1 .8-.8-.7z"${F(C.purpleL)}/>`
       + `<path d="M9 8.2V2.4"${s(C.gold)} stroke-width="1.7"/>`
       + `<path d="M9.4 2.6l4.6 1.7-4.6 1.7z"${s(C.red)} stroke-width="1.4"${tf(C.redD,1)}/>` },
+    /* v12 #3 温故知新（レジェンド）：古い巻物から新しい芽が伸びる */
+    relic_onko_chishin:{ label:'温故知新', tint:'fixed', body:
+        `<path d="M3.5 15.5h13.2a2.6 2.6 0 0 1 0 5.2H5.8a2.3 2.3 0 0 1 0-4.6"${s(C.gold)}${tf(C.goldL,0.35)}/>`
+      + `<circle cx="16.7" cy="18.1" r="1.2"${F(C.gold)}/>`
+      + `<path d="M7 18.1h7"${s(C.orange)} stroke-width="1.2" stroke-opacity=".7"/>`
+      + `<path d="M11 15.5V9.2"${s(C.green)} stroke-width="1.9"/>`
+      + `<path d="M11 11.4C8.6 11.6 6.6 10 6.4 7.4c2.6-.2 4.4 1.4 4.6 4z"${s(C.green)}${tf(C.green,0.45)}/>`
+      + `<path d="M11 9.6c.4-2.6 2.4-4 5-3.8-.2 2.6-2.2 4-5 3.8z"${s(C.green)}${tf(C.green,0.45)}/>`
+      + star4(18.6,3.6,3.2,F(C.goldL)) + star4(4.2,4.4,1.8,F(C.goldL)) },
     relic_majin_seal:{ label:'魔神のお墨付き', tint:'fixed', body:
         `<path d="M6.4 8C4.8 6.4 4.2 4.3 4.6 2 6 3.9 7.5 4.8 9.2 5M17.6 8c1.6-1.6 2.2-3.7 1.8-6-1.4 1.9-2.9 2.8-4.6 3"${s(C.purple)}${tf(C.purple,0.4)}/>`
       + `<circle cx="12" cy="13.5" r="8.2"${s(C.red)}${tf(C.redD,0.35)}/>`

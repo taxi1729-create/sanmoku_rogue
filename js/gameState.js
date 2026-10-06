@@ -102,6 +102,8 @@ const GameState = {
     if(relic?.id==='pinnacle') return this.effectiveMaxRelics();
     return 1;
   },
+  // v12 #2 パッシブ所持数（各記号パッシブの取得レベルの合計）
+  passiveCount(){ return Object.values(this.symbolPassiveTier||{}).reduce((t,v)=>t+(v>0?v:0),0); },
   relicCount(){
     let n=0;
     for(const r of this.relics) n+=this.slotsForRelic(r);

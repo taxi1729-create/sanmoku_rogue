@@ -142,3 +142,8 @@
   .sfx-spark,.sfx-confetti{display:none;}
   .score-combined-stat .value.sfx-score-hit{animation:none;}
 }
+
+/* #バツ実効倍率 バツパッシブLv2/3で変化したバツ倍率は青色で表示 */
+.sfx-caption.cap-cross-eff{color:#7cc8ff;}
+.sfx-t.t-cross-eff{color:#7cc8ff;}
+.sfx-chip.c-cross-eff{background:linear-gradient(180deg,#a8dcff,#2f8cff);box-shadow:0 0 12px rgba(60,150,255,.85);}

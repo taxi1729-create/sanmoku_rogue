@@ -906,7 +906,6 @@ const StageFX = (function(){
       lines=[
         [`基本G${b.base} × num${b.num}<small>（${numNote}）</small>`, `${b.base*b.num}`],
         ['残りラウンド ×1', `+${fmt(b.roundBonus)}`],
-        [`残りリロール${fmt(b.rerollBonus*2)} ×1/2`, `+${fmt(b.rerollBonus)}`],
         ['小計（端数切り捨て）', `= ${b.subtotal}`, 'sub'],
         ['レリック効果', `+${b.relicBonus}`, b.relicBonus?'':'zero', gf&&gf.relic?'relic':null],
         ['レリック強化効果', `+${b.relicEnhanceBonus}`, b.relicEnhanceBonus?'':'zero', gf&&gf.ren?'ren':null],

@@ -209,3 +209,32 @@
   .rg-super::after{opacity:.7;transform:none;}
   .rg-legend::before{opacity:.85;transform:none;}
 }
+
+/* ===================== レリック列：アイコンのみ表示＋タップで効果詳細の吹き出し（アイコン近くに配置・しっぽ付き） ===================== */
+.relic-card.relic-chip.relic-chip-ico-only{width:36px;height:36px;max-width:none;padding:0;justify-content:center;gap:0;border-radius:10px;}
+.relic-card.relic-chip.relic-chip-ico-only:hover{transform:none;}
+.relic-chip-ico-only .relic-ico{font-size:22px;margin:0;display:inline-flex;line-height:1;}
+.relic-chip-ico-only.has-ren{padding:0;}
+.relic-chip-slots{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);margin:0;padding:0 3px;border-radius:6px;background:#1e1830;line-height:1.2;pointer-events:none;z-index:2;}
+.relic-strip-cards{gap:7px;padding-top:2px;}
+/* 一覧吹き出し：アイコンのグリッド */
+.relic-list-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:9px 7px;margin-top:8px;padding:4px 2px 2px;}
+.relic-list-tile{position:relative;width:44px;height:44px;padding:0;justify-self:center;display:flex;align-items:center;justify-content:center;border-radius:10px;
+  background:var(--panel-2,#232a40);border:2px solid #3a2c6a;color:var(--text,#e7e9f0);}
+.relic-list-tile:hover:not(:disabled){transform:none;background:#2c3350;}
+.relic-list-tile .relic-ico{font-size:26px;margin:0;display:inline-flex;}
+.relic-list-tile.active{border-color:var(--gold,#fbbf24);background:#2c2410;}
+.relic-list-tile.scoring{box-shadow:0 0 8px rgba(251,191,36,.6);}
+.relic-list-tile .rl-no{position:absolute;left:2px;bottom:1px;min-width:0;font-size:8px;line-height:1;z-index:2;}
+.relic-list-tile.rg-rare,.relic-list-tile.rg-super{border-width:2px;}
+/* 効果詳細の吹き出し（.passive-info-panel の中央固定を上書きし、JS で left/top を指定） */
+.passive-info-panel.relic-anchored-bubble{transform:none;left:8px;top:14vh;width:min(320px,calc(100vw - 16px));box-sizing:border-box;max-height:min(64vh,520px);overflow:visible;
+  display:flex;flex-direction:column;}
+.relic-anchored-bubble{animation:relicBubblePop .16s ease-out;}
+.passive-info-panel.relic-anchored-bubble.rg-panel-normal{border-color:#6a4ad4;}
+@keyframes relicBubblePop{0%{opacity:0;}100%{opacity:1;}}
+.passive-info-panel.relic-anchored-bubble::before{left:var(--tail-x,50%);top:-8px;width:14px;height:14px;box-sizing:border-box;border:0;
+  border-top:1px solid;border-left:1px solid;border-color:inherit;background:var(--panel);transform:translateX(-50%) rotate(45deg);z-index:3;}
+.passive-info-panel.relic-anchored-bubble.rb-above::before{top:auto;bottom:-8px;border-top:0;border-left:0;border-bottom:1px solid;border-right:1px solid;border-color:inherit;}
+.passive-info-panel.relic-anchored-bubble[style*="max-height"]{overflow-y:auto;}
+.relic-anchored-bubble .info-desc{word-break:break-word;}
