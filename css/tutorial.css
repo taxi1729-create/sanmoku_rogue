@@ -148,3 +148,8 @@
 .tut-root.tut-reduced .tut-spot, .tut-root.tut-reduced .tut-bubble{ transition:none; }
 .tut-root.tut-reduced .tut-spot-ring{ display:none; }
 .tut-root.tut-reduced .tut-bubble.tut-pop{ animation:none; }
+
+/* v1.07 タイトルのチュートリアルスキップ切替 */
+.title-toggle b{ color:#94a3b8; margin-left:.2em; }
+.title-toggle.on{ border-color:#34d399; box-shadow:0 0 0 1px rgba(52,211,153,.45) inset; }
+.title-toggle.on b{ color:#34d399; }

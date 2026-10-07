@@ -1,6 +1,20 @@
-/* 盤面右上の外側の縦列：早送り → ターン終了 → クロックアップ（シカクパッシブ3） */
+/* 盤面右上の外側の縦列：早送り → 詳細非表示 → ターン終了 → クロックアップ（シカクパッシブ3） */
 .board-side-col{position:absolute;top:0;left:calc(100% + 10px);width:52px;display:flex;flex-direction:column;align-items:stretch;gap:6px;z-index:5;}
 .board-side-col .board-ff-btn{position:static;left:auto;top:auto;}
+.board-side-col-left{left:auto;right:calc(100% + 10px);}
+/* カード詳細非表示トグル（早送りの真下） */
+.board-detail-btn{width:52px;height:40px;padding:0;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  background:#1e1830;border:1px solid #6a4ad4;border-radius:9px;color:#cfc7ff;font-size:8.5px;font-weight:700;line-height:1.05;text-align:center;}
+.board-detail-btn .bdh-ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.board-detail-btn:hover:not(:disabled){background:#2a2148;}
+.board-detail-btn.active{background:#3b1f2e;border-color:#fb7185;color:#fecdd3;box-shadow:0 0 8px rgba(251,113,133,.55);}
+/* リロール（盤面左上＝早送りの左右反転位置） */
+.board-reroll-btn{width:52px;height:40px;padding:0;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  background:#1e1830;border:1px solid #6a4ad4;border-radius:9px;color:#cfc7ff;font-size:8.5px;font-weight:700;line-height:1.05;white-space:nowrap;}
+.board-reroll-btn .gi{width:16px;height:16px;}
+.board-reroll-btn:hover:not(:disabled){background:#2a2148;}
+.board-reroll-btn:disabled{opacity:.4;}
+.board-reroll-btn.active{background:#14304a;border-color:#7dd3fc;color:#e0f2fe;box-shadow:0 0 8px rgba(125,211,252,.55);}
 .board-turnend-btn{width:52px;height:40px;padding:0;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
   background:#1e1830;border:1px solid #6a4ad4;border-radius:9px;color:#cfc7ff;font-size:9px;font-weight:700;line-height:1.1;}
 .board-turnend-btn .gi{width:16px;height:16px;}

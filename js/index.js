@@ -109,9 +109,17 @@ const App = {
     GlobalFunctions.saveSlot(this.currentSaveSlot, GameState.toSaveData());
   },
 
-  showMapSelect(){ this.container.innerHTML=''; MapSelectScene.render(this.container); },
+  // 第5階層ボス撃破後：クリア報酬（爆発アップグレード等）の前に「神の啓示」を一度だけ挟む（チュートリアル非表示設定に関係なく常に再生）
+  _floor5Revelation(next){
+    if(typeof Revelation==='undefined'||!Revelation.shouldPlayFloor5()||(typeof ShopScene!=='undefined'&&ShopScene.miniShop)) return false;
+    if(Revelation.isOpen()) return true;
+    this.container.innerHTML='';
+    Revelation.openFloor5().catch(e=>console.error(e)).then(next);
+    return true;
+  },
+  showMapSelect(){ if(this._floor5Revelation(()=>this.showMapSelect())) return; this.container.innerHTML=''; MapSelectScene.render(this.container); },
   showGameMain(stage){ this.container.innerHTML=''; GameMainScene.render(this.container,stage); },
-  showShop(){ this.container.innerHTML=''; ShopScene.render(this.container); },
+  showShop(){ if(this._floor5Revelation(()=>this.showShop())) return; this.container.innerHTML=''; ShopScene.render(this.container); },
   // #2 階層10クリア時のエンディング（ゲームクリア画面＋スタッフロール）
   showEnding(){ this.container.innerHTML=''; EndingScene.render(this.container); },
 

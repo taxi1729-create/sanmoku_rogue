@@ -84,7 +84,7 @@ const TutorialOverlay = (function(){
       title:'階層の地図',
       steps:[
         { icon:'divine_favor', title:'階層の地図',
-          text:'よく来ましたね。ここは階層の地図。三つの試練を越えるたびに、あなたはより深く進むのです。' },
+          text:'よく来ましたね。ここは階層の地図。三つの試練を越えるたびに、あなたはより深く進むのです。目指すは<b>第5階層の踏破</b>――その奥の祭壇です。' },
         { target:()=>pick('.map-header'), icon:'btn_map', title:'階層・所持G・残機',
           text:()=>`いまは<b>第${safe(()=>G().currentFloor,1)}階層</b>。所持Gと<b>残機</b>もここに。試練に敗れても残機があれば一時撤退して立て直せますが、尽きれば旅は終わります。` },
         { target:()=>firstStageCard(), icon:'fx_sparkle', title:'三つの試練', aside:'floors',
@@ -105,8 +105,8 @@ const TutorialOverlay = (function(){
           text:'右上は<b>パッシブ</b>。ボスを倒すと記号の力が宿り、Lvが上がるほど強くなります。タップで詳細を。' },
         { target:()=>byText('.map-header button','デッキ確認'), icon:'btn_deck', title:'デッキ確認',
           text:'いまのデッキの札は、すべてここで確かめられます。' },
-        { target:()=>pick('.map-path .final-shop-card')||null, optionalTarget:true, icon:'all_clear', title:'第10階層と最終決戦',
-          text:'最奥の<b>第10階層</b>では、まず「<b>最終決戦前の商店</b>」で支度を整えてから、最終決戦に挑みます。さあ、最初の試練へ。' },
+        { target:()=>pick('.map-path .final-shop-card')||null, optionalTarget:true, icon:'all_clear', title:'旅の目的',
+          text:'<b>第5階層のボス</b>を打ち倒せば、旅の目的は果たされます。その先の深層は……辿り着いた時に語りましょう。さあ、最初の試練へ。' },
       ],
     },
 
@@ -176,7 +176,12 @@ const TutorialOverlay = (function(){
   let ui=null;      // 表示中の UI
   let pending=null; // 表示待ち（他の演出が終わるのを待っている）
 
+  // v1.07 タイトルの「チュートリアルスキップ」がONの間は表示しない（最初の導入・5/10階層の啓示は対象外＝別モジュール）
+  const SKIP_KEY='sanmoku_skipTutorial';
+  function isSkipOn(){ try{ return localStorage.getItem(SKIP_KEY)==='1'; }catch(e){ return false; } }
+  function setSkip(on){ try{ localStorage.setItem(SKIP_KEY, on?'1':'0'); }catch(e){} }
   function show(key){
+    if(isSkipOn()) return;
     const content=CONTENT[key]; if(!content) return;
     if(isSeen(key)) return;
     if(ui&&ui.key===key) return;
@@ -457,7 +462,7 @@ const TutorialOverlay = (function(){
     show,
     close:()=>close(false),
     isOpen:()=>!!ui,
-    isSeen, reset, markSeen,
+    isSeen, reset, markSeen, isSkipOn, setSkip,
     STORE_KEY, CONTENT,
     // テスト・デバッグ用：現在のステップと対象矩形
     _state:()=>ui?{ key:ui.key, idx:ui.idx, total:ui.steps.length, title:ui.steps[ui.idx].title, target:ui.targets.length?unionRect(ui.targets):null,

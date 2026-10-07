@@ -18,6 +18,7 @@ const TitleScene = {
         <button id="btn-continue" id="btn-continue">続きから</button>
         <button id="btn-gallery">図鑑（発見した効果）</button>
         <button id="btn-best-run">最高到達デッキ・レリックを見る</button>
+        <button id="btn-skip-tutorial" class="title-toggle" type="button" aria-pressed="false">チュートリアルスキップ：<b>OFF</b></button>
       </div>
       ${typeof GameVersion!=='undefined'?`<div class="title-version"><span class="tv-ver">${GameVersion.version}</span><span class="tv-date">最終更新日 ${GameVersion.updated}</span><button type="button" id="btn-update-history" class="tv-history-btn">アップデート履歴</button></div>`:''}
     `;
@@ -34,6 +35,10 @@ const TitleScene = {
     el.querySelector('#btn-best-run').addEventListener('click',()=>{
       App.showBestRun();
     });
+    // v1.07 チュートリアルスキップ（ONの間は各画面のチュートリアルを表示しない。最初の導入と5・10階層の啓示は対象外）
+    const skipBtn=el.querySelector('#btn-skip-tutorial');
+    const paintSkip=()=>{ const on=typeof TutorialOverlay!=='undefined'&&TutorialOverlay.isSkipOn&&TutorialOverlay.isSkipOn(); skipBtn.classList.toggle('on',!!on); skipBtn.setAttribute('aria-pressed',on?'true':'false'); skipBtn.querySelector('b').textContent=on?'ON':'OFF'; };
+    if(skipBtn){ paintSkip(); skipBtn.addEventListener('click',()=>{ if(typeof TutorialOverlay==='undefined') return; TutorialOverlay.setSkip(!TutorialOverlay.isSkipOn()); paintSkip(); }); }
     const histBtn=el.querySelector('#btn-update-history');
     if(histBtn) histBtn.addEventListener('click',()=>this.showUpdateHistory());
   },

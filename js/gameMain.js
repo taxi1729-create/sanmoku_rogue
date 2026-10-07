@@ -26,10 +26,46 @@ const GameMainScene = {
     btn.classList.toggle('active',on); btn.setAttribute('aria-pressed',on?'true':'false');
     btn.innerHTML=`${GameIcons.svg('btn_fast_forward')}<span class="bff-label">${on?'早送りON':'早送り'}</span>`;
   },
-  // 盤面右上の外側の縦列：早送り → ターン終了 → クロックアップ（シカクパッシブ3所持時）
+  // カード詳細非表示トグル：ONの間はカードをタップしても情報の吹き出しを出さない（選択・配置は通常通り）。localStorageに保存
+  HIDE_DETAIL_KEY:'sanmoku_hideCardDetail',
+  isCardDetailHidden(){
+    if(this._hideCardDetail===undefined){ let v=false; try{ v=localStorage.getItem(this.HIDE_DETAIL_KEY)==='1'; }catch(e){} this._hideCardDetail=v; }
+    return this._hideCardDetail;
+  },
+  toggleCardDetailHidden(){
+    this._hideCardDetail=!this.isCardDetailHidden();
+    try{ localStorage.setItem(this.HIDE_DETAIL_KEY,this._hideCardDetail?'1':'0'); }catch(e){}
+    if(this._hideCardDetail){ this.boardInfoCell=null; document.querySelectorAll('.card-hover-tip').forEach(t=>t.remove()); }
+    this.renderAll();
+  },
+  renderDetailHideButton(){
+    const on=this.isCardDetailHidden();
+    const btn=document.createElement('button'); btn.type='button'; btn.className='board-detail-btn'+(on?' active':'');
+    btn.setAttribute('aria-label','カード詳細非表示（ON/OFF）'); btn.setAttribute('aria-pressed',on?'true':'false');
+    const eye=on
+      ? '<svg class="bdh-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.6"/><path d="M4 4l16 16"/></svg>'
+      : '<svg class="bdh-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.6"/></svg>';
+    btn.innerHTML=`${eye}<span class="bdh-label">${on?'詳細非表示<br>ON':'詳細非表示'}</span>`;
+    btn.addEventListener('click',(e)=>{ e.stopPropagation(); this.toggleCardDetailHidden(); });
+    return btn;
+  },
+  // 盤面左上の外側（早送りボタンの左右反転位置）：リロール。リロール中は押すとキャンセル
+  renderBoardLeftButtons(){
+    const col=document.createElement('div'); col.className='board-side-col board-side-col-left';
+    const btn=document.createElement('button'); btn.type='button';
+    btn.className='board-reroll-btn'+(this.rerollMode?' active':'');
+    btn.setAttribute('aria-label',this.rerollMode?'リロールをキャンセル':'リロール');
+    btn.innerHTML=`${GIcon('btn_reroll')}<span class="brr-label">${this.rerollMode?'キャンセル':`リロール(${GameState.rerollCount})`}</span>`;
+    btn.disabled=this.rerollMode?false:(GameState.rerollCount<=0||this.currentSide!=='player'||this.hasBossEffect('reroll_limit'));
+    btn.addEventListener('click',(e)=>{ e.stopPropagation(); if(this.rerollMode) this.cancelReroll(); else this.enterRerollMode(); });
+    col.appendChild(btn);
+    return col;
+  },
+  // 盤面右上の外側の縦列：早送り → 詳細非表示 → ターン終了 → クロックアップ（シカクパッシブ3所持時）
   renderBoardSideButtons(){
     const col=document.createElement('div'); col.className='board-side-col';
     col.appendChild(this.renderFFButton());
+    col.appendChild(this.renderDetailHideButton());
     const te=document.createElement('button'); te.type='button'; te.className='board-turnend-btn'+(this.clockUpActive?' cu-mode':'');
     te.setAttribute('aria-label','ターン終了');
     te.innerHTML=`${GIcon('btn_skip')}<span class="bte-label">ターン終了</span>`;
@@ -1225,7 +1261,8 @@ const GameMainScene = {
     try{
       const runs=[];
       for(let i=0;i<bingos.length;i++){
-        if(i>0) await this.sleep(this.scoreFastForward?Math.max(20,Math.round(300/8)):300);
+        // 同時ビンゴの開始間隔は 0.3/(n-1) 秒（n=このシーケンスのビンゴ数）。早送りの有無に関わらずこの間隔
+        if(i>0){ const gap=300/(bingos.length-1); await this.sleep(Math.round(gap)); }
         runs.push(this.showScoreStep(bingos[i],ctx));
       }
       const res=await Promise.allSettled(runs);
@@ -1235,7 +1272,7 @@ const GameMainScene = {
       if(bingos.length>=2&&typeof ScoreFX!=='undefined'&&ScoreFX.finale){
         const total=bingos.reduce((t,b)=>t+(b.score||0),0);
         await ScoreFX.finale({ total, count:bingos.length, targetScore:GameState.targetScore,
-          getSpeed:()=>this.scoreFastForward?8:1,
+          getSpeed:()=>1, // 複数ビンゴの最終点数表示は早送りONでも常に通常再生（タップでのスキップは可）
           scoreEl:document.querySelector('.score-combined-stat .value'),
           shakeEl:document.querySelector('.game-screen') });
         this.addLog(`${bingos.length}ビンゴ！ 合計${GlobalFunctions.formatSigned(total)}（${GlobalFunctions.formatScore(startScore)}→${GlobalFunctions.formatScore(GameState.currentScore)}）`);
@@ -2313,6 +2350,7 @@ const GameMainScene = {
     ba.appendChild(this.renderBoard());
     // 早送りトグル：レリック一覧ボタンの下（盤面の右上の外側）に常設。その下にターン終了・クロックアップ
     ba.appendChild(this.renderBoardSideButtons());
+    ba.appendChild(this.renderBoardLeftButtons());
     if(this.clockUpActive) wrap.classList.add('clockup-active');
     wrap.appendChild(ba);
     const bi=this.renderBoardInfoPanel(); if(bi) wrap.appendChild(bi);
@@ -2726,7 +2764,7 @@ const GameMainScene = {
 
   // #4 カード説明を右上吹き出し表示
   renderBoardInfoPanel(){
-    if(this.boardInfoCell===null) return null;
+    if(this.boardInfoCell===null||this.isCardDetailHidden()) return null;
     const cd=this.board[this.boardInfoCell]; if(!cd) return null;
     const panel=document.createElement('div'); panel.className='card-tooltip-panel';
     panel.innerHTML=`<div class="info-title sym-${cd.symbol}">${GameData.SYMBOL_LABEL[cd.symbol]} 基礎点${cd.baseScore}</div>${this.cardInfoDescHtml(cd.card||{})}`;
@@ -2875,6 +2913,7 @@ const GameMainScene = {
 
   attachHoverTip(el,card){
     el.addEventListener('mouseenter',()=>{
+      if(this.isCardDetailHidden()) return;
       const lines=[];
       if(card.jamming){const emoji=GameData.JAMMING_EMOJI[card.jamming]||'';lines.push(`<span class="desc-jamming">${emoji} 【${card.jamming}】${GameData.JAMMING_DESC[card.jamming]||''}</span>`);}
       if(card.enhance) lines.push(`<span class="desc-enhance">【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}</span>`);
@@ -2890,7 +2929,7 @@ const GameMainScene = {
   // #6 手札カードもパッシブと同様に吹き出し表示にする（配置操作を妨げないよう、背景クリックでは閉じない）
   renderHandInfoPanel(){
     const hide=()=>{ this._handBubbleTok=null; return null; }; // 吹き出しが消えたら自動フェードのタイマーもリセット
-    if(this.rerollMode||!this.selectedCardId) return hide();
+    if(this.rerollMode||!this.selectedCardId||this.isCardDetailHidden()) return hide(); // 詳細非表示ON中は吹き出しを出さない
     if(this.handBubbleClosedFor===this.selectedCardId) return hide(); // #扇形 ×で吹き出しだけ閉じた（カードは選択中のまま）
     const card=GameState.hand.find(c=>c.id===this.selectedCardId); if(!card) return hide();
     if(!this._handBubbleTok||this._handBubbleTok.id!==card.id) this._handBubbleTok={id:card.id};
@@ -3198,7 +3237,7 @@ const GameMainScene = {
       const okBtn=document.createElement('button');okBtn.textContent=`確定（${this.rerollSelected.size}枚）`;okBtn.disabled=this.rerollSelected.size===0;okBtn.addEventListener('click',()=>this.confirmReroll());controls.appendChild(okBtn);
       const cancelBtn=document.createElement('button');cancelBtn.textContent='キャンセル';cancelBtn.addEventListener('click',()=>this.cancelReroll());controls.appendChild(cancelBtn);
     }else{
-      const rBtn=document.createElement('button');rBtn.innerHTML=`${GIcon('btn_reroll',{cls:'gi-btn'})}(${GameState.rerollCount})`;rBtn.title='リロール';rBtn.disabled=GameState.rerollCount<=0||this.currentSide!=='player'||this.hasBossEffect('reroll_limit');rBtn.addEventListener('click',()=>this.enterRerollMode());controls.appendChild(rBtn);
+      // リロールボタンは盤面の左上（早送りボタンの左右反転位置）へ移動（renderBoardLeftButtons）
       // #7 ターン終了ボタン（旧スキップ）は盤面右上の早送りボタンの下へ移動（renderBoardSideButtons）
     }
     // #4 デッキ/山札/捨て札/廃棄札確認ボタン（上画面に配置。GameIcons のSVGアイコン表記）
@@ -3333,7 +3372,7 @@ const GameMainScene = {
     // 敗北：残機があれば「一時撤退」（ミニショップへ）、残機0なら GAME OVER（タイトルへ）
     const retreat = !win ? this.retreatInfo : null;
     const gameOver = !win && !retreat;
-    const btnLabel = hasPassiveChoice ? 'パッシブ報酬を受け取る' : (win ? (goShop?'ショップへ':'マップに戻る') : (retreat?'ミニショップで体制を整える':'タイトルへ'));
+    const btnLabel = hasPassiveChoice ? 'パッシブ報酬を受け取る' : (win ? (goShop?'ショップへ':((GameState.currentFloor>=10&&this.stage&&this.stage.key==='boss')?'エンディングへ':'マップに戻る')) : (retreat?'ミニショップで体制を整える':'タイトルへ'));
     const goLose=()=>{
       if(typeof StageFX!=='undefined') StageFX.clearAll();
       if(retreat){ ShopScene.miniShop=true; App.showShop(); }
@@ -3357,7 +3396,7 @@ const GameMainScene = {
         onNext:()=>{
           if(!win){ goLose(); return; }
           if(hasPassiveChoice){ this.passiveModalOpen=true; this.renderAll(); }
-          else{ StageFX.clearAll(); if(goShop){ App.showShop(); } else { App.showMapSelect(); } }
+          else{ StageFX.clearAll(); if(goShop){ App.showShop(); } else if(GameState.currentFloor>=10&&this.stage&&this.stage.key==='boss'){ App.saveGame(); App.showEnding(); } else { App.showMapSelect(); } } // 第10階層（最終決戦）クリア → エンディング演出
         },
       });
       const ph=document.createElement('div'); ph.className='stfx-result-placeholder'; ph.hidden=true; return ph;

@@ -129,6 +129,7 @@ const GameState = {
     this.currentDeck=GameData.buildDeckForMode(this.gameMode);
     this.gold=0; this.relics=[]; this.clearedStages=[];
     this.finalShopDone=false; // #6 階層10特殊構成の初回フラグをリセット
+    this.floor5RevelationDone=false; // 第5階層踏破の啓示（Revelation）を再生済みか（1ランに1回）
     this.rerollCount=GameData.INITIAL_REROLL;
     this.handSizeBonus=0; this.roundsBonus=0; this.turnsBonus=0;
     this.relicSlotBonus=0; this.rerollBonus=0; this.packCardBonus=0;
@@ -183,6 +184,7 @@ const GameState = {
       sevenPendingMultBoost:this.sevenPendingMultBoost,
       bossRerollUsed:this.bossRerollUsed,
       finalShopDone:this.finalShopDone,
+      floor5RevelationDone:!!this.floor5RevelationDone,
       gameMode:this.gameMode,
       initialPassiveGranted:this.initialPassiveGranted,
       lives:this.lives, retreat:this.retreat,
@@ -218,6 +220,7 @@ const GameState = {
     this.sevenPendingMultBoost=d.sevenPendingMultBoost||false;
     this.bossRerollUsed=d.bossRerollUsed||false;
     this.finalShopDone=d.finalShopDone||false;
+    this.floor5RevelationDone=!!d.floor5RevelationDone;
     this.gameMode=d.gameMode||'normal';
     this.initialPassiveGranted=d.initialPassiveGranted||false;
     // 残機（旧セーブは残機フィールドが無いので最大値2）・一時撤退中の情報
