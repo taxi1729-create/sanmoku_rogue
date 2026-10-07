@@ -411,7 +411,7 @@ const MajinEvent = (function(){
       return { key:s, icon:GameData.SYMBOL_LABEL[s], iconCls:'sym-'+s, label:`${GameData.SYMBOL_PASSIVE_NAMES[s]} Lv${nt}「${p.name}」`, desc:p.desc };
     }), {title:`記号パッシブを1つ選べ（${cands.length}択）`, head:headHtml});
     const nt=(G().symbolPassiveTier[key]||0)+1;
-    G().symbolPassiveTier[key]=nt; GameData.refreshPassiveEnhance();
+    G().symbolPassiveTier[key]=nt; GameData.refreshPassiveEnhance(); GameData.enforceCrossAll();
     return passiveHtml(key, nt);
   }
 
@@ -819,6 +819,17 @@ const MajinEvent = (function(){
         });
         grid.appendChild(w);
       });
+      // スワイプ複数選択
+      if(max>1&&typeof SwipeSelect!=='undefined'){
+        grid.classList.add('swipe-select-zone');
+        SwipeSelect.attach(grid,{
+          item:'.mj-pick-card', getKey:x=>+x.dataset.i,
+          isSelected:k=>sel.has(k), canSelect:()=>sel.size<max,
+          set:(k,on)=>{ if(on) sel.add(k); else sel.delete(k); },
+          paint:(x,on)=>x.classList.toggle('picked',on),
+          commit:()=>upd(),
+        });
+      }
       p.appendChild(grid);
       confirm.addEventListener('click',()=>{ if(confirm.disabled) return; res([...sel].sort((a,b)=>a-b).map(i=>cards[i])); });
       p.appendChild(confirm); upd();

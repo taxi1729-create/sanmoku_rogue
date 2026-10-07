@@ -126,6 +126,10 @@ const MapSelectScene = {
       const skipBtn=card.querySelector('.skip-btn');
       if(skipBtn) skipBtn.addEventListener('click',()=>{
         if(locked||isCleared) return;
+        confirmSkip(()=>doSkip());
+      });
+      const doSkip=()=>{
+        if(locked||isCleared||GameState.clearedStages.includes(stage.key)) return;
         // #8 スキップ報酬G＝(基本G4)×num＋レリック効果＋レリック強化効果（num=1、階層6以上で+1）
         const sr=GameState.calcSkipReward();
         const total=sr.total;
@@ -138,7 +142,7 @@ const MapSelectScene = {
         App.saveGame();
         this.pendingReward={stageName:stage.name,breakdown:sr,gold:total,extra:bonusMsg};
         this.renderAll();
-      });
+      };
     });
     el.appendChild(path);
 

@@ -1,12 +1,12 @@
 /* startEvent.js — スタートイベント「神の寵愛」
  * 「はじめから」で新規ゲームを開始した直後（マップへ行く前）に一度だけ発生する。
- * 聖なる声がゲームの目的と基本を語り（チュートリアルを兼ねる）、5種の寵愛からランダムに提示された3つの中から1つを授ける。
+ * 聖なる声がゲームの目的と基本を語り（チュートリアルを兼ねる）、4種の施しからランダムに提示された3つの中から1つを授ける。
  * 公開API（グローバル const StartEvent）:
  *   StartEvent.open() -> Promise      イベント画面を開く（完了時に App.saveGame() 済みで resolve。マップ遷移は呼び出し側）
  *   StartEvent.isOpen()
  *   StartEvent.close()                強制終了（resolve される）
  *   StartEvent.skipStory()            語りをスキップして寵愛選択へ
- *   StartEvent.pickOffer(rng)         5種から3つを抽選（id配列）
+ *   StartEvent.pickOffer(rng)         4種から3つを抽選（id配列）
  *   StartEvent.debugForce(opts)       テスト用：次回 open の提示内容を固定
  *       opts = { offer:['card_pack','all_mult','enhance'], upgradeEffects:['base_up5',...], skipIntro:true }
  *   StartEvent.BLESSINGS / StartEvent.PAGES
@@ -102,8 +102,17 @@ const StartEvent = (function(){
       desc:()=>'ショップの通常アップグレードと同じく、3つの効果から1つを選んでデッキに適用する。' },
     gold:{ id:'gold', name:'5G', icon:'gold_coin',
       desc:()=>'旅の路銀として5Gを授かる。' },
+    // v1.00 #13 最初の施し：以下の4つに固定し、ランダムに選ばれた3つから1つを選ぶ
+    gold10:{ id:'gold10', name:'10G', icon:'gold_coin',
+      desc:()=>'旅の路銀として10Gを授かる。' },
+    jam_card:{ id:'jam_card', name:'ジャミングカード', icon:'pack_jamming',
+      desc:()=>'スタン・混乱・引き直しのいずれかが付与された基礎点15のカード（バツ以外の記号）3枚から1枚を選び、デッキに加える。' },
+    enh_card:{ id:'enh_card', name:'強化カード', icon:'pack_enhance',
+      desc:()=>'エクステンド・拡大・巨大化のいずれかが付与された基礎点15のカード（バツ以外の記号）3枚から1枚を選び、デッキに加える。' },
+    purge_enhance:{ id:'purge_enhance', name:'削除と強化', icon:'pack_upgrade',
+      desc:()=>'デッキからランダムなカードを3枚削除し、ランダムなカード3枚にカード強化効果を付与する。' },
   };
-  const BLESSING_IDS = ['card_pack','all_mult','enhance','upgrade','gold'];
+  const BLESSING_IDS = ['gold10','jam_card','enh_card','purge_enhance'];
   function pickOffer(rng){ return shuffleR(BLESSING_IDS, rng||Math.random).slice(0,3); }
 
   let forced=null;
@@ -344,6 +353,17 @@ const StartEvent = (function(){
         });
         grid.appendChild(w);
       });
+      // スワイプ複数選択
+      if(max>1&&typeof SwipeSelect!=='undefined'){
+        grid.classList.add('swipe-select-zone');
+        SwipeSelect.attach(grid,{
+          item:'.sev-pick-card', getKey:x=>+x.dataset.i,
+          isSelected:k=>sel.has(k), canSelect:()=>sel.size<max,
+          set:(k,on)=>{ if(on) sel.add(k); else sel.delete(k); },
+          paint:(x,on)=>x.classList.toggle('picked',on),
+          commit:()=>{ detail.hidden=true; upd(); },
+        });
+      }
       p.appendChild(grid);
       p.appendChild(detail);
       confirm.addEventListener('click',()=>{ if(confirm.disabled) return; res([...sel].sort((a,b)=>a-b)); });
@@ -403,7 +423,61 @@ const StartEvent = (function(){
   }
 
   // ===================== 各寵愛の実行（結果HTMLを返す） =====================
+  // v1.00 #13 施し用：基礎点15・バツ以外のランダム記号のカード
+  function startCard(fields){
+    const c={ id:'start_'+Date.now()+'_'+Math.floor(Math.random()*100000), symbol:GlobalFunctions.randChoice(['Circle','Triangle','Square']), number:15, baseScore:15, jamming:null, enhance:null, trait:null, ...fields };
+    if(G().symbolPassiveTier&&G().symbolPassiveTier.Cross>=3) c.symbol='Cross';
+    GameData.applyGrantSideEffects(c, G().gold);
+    return c;
+  }
+  async function pickStartCard(cands, title){
+    await playPack('card_pack', cands.map(c=>({html:cardHtml(c)})));
+    if(!ui) return '';
+    say('天より降りし三枚の札。あなたの束に加えるものを選びなさい。');
+    const [i]=await pickCards(cands,{title, hint:'3枚のうち1枚を選択'});
+    const card=cands[i];
+    const d0=G().currentDeck.length;
+    G().currentDeck.push(card);
+    GlobalFunctions.recordCard(card);
+    refreshStats(null, d0);
+    return `<div class="sev-sub">デッキに加わったカード</div><div class="sev-card-row">${cardHtml(card,'sev-reveal')}</div>${cardDescHtml(card)}<div class="sev-note">デッキ ${d0}枚 → <b>${G().currentDeck.length}枚</b></div>`;
+  }
   const RUN = {
+    async gold10(){
+      const g0=G().gold;
+      G().gold+=10;
+      refreshStats(g0, null);
+      spawnCoins(14);
+      return `<div class="sev-grant"><span class="sev-grant-ico">${ico('gold_coin')}</span><div><b>+10G</b> を授かった<div class="sev-grant-desc">所持G ${g0} → <b>${G().gold}</b></div></div></div>`;
+    },
+    async jam_card(){
+      const cands=[0,1,2].map(()=>startCard({ jamming:GlobalFunctions.randChoice(['スタン','混乱','引き直し']) }));
+      return pickStartCard(cands,'デッキに加えるジャミングカードを選べ');
+    },
+    async enh_card(){
+      const cands=[0,1,2].map(()=>startCard({ enhance:GlobalFunctions.randChoice(['エクステンド','拡大','巨大化']) }));
+      return pickStartCard(cands,'デッキに加える強化カードを選べ');
+    },
+    async purge_enhance(){
+      const deck=G().currentDeck;
+      const d0=deck.length;
+      const delN=Math.min(3, Math.max(0, deck.length-1));
+      const delIdx=shuffleR(deck.map((_,k)=>k), Math.random).slice(0,delN).sort((a,b)=>b-a);
+      const removed=delIdx.map(i=>deck[i]);
+      delIdx.forEach(i=>deck.splice(i,1));
+      const encIdx=shuffleR(deck.map((_,k)=>k), Math.random).slice(0,Math.min(3,deck.length));
+      let html=`<div class="sev-sub">削除されたカード</div><div class="sev-card-row">${removed.map(c=>`<div class="sev-lost">${cardHtml(c)}<span class="sev-lost-mark">削除</span></div>`).join('')}</div>`;
+      html+=`<div class="sev-sub">強化効果が付与されたカード</div>`;
+      encIdx.forEach(di=>{
+        const before=clone(deck[di]);
+        const r=applyShopEffect('grant_enhance',[di]);
+        const after=r.affected[0]||deck[di];
+        GlobalFunctions.recordCard(after);
+        html+=`<div class="sev-ba-wrap">${beforeAfterHtml(before, after)}${cardDescHtml(after)}</div>`;
+      });
+      refreshStats(null, d0);
+      return html+`<div class="sev-note">デッキ ${d0}枚 → <b>${deck.length}枚</b></div>`;
+    },
     async card_pack(){
       const cands=[GameData.generateShopCard(), GameData.generateShopCard()];
       await playPack('card_pack', cands.map(c=>({html:cardHtml(c)})));
@@ -513,6 +587,10 @@ const StartEvent = (function(){
     enhance:'札に宿りし力、どうか正しく振るいなさい。',
     upgrade:'磨かれた力は、あなたを裏切りません。',
     gold:'ささやかな路銀です。ショップで役立てなさい。',
+    gold10:'ささやかな路銀です。ショップで役立てなさい。',
+    jam_card:'その札が、敵の歩みを乱すでしょう。',
+    enh_card:'札に宿りし力、どうか正しく振るいなさい。',
+    purge_enhance:'削ぎ落とし、磨き上げる。それもまた力です。',
   };
 
   function outroAnim(){

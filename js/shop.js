@@ -42,7 +42,7 @@ const ShopScene = {
     const fixedUpgrade = [{ type:'pickup_upgrade' }];
     const randomSlots = [];
     // #3 ランダム商品の枠を8→4枠に変更
-    for(let i = 0; i < 4; i++) randomSlots.push({ type: GameData.pickWeightedType() });
+    for(let i = 0; i < 4; i++) randomSlots.push(this.makeRandomSlot());
     // #6 爆発通常アップグレード：通常の重み付き抽選とは別に、ショップ生成のたび20%の確率で1枠を確保して出現させる
     if(Math.random() < 0.2){
       const idx = Math.floor(Math.random()*randomSlots.length);
@@ -58,13 +58,41 @@ const ShopScene = {
     const miniFixed = [{ type:'relic_pack', miniFixed:true }, { type:'card_focus', miniFixed:true }];
     const randomSlots = [];
     for(let i = 0; i < 2; i++){
-      const slot = { type: GameData.pickWeightedType() };
+      const slot = this.makeRandomSlot();
       // セーブに陳列を残すため、表示時に抽選する内容（ピックアップのレリック・効果）もここで確定させる
       if(slot.type==='pickup_relic') slot._relic = this.pickRelic();
       if(slot.type==='pickup_upgrade') slot._single = GlobalFunctions.randChoice(GameData.normalSelectPool().filter(e=>!e.rarity));
       randomSlots.push(slot);
     }
     return { mini:true, fixedRelics:[], fixedCardPack:[], fixedUpgrade:[], miniFixed, randomSlots };
+  },
+
+  // ランダム商品1枠の抽選：15%でピックアップカード（カードを事前抽選して保持）、それ以外は通常の重み付き抽選
+  makeRandomSlot(){
+    const type = GameData.rollRandomShopSlotType();
+    const slot = { type };
+    if(type==='pickup_card') slot._card = this.genPickupCard();
+    return slot;
+  },
+  // ピックアップカード：？カードパックと同じ生成。5%で全効果付き・基礎点100〜150
+  genPickupCard(){
+    if(Math.random() < GameData.PICKUP_CARD_SPECIAL_RATE){ const c = this.genDreamCard(GlobalFunctions.randInt(100, 150)); c.pickupSpecial = true; return c; }
+    return GameData.generateShopCard();
+  },
+  pickupCardPrice(card){ return GameState.shopPriceOf(GameData.pickupCardBasePrice(card)); },
+  buyPickupCard(slot){
+    if(slot.used) return;
+    if(!slot._card) slot._card = this.genPickupCard();
+    const card = slot._card;
+    const price = this.pickupCardPrice(card);
+    if(GameState.gold < price){ this.message='Gが足りません'; this.renderAll(); return; }
+    GameState.gold -= price;
+    slot.used = true;
+    const owned = { ...card }; delete owned.pickupSpecial;
+    GameState.currentDeck.push(owned);
+    GlobalFunctions.recordCard(owned);
+    this.message = `ピックアップカード ${GIconSym(owned.symbol)}（基礎点${owned.baseScore}）を${price}Gで購入した`;
+    this.renderAll();
   },
 
   pickRelic(){
@@ -384,10 +412,11 @@ const ShopScene = {
 
   // ===== Random slot handler =====
   handleRandomSlot(slot){
-    const price = slot.type==='pickup_relic' ? this.relicPrice(slot._relic||{}) : GameState.shopPriceOf(this.slotPrice(slot.type));
+    const price = slot.type==='pickup_relic' ? this.relicPrice(slot._relic||{}) : slot.type==='pickup_card' ? this.pickupCardPrice(slot._card) : GameState.shopPriceOf(this.slotPrice(slot.type));
     if(GameState.gold < price){ this.message='Gが足りません'; this.renderAll(); return; }
     switch(slot.type){
       case 'pickup_relic': this.buyPickupRelic(slot); break;
+      case 'pickup_card': this.buyPickupCard(slot); break;
       case 'card_pack': this.buyCardPack(slot); break;
       case 'pickup_upgrade': this.buyUpgrade('normal', slot); break;
       case 'normal_upgrade': this.buyUpgrade('normal', slot); break;
@@ -570,6 +599,7 @@ const ShopScene = {
     App.saveGame();
   },
   renderAll(){
+    try{ GameData.enforceCrossAll(); }catch(e){} // v1.00 #9 バツパッシブLv3
     try{ this.miniShopAutoSave(); }catch(e){}
     // #4 タップのたびに画面が一番上に戻る不具合を防ぐ：スクロール位置を保持
     const scrollY = window.scrollY;
@@ -703,7 +733,7 @@ const ShopScene = {
     ownedRow.classList.add('relic-strip-in-modal');
     modal.appendChild(ownedRow);
 
-    const skipBtn = document.createElement('button'); skipBtn.textContent='スキップ'; skipBtn.style.marginTop='18px'; skipBtn.addEventListener('click', () => this.skipRelicPack()); modal.appendChild(skipBtn);
+    const skipBtn = document.createElement('button'); skipBtn.textContent='スキップ'; skipBtn.style.marginTop='18px'; skipBtn.addEventListener('click', () => confirmSkip(() => this.skipRelicPack())); modal.appendChild(skipBtn);
     overlay.appendChild(modal);
     // 効果詳細の吹き出し（効果・現在の効果量・位置の移動・売却）はモーダルの上に重ねる
     if(this.packActiveRelicId!=null){
@@ -809,6 +839,24 @@ const ShopScene = {
         row.appendChild(el); return;
       }
 
+      // ピックアップカード：事前抽選したカードを陳列（価格＝1G＋ジャミング2G＋強化4G＋性質変化6G）
+      if(slot.type==='pickup_card'){
+        if(!slot._card) slot._card=this.genPickupCard();
+        const c=slot._card;
+        const cPrice=this.pickupCardPrice(c);
+        const lines=[];
+        if(c.jamming) lines.push(`<span class="desc-jamming">${GameData.JAMMING_EMOJI?.[c.jamming]||''}【${c.jamming}】${GameData.JAMMING_DESC[c.jamming]||''}</span>`);
+        if(c.enhance) lines.push(`<span class="desc-enhance">【${c.enhance}】${GameData.ENHANCE_DESC[c.enhance]||''}</span>`);
+        if(c.trait)   lines.push(`<span class="desc-trait">【${c.trait}】${GameData.TRAIT_DESC[c.trait]||''}</span>`);
+        el.className+=' pickup-slot pickup-card-slot'+(c.pickupSpecial?' dream-slot':'');
+        el.innerHTML=`<div class="slot-title">${GIcon('pack_card')}ピックアップカード</div>`
+          +`<div class="pickup-card-face"><div class="card${c.trait?' trait-'+c.trait.replace(/[()]/g,''):''}">${this.cardTagsHtml(c)}${this.cardSymbolHtml(c)}${this.cardScoreHtml(c,GameState.gold)}</div></div>`
+          +`<div class="slot-desc">基礎点${c.baseScore}${lines.length?'<br>'+lines.join('<br>'):''}</div>`
+          +`<button class="buy-btn" ${GameState.gold<cPrice?'disabled':''}>購入（${cPrice}G）</button>`;
+        el.querySelector('.buy-btn').addEventListener('click', () => this.buyPickupCard(slot));
+        row.appendChild(el); return;
+      }
+
       // #1 pickup_upgrade: 1効果を事前抽選して表示
       if(slot.type==='pickup_upgrade'){
         if(!slot._single){
@@ -843,7 +891,7 @@ const ShopScene = {
 
   slotDesc(type){
     const nN=GameState.packCardCount(false), nE=GameState.packCardCount(true); // #11
-    const descs = { pickup_relic:'ランダムなレリックを購入', card_pack:'カード2枚から1枚選択', pickup_upgrade:`通常セレクトから3つ・対象カード${nN}枚`, normal_upgrade:`通常セレクトから3つ・対象カード${nN}枚`, special_upgrade:`特別セレクトから2つ・対象カード${nN}枚`, card_focus:'カード4枚から2枚ピックアップ', bingo_focus:'ビンゴ倍率強化を選択', dream_card:'カード2枚から1枚ピックアップ（全効果付き）',
+    const descs = { pickup_relic:'ランダムなレリックを購入', pickup_card:'陳列されたカード1枚を購入',card_pack:'カード2枚から1枚選択', pickup_upgrade:`通常セレクトから3つ・対象カード${nN}枚`, normal_upgrade:`通常セレクトから3つ・対象カード${nN}枚`, special_upgrade:`特別セレクトから2つ・対象カード${nN}枚`, card_focus:'カード4枚から2枚ピックアップ', bingo_focus:'ビンゴ倍率強化を選択', dream_card:'カード2枚から1枚ピックアップ（全効果付き）',
       enhance_pack:'強化付きカード3枚から1枚選択', jamming_pack:'ジャミング付きカード3枚から1枚選択', relic_pack:'レリック3つから1つ選択・売却してストック確保も可能',
       normal_explosive_upgrade:`通常セレクトから5つ・対象カード${nE}枚・5つの中から最大3つまで選択（補充なし）` };
     return descs[type] || '';
@@ -890,12 +938,24 @@ const ShopScene = {
       grid.appendChild(wrap);
     });
     modal.appendChild(grid);
+    // スワイプ複数選択
+    if(pickCount>1 && typeof SwipeSelect!=='undefined'){
+      grid.classList.add('swipe-select-zone');
+      Array.from(grid.children).forEach((w,i)=>{ w.dataset.idx=i; });
+      SwipeSelect.attach(grid,{
+        item:'.card-pick-wrap', getKey:el=>{ const v=parseInt(el.dataset.idx,10); return isNaN(v)?null:v; },
+        isSelected:k=>p.selected.has(k), canSelect:()=>p.selected.size<pickCount,
+        set:(k,on)=>{ if(on) p.selected.add(k); else p.selected.delete(k); },
+        paint:(el,on)=>el.classList.toggle('picked',on),
+        commit:()=>this.renderAll(),
+      });
+    }
     if(pickCount>1){
       const confirmBtn = document.createElement('button'); confirmBtn.textContent=`決定（${p.selected.size}/${pickCount}）`; confirmBtn.style.marginTop='12px'; confirmBtn.disabled = p.selected.size < pickCount;
       confirmBtn.addEventListener('click', () => this.confirmCardPackMulti());
       modal.appendChild(confirmBtn);
     }
-    const skipBtn = document.createElement('button'); skipBtn.textContent='スキップ'; skipBtn.style.marginTop='18px'; skipBtn.addEventListener('click', () => this.skipCardPack()); modal.appendChild(skipBtn);
+    const skipBtn = document.createElement('button'); skipBtn.textContent='スキップ'; skipBtn.style.marginTop='18px'; skipBtn.addEventListener('click', () => confirmSkip(() => this.skipCardPack())); modal.appendChild(skipBtn);
     overlay.appendChild(modal); return overlay;
   },
 
@@ -1041,6 +1101,17 @@ const ShopScene = {
       grid.appendChild(slot);
     });
     modal.appendChild(grid);
+    // スワイプ複数選択：対象を複数選べる効果のとき、なぞったカードをまとめて選択／解除
+    if(needsTarget && eff.targetMax>1 && typeof SwipeSelect!=='undefined'){
+      grid.classList.add('swipe-select-zone');
+      SwipeSelect.attach(grid,{
+        item:'.fan-slot', getKey:el=>{ const v=parseInt(el.dataset.idx,10); return isNaN(v)?null:v; },
+        isSelected:k=>p.selectedTargets.has(k), canSelect:()=>p.selectedTargets.size<eff.targetMax,
+        set:(k,on)=>{ if(on) p.selectedTargets.add(k); else p.selectedTargets.delete(k); },
+        paint:(el,on)=>{ const c=el.querySelector('.pack-card-item'); if(c) c.classList.toggle('picked',on); },
+        commit:()=>{ this.pickBubble=null; this.renderAll(); },
+      });
+    }
     // #扇形 タップしたカードの効果吹き出し（×で吹き出しだけ閉じる。選択状態はそのまま）
     const pb = this.pickBubble;
     if(pb && pb.pack===p && !pb.closed && GameState.currentDeck[pb.idx] && p.cardIndexes.includes(pb.idx)){
@@ -1053,7 +1124,7 @@ const ShopScene = {
     const confirmBtn = document.createElement('button');
     confirmBtn.textContent = (isExplosive && p.picksRemaining>1) ? '決定して次へ' : '決定';
     confirmBtn.disabled=!eff||(needsTarget&&p.selectedTargets.size<eff.targetMin); confirmBtn.addEventListener('click',()=>this.confirmPack()); btnRow.appendChild(confirmBtn);
-    const skipBtn = document.createElement('button'); skipBtn.textContent='スキップ'; skipBtn.addEventListener('click',()=>this.skipPack()); btnRow.appendChild(skipBtn);
+    const skipBtn = document.createElement('button'); skipBtn.textContent='スキップ'; skipBtn.addEventListener('click',()=>confirmSkip(()=>this.skipPack())); btnRow.appendChild(skipBtn);
     modal.appendChild(btnRow);
     overlay.appendChild(modal); return overlay;
   },

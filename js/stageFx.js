@@ -1240,8 +1240,11 @@ const StageFX = (function(){
     skipBtn.addEventListener('click',(e)=>{
       e.stopPropagation(); if(ui!==pvUI || ui.choosing) return;
       if(ui.busy){ settle(); return; }
+      confirmSkip(()=>{
+      if(ui!==pvUI || ui.choosing) return;
       ui.choosing=true;
       anim(content,[{opacity:1,transform:'none'},{opacity:0,transform:'translateY(-30px)'}],{duration:R?80:320,fill:'forwards'}).finished.catch(()=>{}).then(()=>{ const fn=ui.opts.onSkip; if(fn) fn(); });
+      });
     });
     // 降臨
     (async()=>{

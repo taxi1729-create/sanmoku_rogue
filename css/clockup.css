@@ -1,0 +1,67 @@
+/* 盤面右上の外側の縦列：早送り → ターン終了 → クロックアップ（シカクパッシブ3） */
+.board-side-col{position:absolute;top:0;left:calc(100% + 10px);width:52px;display:flex;flex-direction:column;align-items:stretch;gap:6px;z-index:5;}
+.board-side-col .board-ff-btn{position:static;left:auto;top:auto;}
+.board-turnend-btn{width:52px;height:40px;padding:0;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  background:#1e1830;border:1px solid #6a4ad4;border-radius:9px;color:#cfc7ff;font-size:9px;font-weight:700;line-height:1.1;}
+.board-turnend-btn .gi{width:16px;height:16px;}
+.board-turnend-btn:hover:not(:disabled){background:#2a2148;}
+.board-turnend-btn:disabled{opacity:.4;}
+.board-turnend-btn.cu-mode:not(:disabled){border-color:#5eead4;color:#ccfbf1;box-shadow:0 0 8px rgba(45,212,191,.55);}
+
+.board-clockup-btn{--cu-frac:1;position:relative;width:52px;height:52px;padding:0;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  background:radial-gradient(circle at 50% 35%,#134e4a,#0b1f2a 75%);border:1px solid #2dd4bf;border-radius:12px;color:#ccfbf1;font-size:8.5px;font-weight:800;line-height:1.05;text-align:center;overflow:hidden;}
+.board-clockup-btn .bcu-ico{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.board-clockup-btn:not(:disabled):not(.running){box-shadow:0 0 10px rgba(45,212,191,.55);animation:cuReady 1.4s ease-in-out infinite alternate;}
+.board-clockup-btn:disabled{opacity:.4;animation:none;box-shadow:none;}
+.board-clockup-btn.used{filter:grayscale(.8);}
+.board-clockup-btn.running{border-color:#5eead4;box-shadow:0 0 14px rgba(45,212,191,.8);cursor:default;}
+.board-clockup-btn .bcu-ring{position:absolute;inset:3px;border-radius:50%;
+  background:conic-gradient(#5eead4 calc(var(--cu-frac)*360deg),rgba(94,234,212,.12) 0);
+  -webkit-mask:radial-gradient(circle,transparent 58%,#000 60%);mask:radial-gradient(circle,transparent 58%,#000 60%);}
+.board-clockup-btn .bcu-time{position:relative;font-size:14px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;text-shadow:0 0 6px #2dd4bf;}
+.board-clockup-btn .bcu-label{position:relative;}
+.board-clockup-btn.running .bcu-label{font-size:6.5px;letter-spacing:.04em;color:#99f6e4;}
+.board-clockup-btn.cu-hurry .bcu-ring{background:conic-gradient(#fb7185 calc(var(--cu-frac)*360deg),rgba(251,113,133,.15) 0);}
+.board-clockup-btn.cu-hurry .bcu-time{color:#fecdd3;text-shadow:0 0 6px #fb7185;animation:cuHurry .5s ease-in-out infinite alternate;}
+@keyframes cuReady{from{box-shadow:0 0 6px rgba(45,212,191,.35);}to{box-shadow:0 0 14px rgba(45,212,191,.8);}}
+@keyframes cuHurry{from{transform:scale(1);}to{transform:scale(1.15);}}
+
+/* クロックアップ中：盤面をシアンに染め、走査線を流す */
+.game-screen.clockup-active .board{box-shadow:0 0 0 2px #2dd4bf,0 0 22px rgba(45,212,191,.55);position:relative;}
+.game-screen.clockup-active .board::after{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(180deg,rgba(45,212,191,0) 0%,rgba(45,212,191,.16) 50%,rgba(45,212,191,0) 100%),rgba(20,184,166,.07);
+  background-size:100% 40%,100% 100%;background-repeat:no-repeat;animation:cuScan 1.6s linear infinite;}
+@keyframes cuScan{from{background-position:0 -40%,0 0;}to{background-position:0 140%,0 0;}}
+.turn-cu-tag{display:inline-block;margin-right:6px;padding:1px 6px;border-radius:6px;background:#0f766e;color:#ccfbf1;font-size:.8em;font-weight:900;letter-spacing:.06em;box-shadow:0 0 8px rgba(45,212,191,.7);}
+
+/* 開始／終了の特殊演出（全画面） */
+.cu-fx{--cu-dur:900ms;position:fixed;inset:0;z-index:9000;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;}
+.cu-fx-flash{position:absolute;inset:0;background:radial-gradient(circle at 50% 45%,rgba(204,251,241,.95),rgba(45,212,191,.55) 35%,rgba(8,47,73,.85) 75%);animation:cuFlash var(--cu-dur) ease-out forwards;}
+.cu-fx-end .cu-fx-flash{background:radial-gradient(circle at 50% 45%,rgba(255,255,255,.9),rgba(129,140,248,.5) 35%,rgba(15,23,42,.85) 75%);}
+.cu-fx-rings{position:absolute;left:50%;top:45%;width:0;height:0;}
+.cu-fx-rings i{position:absolute;left:-60px;top:-60px;width:120px;height:120px;border-radius:50%;border:3px solid #5eead4;opacity:0;animation:cuRing var(--cu-dur) ease-out forwards;}
+.cu-fx-rings i:nth-child(2){animation-delay:calc(var(--cu-dur)*.12);}
+.cu-fx-rings i:nth-child(3){animation-delay:calc(var(--cu-dur)*.24);}
+.cu-fx-end .cu-fx-rings i{border-color:#a5b4fc;animation-name:cuRingIn;}
+.cu-fx-clock{position:relative;width:132px;height:132px;margin-top:-30px;animation:cuClockIn var(--cu-dur) cubic-bezier(.2,1.4,.4,1) forwards;}
+.cu-fx-clock .cu-face{fill:rgba(15,23,42,.75);stroke:#5eead4;stroke-width:3;}
+.cu-fx-clock .cu-ticks line{stroke:#ccfbf1;stroke-width:2.5;stroke-linecap:round;}
+.cu-fx-clock .cu-hand{stroke:#fff;stroke-linecap:round;transform-origin:50px 50px;}
+.cu-fx-clock .cu-hand-m{stroke-width:3;animation:cuSpin calc(var(--cu-dur)/3) linear infinite;}
+.cu-fx-clock .cu-hand-h{stroke-width:4.5;animation:cuSpin var(--cu-dur) linear infinite;}
+.cu-fx-clock .cu-pin{fill:#5eead4;}
+.cu-fx-end .cu-fx-clock .cu-face{stroke:#a5b4fc;}
+.cu-fx-end .cu-fx-clock .cu-hand{animation-timing-function:cubic-bezier(.1,.8,.3,1);animation-iteration-count:1;animation-fill-mode:forwards;}
+.cu-fx-text{position:relative;margin-top:10px;font-size:40px;font-weight:900;font-style:italic;letter-spacing:.08em;color:#fff;
+  text-shadow:0 0 10px #2dd4bf,0 0 24px #14b8a6,3px 3px 0 #0f766e;animation:cuTextIn var(--cu-dur) cubic-bezier(.2,1.3,.4,1) forwards;}
+.cu-fx-end .cu-fx-text{text-shadow:0 0 10px #818cf8,0 0 24px #6366f1,3px 3px 0 #3730a3;}
+.cu-fx-sub{position:relative;margin-top:4px;font-size:12px;font-weight:800;color:#e0f2fe;text-shadow:0 1px 3px #000;animation:cuTextIn var(--cu-dur) ease-out forwards;}
+@keyframes cuFlash{0%{opacity:0;}12%{opacity:1;}70%{opacity:.85;}100%{opacity:0;}}
+@keyframes cuRing{0%{transform:scale(.2);opacity:0;}20%{opacity:1;}100%{transform:scale(4.5);opacity:0;}}
+@keyframes cuRingIn{0%{transform:scale(4.5);opacity:0;}30%{opacity:1;}100%{transform:scale(.2);opacity:0;}}
+@keyframes cuClockIn{0%{transform:scale(.2) rotate(-90deg);opacity:0;}30%{transform:scale(1.15) rotate(0);opacity:1;}80%{transform:scale(1);opacity:1;}100%{transform:scale(1.4);opacity:0;}}
+@keyframes cuSpin{from{transform:rotate(0);}to{transform:rotate(360deg);}}
+@keyframes cuTextIn{0%{transform:scale(2.6);opacity:0;letter-spacing:.5em;}25%{transform:scale(1);opacity:1;letter-spacing:.08em;}80%{opacity:1;}100%{transform:scale(1.05);opacity:0;}}
+@media (prefers-reduced-motion: reduce){
+  .board-clockup-btn,.board-clockup-btn .bcu-time,.game-screen.clockup-active .board::after,.cu-fx-clock .cu-hand{animation:none!important;}
+}

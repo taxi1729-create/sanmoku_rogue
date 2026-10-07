@@ -26,6 +26,33 @@ const GameMainScene = {
     btn.classList.toggle('active',on); btn.setAttribute('aria-pressed',on?'true':'false');
     btn.innerHTML=`${GameIcons.svg('btn_fast_forward')}<span class="bff-label">${on?'早送りON':'早送り'}</span>`;
   },
+  // 盤面右上の外側の縦列：早送り → ターン終了 → クロックアップ（シカクパッシブ3所持時）
+  renderBoardSideButtons(){
+    const col=document.createElement('div'); col.className='board-side-col';
+    col.appendChild(this.renderFFButton());
+    const te=document.createElement('button'); te.type='button'; te.className='board-turnend-btn'+(this.clockUpActive?' cu-mode':'');
+    te.setAttribute('aria-label','ターン終了');
+    te.innerHTML=`${GIcon('btn_skip')}<span class="bte-label">ターン終了</span>`;
+    te.disabled=!this.canEndTurnNow();
+    te.addEventListener('click',(e)=>{ e.stopPropagation(); this.manualSkipTurn(); });
+    col.appendChild(te);
+    if(this.hasClockUp()){
+      const cu=document.createElement('button'); cu.type='button';
+      cu.className='board-clockup-btn'+(this.clockUpActive?' running':'')+(this.clockUpUsed&&!this.clockUpActive?' used':'');
+      cu.setAttribute('aria-label','クロックアップ');
+      const ms=this.clockUpRemainingMs();
+      cu.style.setProperty('--cu-frac',(ms/this.CLOCKUP_DURATION_MS).toFixed(4));
+      const clock='<svg class="bcu-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/><path d="M5 3.5 2.8 5.7M19 3.5l2.2 2.2"/></svg>';
+      cu.innerHTML=this.clockUpActive
+        ? `<span class="bcu-ring"></span><span class="bcu-time">${(ms/1000).toFixed(1)}</span><span class="bcu-label">CLOCK UP</span>`
+        : `${clock}<span class="bcu-label">${this.clockUpUsed?'使用済み':'クロック<br>アップ'}</span>`;
+      cu.disabled=this.clockUpActive?false:!this.canClockUpNow();
+      if(this.clockUpActive) cu.setAttribute('aria-disabled','true');
+      cu.addEventListener('click',(e)=>{ e.stopPropagation(); if(!this.clockUpActive) this.startClockUp(); });
+      col.appendChild(cu);
+    }
+    return col;
+  },
   renderFFButton(){
     const btn=document.createElement('button'); btn.type='button'; btn.className='board-ff-btn';
     btn.setAttribute('aria-label','早送り（ON/OFF）');
@@ -52,6 +79,8 @@ const GameMainScene = {
     this.justPlacedCell=null; this.justPlacedCells=null;
     this.justDrawnIds=new Set(); // #6 ドロー演出用
     this.extendActive=false; // #4 エクステンド
+    this.placementBusy=false; this.scoringBusy=false; // #入力ロック ステージ開始時に必ず解除
+    this.resetClockUp(); this.clockUpUsed=false; // #シカクパッシブ3 クロックアップはステージ（ゲーム）中1回
     GameState.currentDeck.forEach(c=>GlobalFunctions.recordCard(c)); // #5 図鑑：所持デッキの発見効果を反映
     GameState.relics.forEach(r=>GlobalFunctions.recordRelic(r.id));
     this.turnsBonus_bossRestore=0; this.expandPending=null; this.paintPending=null;
@@ -59,6 +88,7 @@ const GameMainScene = {
     this.effects={stunNextNpc:false,confuseNextNpc:false,breakUntilTurn:null,linkRestrict:null,redirectBan:null,sealCell:null,lureRestrict:false};
     GameState.initStage(stage);
     GameData.refreshPassiveEnhance(); // v14 #1
+    GameData.enforceCrossAll(); // v1.00 #9
     this.applyBossEffect();
     this.applyRelicInitEffects();
     this.stageBonusRounds=0;
@@ -238,6 +268,7 @@ const GameMainScene = {
   startRound(){
     // 盤面は毎ラウンドリセットする（以前はボス効果「バツ配置」時に前ラウンドの盤面が残ってしまっていた）
     this.board=new Array(GameData.BOARD_SIZE*GameData.BOARD_SIZE).fill(null);
+    this._npcIntent=null; this.npcNextCell=null; // NPC次手予告はラウンドをまたがない
     if(this.hasBossEffect('cross_corner')){ const bs=GameData.BOARD_SIZE; const ccBe=this.bossEffectById('cross_corner'); GlobalFunctions.shuffle([0,bs-1,bs*(bs-1),bs*bs-1]).slice(0,2*(ccBe.power||1)).forEach(i=>{ /* #8 四隅のうち2つ（階層6以降は4つ） */ if(!this.blockedCells.has(i)) this.board[i]={symbol:'Cross',baseScore:this.npcCrossBase(),owner:'npc',card:null}; }); }
     // #8 チェックパッシブ2：盤面がリセットされる毎ラウンド、4隅にマル・シカク・サンカクのいずれかランダムな記号＋ランダムなマルチ効果のカードを配置し続ける
     if(GameState.symbolPassiveTier.Check>=2){
@@ -280,6 +311,7 @@ const GameMainScene = {
   },
 
   endRound(){
+    this.resetClockUp(); // #シカクパッシブ3 タイマー片付け
     this.prevRoundScore=GameState.currentScore;
     // #7 レリック「ラウンド強化」：ラウンド終了時、最終加算補正+1000×n(n=現在ラウンド)
     if(GameState.hasRelic('round_boost')&&this.relicActive()){
@@ -465,6 +497,7 @@ const GameMainScene = {
   finishStage(result){
     if(result==='lose'&&this.resultState==='lose') return; // 二重の失敗処理で残機を2つ消費しないためのガード
     this._clearFx=[];
+    this.resetClockUp(); // #シカクパッシブ3 タイマー片付け
     // #3 ゲームスコア最高得点を記録
     GlobalFunctions.saveHighScoreIfBetter(GameState.currentScore);
     // #2 統一ボス効果の倍率を元に戻す
@@ -687,11 +720,12 @@ const GameMainScene = {
   },
 
   // #4 手札のリロールはサンカクパッシブと無関係（解放対象はショップの品揃え更新）
-  enterRerollMode(){ if(this.currentSide!=='player'||this.resultState||GameState.rerollCount<=0) return; this.rerollMode=true; this.rerollSelected=new Set(); this.selectedCardId=null; this.renderAll(); },
+  enterRerollMode(){ if(this.isPlayerInputLocked()||GameState.rerollCount<=0) return; this.rerollMode=true; this.rerollSelected=new Set(); this.selectedCardId=null; this.renderAll(); },
   cancelReroll(){ this.rerollMode=false; this.rerollSelected=new Set(); this.renderAll(); },
   toggleRerollCard(id){ if(this.rerollSelected.has(id)) this.rerollSelected.delete(id); else this.rerollSelected.add(id); this.renderAll(); },
   confirmReroll(){
     if(!this.rerollMode||this.rerollSelected.size===0||GameState.rerollCount<=0) return;
+    if(this.isPlayerInputLocked()) return; // #入力ロック
     GameState.rerollCount--;
     const sel=GameState.hand.filter(c=>this.rerollSelected.has(c.id));
     GameState.hand=GameState.hand.filter(c=>!this.rerollSelected.has(c.id));
@@ -1185,7 +1219,7 @@ const GameMainScene = {
     return true;
   },
 
-  async playScoreSequence(bingos){ for(const b of bingos) await this.showScoreStep(b); },
+  async playScoreSequence(bingos){ const prev=this.scoringBusy; this.scoringBusy=true; try{ for(const b of bingos) await this.showScoreStep(b); } finally{ this.scoringBusy=prev; } },
   // v12 #9 レリック「チャージ」：全てのビンゴ計算が終わりラウンドが上がるタイミングでのみ、手札の基礎点合計をnに加算する
   updateCharge(sum){
     if(!(GameState.hasRelic('charge')&&this.relicActive())) return;
@@ -1437,7 +1471,8 @@ const GameMainScene = {
     this.board.forEach(cell=>{
       if(!cell?.card) return;
       const sqP1c=cell.card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=2; // シカクパッシブ3はシカクカードのみ有効
-      if(cell.card.enhance==='巨大化') cell.baseScore+=3*(sqP1c?2:1);
+      // v1.00 #11 巨大化：ターン消費ごとにカード基礎点+1（シカクパッシブLv2のシカクカードは+2）。カード自体に永続加算する
+      if(cell.card.enhance==='巨大化'){ const g=sqP1c?2:1; cell.baseScore+=g; if(!cell.card._ghostOf) cell.card.baseScore+=g; }
       // 肥大化：カード基礎点/2×対象ビンゴ倍率
       if(cell.card.enhance==='肥大化'){const a=Math.round((cell.card.baseScore/2)*GameData.BINGO_MULTIPLIER_BASE[cell.symbol]*(sqP1c?2:1));GameState.currentScore=Math.max(0,GameState.currentScore+a);}
     });
@@ -1461,7 +1496,7 @@ const GameMainScene = {
     return true;
   },
   async checkAutoSkip(){
-    if(this.currentSide!=='player'||this.resultState) return;
+    if(this.currentSide!=='player'||this.resultState||this.clockUpActive) return;
     if(this.hasAnyValidPlacement()) return;
     const reason=GameState.hand.length===0?'手札がない':'盤面に置ける場所がない';
     this.addLog(`スキップ：${reason}ためターンを消費しました`);
@@ -1474,17 +1509,123 @@ const GameMainScene = {
     if(this.currentSide==='npc') this.scheduleAIMove();
   },
 
-  // #7 ターンスキップボタン：プレイヤーが任意にそのターンを終了できるようにする
+  // #7 ターン終了ボタン（旧スキップ）：プレイヤーが任意にそのターンを終了できる。クロックアップ中はクロックアップを終了してターンを消費する
   async manualSkipTurn(){
-    if(this.currentSide!=='player'||this.resultState||this.rerollMode) return;
-    this.addLog('スキップ：プレイヤーがターンをスキップしました');
-    this.turnInRound++;
-    this.applyPerTurnEnhances();
-    if(this.turnInRound>GameState.effectiveTurnsPerRound()){ this.renderAll(); await this.sleep(300); this.endRound(); return; }
-    this.currentSide='npc';
-    if(GameState.floor10SpecialBoss&&this.isForcedNpcTurn(this.turnInRound+1)) this.currentSide='npc';
+    if(this.clockUpActive){ return this.endClockUp('manual'); }
+    if(this.isPlayerInputLocked()||this.rerollMode) return;
+    this.placementBusy=true; this.refreshSideButtons();
+    try{
+      this.addLog('ターン終了：プレイヤーがターンを終了しました');
+      this.selectedCardId=null; this.expandPending=null; this.paintPending=null;
+      this.turnInRound++;
+      this.applyPerTurnEnhances();
+      if(this.turnInRound>GameState.effectiveTurnsPerRound()){ this.renderAll(); await this.sleep(300); this.endRound(); return; }
+      this.currentSide='npc';
+      if(GameState.floor10SpecialBoss&&this.isForcedNpcTurn(this.turnInRound+1)) this.currentSide='npc';
+      this.renderAll();
+      if(this.currentSide==='npc') this.scheduleAIMove();
+    } finally { this.placementBusy=false; this.refreshSideButtons(); }
+  },
+  canEndTurnNow(){
+    if(this.clockUpActive) return !this.clockUpEnding&&!this.clockUpIntro&&!this.resultState;
+    return !this.isPlayerInputLocked()&&!this.rerollMode;
+  },
+
+  // ===== #シカクパッシブ3 シカク・クロックアップ =====
+  // ゲーム（ステージ）中1回、自分のターンに発動。30秒間エクステンド状態でターンを消費せず自由に配置でき、
+  // ターン終了ボタン or 30秒経過でターンを1消費→ビンゴ判定・点数計算→通常の手番終了処理へ
+  CLOCKUP_DURATION_MS:30000,
+  hasClockUp(){ return (GameState.symbolPassiveTier.Square||0)>=3; },
+  canClockUpNow(){
+    return this.hasClockUp()&&!this.clockUpUsed&&!this.clockUpActive&&!this.isPlayerInputLocked()&&!this.rerollMode;
+  },
+  clockUpRemainingMs(){ return this.clockUpActive&&this.clockUpEndsAt?Math.max(0,this.clockUpEndsAt-Date.now()):this.CLOCKUP_DURATION_MS; },
+  // 盤面離脱・ステージ終了・ラウンド終了時のタイマー片付け
+  stopClockUpTimer(){ if(this._clockUpTimer){ clearInterval(this._clockUpTimer); this._clockUpTimer=null; } },
+  resetClockUp(){
+    this.stopClockUpTimer(); this._clockUpToken=(this._clockUpToken||0)+1;
+    this.clockUpActive=false; this.clockUpEnding=false; this.clockUpIntro=false; this.clockUpEndsAt=0;
+    if(typeof document!=='undefined') document.querySelectorAll('.cu-fx').forEach(e=>e.remove());
+  },
+  updateClockUpCountdown(){
+    if(!this.container) return;
+    const ms=this.clockUpRemainingMs(), frac=ms/this.CLOCKUP_DURATION_MS;
+    this.container.querySelectorAll('.board-clockup-btn').forEach(b=>{
+      b.style.setProperty('--cu-frac',frac.toFixed(4));
+      const t=b.querySelector('.bcu-time'); if(t) t.textContent=(ms/1000).toFixed(1);
+      b.classList.toggle('cu-hurry',this.clockUpActive&&ms<=5000);
+    });
+  },
+  async playClockUpFx(kind){
+    if(typeof document==='undefined') return;
+    const fast=!!this.scoreFastForward, dur=fast?300:(kind==='start'?900:800);
+    const el=document.createElement('div'); el.className='cu-fx cu-fx-'+kind; el.style.setProperty('--cu-dur',dur+'ms');
+    const ticks=Array.from({length:12},(_,i)=>`<line x1="50" y1="8" x2="50" y2="${i%3===0?16:13}" transform="rotate(${i*30} 50 50)"/>`).join('');
+    el.innerHTML=`<div class="cu-fx-flash"></div><div class="cu-fx-rings"><i></i><i></i><i></i></div>
+      <svg class="cu-fx-clock" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" class="cu-face"/><g class="cu-ticks">${ticks}</g>
+      <line x1="50" y1="50" x2="50" y2="22" class="cu-hand cu-hand-m"/><line x1="50" y1="50" x2="50" y2="32" class="cu-hand cu-hand-h"/><circle cx="50" cy="50" r="3.5" class="cu-pin"/></svg>
+      <div class="cu-fx-text">${kind==='start'?'CLOCK UP':'CLOCK OVER'}</div>
+      <div class="cu-fx-sub">${kind==='start'?`${Math.round(this.CLOCKUP_DURATION_MS/1000)}秒間 ターン消費なしで自由に配置`:'ターン消費 → 点数計算'}</div>`;
+    document.body.appendChild(el);
+    await this.sleep(dur);
+    el.remove();
+  },
+  async startClockUp(){
+    if(!this.canClockUpNow()) return;
+    const token=(this._clockUpToken||0)+1; this._clockUpToken=token;
+    this.clockUpUsed=true; this.clockUpActive=true; this.clockUpIntro=true; this.clockUpEnding=false;
+    this.clockUpEndsAt=Date.now()+this.CLOCKUP_DURATION_MS;
+    this.selectedCardId=null; this.expandPending=null; this.paintPending=null; this.boardInfoCell=null;
+    this.addLog(`シカク・クロックアップ発動：${Math.round(this.CLOCKUP_DURATION_MS/1000)}秒間、盤面にエクステンド付与（ターンを消費せず自由に配置）`);
     this.renderAll();
-    if(this.currentSide==='npc') this.scheduleAIMove();
+    try{ await this.playClockUpFx('start'); }
+    finally{ if(this._clockUpToken===token) this.clockUpIntro=false; }
+    if(this._clockUpToken!==token||!this.clockUpActive||this.resultState) return;
+    // 演出の分だけ待たせないよう、操作可能になった時点から30秒を数える
+    this.clockUpEndsAt=Date.now()+this.CLOCKUP_DURATION_MS;
+    this.stopClockUpTimer();
+    this._clockUpTimer=setInterval(()=>{
+      if(this._clockUpToken!==token||!this.clockUpActive||this.resultState){ this.stopClockUpTimer(); return; }
+      this.updateClockUpCountdown();
+      if(this.clockUpRemainingMs()<=0){ this.stopClockUpTimer(); this.endClockUp('timeout'); }
+    },100);
+    this.renderAll();
+  },
+  async endClockUp(reason){
+    if(!this.clockUpActive||this.clockUpEnding||this.clockUpIntro) return;
+    const token=this._clockUpToken;
+    this.clockUpEnding=true; this.stopClockUpTimer();
+    this.selectedCardId=null; this.expandPending=null; this.paintPending=null;
+    this.refreshSideButtons();
+    try{
+      // 配置処理（ドロー等の配置時効果）の完了を待つ
+      for(let i=0;i<200&&this.placementBusy;i++) await this.sleep(50);
+      if(this._clockUpToken!==token||this.resultState) return;
+      this.addLog(reason==='timeout'?'クロックアップ終了：30秒経過（ターンを1消費）':'クロックアップ終了：ターン終了（ターンを1消費）');
+      this.renderAll();
+      await this.playClockUpFx('end');
+      if(this._clockUpToken!==token||this.resultState) return;
+      this.clockUpActive=false;
+      // 以下は placeCard / executePlacement の手番終了処理と同じ流れ（ビンゴ判定→ターン消費→点数計算→ラウンド終了 or NPCへ）
+      this.extendActive=false; // クロックアップのエクステンドを解除して盤面全体を判定
+      const breakActive=this.isBreakActive();
+      const newBingos=this.detectNewBingos();
+      this.turnInRound++; this.applyPerTurnEnhances();
+      if(this.turnInRound%4===0){ const n=this.relicActive()?GameState.relics.filter(r=>r.id==='draw_boost').length:0; for(let i=0;i<n&&GameState.handCountForLimit()<GameState.effectiveHandSize();i++) this.drawOne(); }
+      this.selectedCardId=null; this.boardInfoCell=null; this.activeRelicId=null; this.expandPending=null; this.paintPending=null;
+      this.renderAll();
+      if(newBingos.length>0) await this.playScoreSequence(newBingos);
+      if(this.resultState) return;
+      const endByBingo=this.shouldBingoEndRound(newBingos,breakActive);
+      if(endByBingo||this.turnInRound>GameState.effectiveTurnsPerRound()){ this.renderAll(); await this.sleep(300); this.endRound(); return; }
+      this.currentSide='npc';
+      if(GameState.floor10SpecialBoss&&this.isForcedNpcTurn(this.turnInRound+1)) this.currentSide='npc';
+      this.renderAll();
+      if(this.currentSide==='npc') this.scheduleAIMove(); else this.checkAutoSkip();
+    } finally {
+      if(this._clockUpToken===token){ this.clockUpActive=false; this.clockUpEnding=false; }
+      this.refreshSideButtons();
+    }
   },
 
   async scheduleAIMove(){
@@ -1548,21 +1689,25 @@ const GameMainScene = {
     }
   },
 
-  chooseAICell(){
+  // NPC次手予告：実際の行動（chooseAICell）と同じ判定を副作用なしで行う。同点時の乱択は this._npcSeed で固定するため、
+  //   盤面・効果が同じなら予告と実際の配置マスは必ず一致する。戻り値 {ci, stun, consumed}（consumed=消費されるジャミング効果）
+  decideAICell(){
+    if(typeof this._npcSeed!=='number') this._npcSeed=Math.random();
+    const ef=this.effects, consumed=[];
     let empty=this.board.map((v,i)=>(v===null&&!this.blockedCells.has(i))?i:-1).filter(i=>i>=0);
-    if(this.effects.redirectBan!==null&&this.effects.redirectBan.size>0){const ban=this.effects.redirectBan;const e2=empty.filter(i=>!ban.has(i));this.effects.redirectBan=null;if(e2.length>0) empty=e2;else{this.effects.stunNextNpc=true;return null;}}
-    if(this.effects.sealCell){const sealed=this.effects.sealCell;const e2=empty.filter(i=>!sealed.has(i));this.effects.sealCell=null;if(e2.length>0) empty=e2;else{this.effects.stunNextNpc=true;return null;}}
-    if(this.effects.lureRestrict){
-      this.effects.lureRestrict=false;
+    if(ef.redirectBan!==null&&ef.redirectBan&&ef.redirectBan.size>0){const ban=ef.redirectBan;const e2=empty.filter(i=>!ban.has(i));consumed.push('redirectBan');if(e2.length>0) empty=e2;else return {ci:null,stun:true,consumed};}
+    if(ef.sealCell){const sealed=ef.sealCell;const e2=empty.filter(i=>!sealed.has(i));consumed.push('sealCell');if(e2.length>0) empty=e2;else return {ci:null,stun:true,consumed};}
+    if(ef.lureRestrict){
+      consumed.push('lureRestrict');
       // #4 誘導：4×4なら中央2×2、5×5なら中央1×1マスのみに制限
       const bs=GameData.BOARD_SIZE, size=(bs>=5)?1:Math.max(1,bs-2), start=Math.floor((bs-size)/2);
       const center=[];
       for(let r=start;r<start+size;r++) for(let c=start;c<start+size;c++) center.push(this.cellIndex(r,c));
       const e2=empty.filter(i=>center.includes(i));
-      if(e2.length>0) empty=e2;else{this.effects.stunNextNpc=true;return null;}
+      if(e2.length>0) empty=e2;else return {ci:null,stun:true,consumed};
     }
     // #10 リンク制限（カードのジャミング「リンク」とレリック強化「オールリンク」はqueueJammingEffect()で合算済み）
-    if(this.effects.linkRestrict){const r=this.effects.linkRestrict.filter(i=>empty.includes(i));this.effects.linkRestrict=null;if(r.length>0){empty=r;}else{this.effects.stunNextNpc=true;return null;}}
+    if(ef.linkRestrict){const r=ef.linkRestrict.filter(i=>empty.includes(i));consumed.push('linkRestrict');if(r.length>0){empty=r;}else return {ci:null,stun:true,consumed};}
     const weighted=empty.map(ci=>{
       let w=0;
       for(const win of this.windows){
@@ -1574,23 +1719,55 @@ const GameMainScene = {
       }
       return{ci,w};
     });
-    if(weighted.length===0) return null;
-    const isConf=this.effects.confuseNextNpc;
-    if(isConf){
-      this.effects.confuseNextNpc=false;
-      // #7 混乱高度化：プレイヤーにとって最も有利な（NPCにとって最も邪魔しにくい）マスを選ぶ
-      // プレイヤーのビンゴ可能性が高いマスに置かせる（ビンゴの可能性重みが最小のマス）
-      const tgt=weighted.reduce((a,b)=>b.w<a.w?b:a);
-      return GlobalFunctions.randChoice(weighted.filter(w=>w.w===tgt.w)).ci;
-    }
-    const tgt=weighted.reduce((a,b)=>b.w>a.w?b:a);
-    return GlobalFunctions.randChoice(weighted.filter(w=>w.w===tgt.w)).ci;
+    if(weighted.length===0) return {ci:null,stun:false,consumed};
+    // #7 混乱高度化：プレイヤーにとって最も有利な（NPCにとって最も邪魔しにくい）マス＝重み最小を選ぶ
+    const isConf=ef.confuseNextNpc;
+    if(isConf) consumed.push('confuseNextNpc');
+    const tw=isConf?Math.min(...weighted.map(w=>w.w)):Math.max(...weighted.map(w=>w.w));
+    const ties=weighted.filter(w=>w.w===tw);
+    const pick=ties[Math.min(ties.length-1,Math.floor(this._npcSeed*ties.length))];
+    return {ci:pick.ci,stun:false,consumed};
+  },
+
+  // 次にNPCが置くマス（プレイヤーの番のみ。スタン予定・ラウンド結果表示中は予告なし）
+  //   プレイヤーの手番開始時の盤面で決めた「予告マス」を手番中は固定し（_npcIntent）、NPCは原則そのマスに置く。
+  //   予告マスが埋まった場合は再計算。ジャミング（引き直し/封印/誘導/リンク/混乱）が掛かった場合はNPCの行動時に通常判定へ戻る
+  predictNpcCell(){
+    if(this.currentSide!=='player'||this.resultState||this.effects.stunNextNpc) return null;
+    const it=this._npcIntent;
+    if(it&&this.board[it.ci]===null&&!this.blockedCells.has(it.ci)) return it.ci;
+    const d=this.decideAICell();
+    if(d.stun||d.ci===null){ this._npcIntent=null; return null; }
+    this._npcIntent={ci:d.ci};
+    return d.ci;
+  },
+
+  chooseAICell(){
+    const d=this.decideAICell();
+    const it=this._npcIntent; this._npcIntent=null;
+    this._npcSeed=Math.random(); // 次の手番用に乱択シードを更新
+    const ef=this.effects;
+    d.consumed.forEach(k=>{ if(k==='lureRestrict'||k==='confuseNextNpc') ef[k]=false; else ef[k]=null; });
+    if(d.stun){ ef.stunNextNpc=true; return null; }
+    // 直前のプレイヤー手番で予告したマスがまだ空いていれば、予告どおりそこに置く
+    if(it&&d.consumed.length===0&&this.board[it.ci]===null&&!this.blockedCells.has(it.ci)) return it.ci;
+    return d.ci;
   },
 
   // #15/#17 ヒント計算：マルチカードが盤面にある場合も考慮、塗りつぶしも考慮
-  computeHints(){
-    if(this.rerollMode||this.currentSide!=='player'||!this.selectedCardId||this.resultState) return {};
-    const card=GameState.hand.find(c=>c.id===this.selectedCardId); if(!card) return {};
+  // opts.npcCell 指定時：そのマスにNPCがバツを置いた場合のバツビンゴ点数を同じ計算経路で予測する（NPC次手予告用）
+  computeHints(opts){
+    const npcCi=(opts&&opts.npcCell!=null)?opts.npcCell:null;
+    if(npcCi!==null){
+      if(this.resultState||this.board[npcCi]!==null) return {};
+      if(this.extendActive) return {}; // エクステンド中はNPCの配置でビンゴ判定を行わない
+    }else if(this.rerollMode||this.currentSide!=='player'||!this.selectedCardId||this.resultState) return {};
+    const card=npcCi!==null
+      ? {id:'__npc_preview__',symbol:'Cross',baseScore:this.npcCrossBase(),number:this.npcCrossBase(),enhance:null,jamming:null,trait:null}
+      : GameState.hand.find(c=>c.id===this.selectedCardId);
+    if(!card) return {};
+    // NPCの配置はプレイヤーの配置（ターン+1）の後に行われるため、ターン依存の補正は次ターンの値で計算する
+    const turnNow=this.turnInRound+((npcCi!==null&&this.currentSide==='player')?1:0);
     const hints={};
     const isPaint=card.trait==='塗りつぶし'||card.trait==='塗りつぶし(レリック)';
 
@@ -1613,13 +1790,14 @@ const GameMainScene = {
       if(card.symbol==='Square'&&sqTier>=1) draws+=1;
       const discardedIds=new Set(GameState.discardedPile.map(c=>c.id));
       const available=GameState.drawPile.length+(GameState.drawPile.length<draws?GameState.discardPile.filter(c=>!discardedIds.has(c.id)).length:0);
+      if(npcCi!==null) return GameState.hand.length;
       return Math.max(0,GameState.hand.length-1+Math.min(draws,available));
     })();
     // 配置したカード自身は手札に残らないため、手札の将軍判定からは除外する
     const handHasGeneral=GameState.hand.some(c=>c.id!==card.id&&c.trait==='将軍');
 
     // 配置可能なセル（塗りつぶしなら占有マスも含む）
-    const empty=this.board.map((v,i)=>{
+    const empty=npcCi!==null?[npcCi]:this.board.map((v,i)=>{
       if(this.blockedCells.has(i)) return -1;
       if(v===null) return i;
       if(isPaint) return i; // 塗りつぶし可能
@@ -1628,6 +1806,7 @@ const GameMainScene = {
 
     // #予測修正 エクステンド：このカードを置いたターンはビンゴ判定を行わないため予測も出さない
     if(card.enhance==='エクステンド') return hints;
+    if(this.clockUpActive) return hints; // #シカクパッシブ3 クロックアップ中はビンゴ判定を終了時にまとめて行うため予測を出さない
     if(this.extendActive&&this.turnInRound<=(this.extendTurn||0)) return hints; // v14 #3 同一ターン内（ネガティブ配置後など）はエクステンド継続中のため判定しない
     const noRelic=this.hasBossEffect('no_relic');
     const quadOnly=this.hasBossEffect('quad_only');
@@ -1647,7 +1826,8 @@ const GameMainScene = {
         // #6 シカクパッシブ1：シカクカードをプレイした時に自身の基礎点+1が永続付与されるため、予測もこの適用後の値で計算する
         if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1) bs+=1;
         const simCard={...card,baseScore:bs};
-        targets.forEach(t=>{ sim[t]={symbol:card.symbol,baseScore:bs,owner:'player',card:t===targets[0]?simCard:{...simCard,_ghostOf:card.id}}; });
+        if(npcCi!==null) sim[npcCi]={symbol:'Cross',baseScore:bs,owner:'npc',card:null};
+        else targets.forEach(t=>{ sim[t]={symbol:card.symbol,baseScore:bs,owner:'player',card:t===targets[0]?simCard:{...simCard,_ghostOf:card.id}}; });
         // サンダー：配置直後・ビンゴ判定前に盤面の×を全除去（実際の処理順と同じ）
         if(card.jamming==='サンダー') for(let i=0;i<sim.length;i++) if(sim[i]?.symbol==='Cross') sim[i]=null;
 
@@ -1751,7 +1931,7 @@ const GameMainScene = {
           if(GameState.symbolPassiveTier.Seven>=1){ const n7=cells.filter(c=>c&&c.baseScore%7===0).length; if(n7>0) mult+=n7*77; }
           if(!noRelic){
             const cTurn2=GameState.relicCountOf('turn_boost');
-            if(cTurn2>0) mult*=Math.pow(Math.pow(1.01,this.turnInRound),cTurn2);
+            if(cTurn2>0) mult*=Math.pow(Math.pow(1.01,turnNow),cTurn2);
             const cHand2=GameState.relicCountOf('hand_boost');
             if(cHand2>0) mult+=predictedHandCount*3*cHand2; // #6 配置・ドロー後の手札枚数で計算
             const cLastStand2=GameState.relicCountOf('last_stand');
@@ -1760,7 +1940,7 @@ const GameMainScene = {
             if(cChgP>0&&this.chargeN) mult+=this.chargeN*cChgP;
             if(this.roundCorrMultBonus) mult+=this.roundCorrMultBonus;
             const cTen2P=GameState.relicCountOf('ten_stage');
-            if(cTen2P>0&&this.turnInRound===10) mult+=30*cTen2P;
+            if(cTen2P>0&&turnNow===10) mult+=30*cTen2P;
             mult+=150*GameState.relicCountOf('pinnacle');
             mult+=10*GameState.passiveCount()*GameState.relicCountOf('onko_chishin');
             GameState.relics.forEach(rel=>{
@@ -1772,7 +1952,7 @@ const GameMainScene = {
           }
           cells.forEach(c=>{
             if(!c.card||c.card._ghostOf) return;
-            if(c.card.trait==='指令官'&&this.turnInRound>=7&&this.turnInRound<=10) mult*=1.2;
+            if(c.card.trait==='指令官'&&turnNow>=7&&turnNow<=10) mult*=1.2;
             if(c.card.trait==='ミニマム'){ const counts={}; GameData.SYMBOLS.forEach(sy=>{counts[sy]=sim.filter(bc=>bc&&bc.symbol===sy).length;}); const minv=Math.min(...Object.values(counts).filter(v=>v>0)); mult+=minv*20; }
             if(c.card.trait==='マキシマム'){ const counts={}; GameData.SYMBOLS.forEach(sy=>{counts[sy]=sim.filter(bc=>bc&&bc.symbol===sy).length;}); const maxS=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]; if(maxS&&maxS[0]===s) mult+=maxS[1]*10; }
           });
@@ -1819,7 +1999,7 @@ const GameMainScene = {
 
   onCardClick(id){
     if(this.rerollMode){this.toggleRerollCard(id);return;}
-    if(this.currentSide!=='player'||this.resultState) return;
+    if(this.isPlayerInputLocked()) return; // #入力ロック 点数計算中・配置処理中は選択も受け付けない
     this.selectedCardId=(this.selectedCardId===id)?null:id;
     this.handBubbleClosedFor=null; // #扇形 別のカードを選ぶ／選択解除で吹き出しを再表示
     this.boardInfoCell=null; this.activeRelicId=null; this.expandPending=null; this.paintPending=null;
@@ -1828,6 +2008,8 @@ const GameMainScene = {
 
   onCellClick(ci){
     if(this.resultState||this.rerollMode) return;
+    // #入力ロック 点数計算中・配置処理中・NPC手番は配置操作（拡張／塗りつぶしの2タップ確認含む）を受け付けない
+    if(this.selectedCardId&&this.isPlayerInputLocked()) return;
     if(!this.selectedCardId){
       const occ=this.board[ci]; if(occ){this.boardInfoCell=(this.boardInfoCell===ci)?null:ci;this.renderAll();} return;
     }
@@ -1904,7 +2086,23 @@ const GameMainScene = {
     return targets.length>0?targets:null;
   },
 
+  // #入力ロック 点数計算・配置処理中・NPC手番・クロックアップ終了処理中はプレイヤーの盤面操作を受け付けない
+  isPlayerInputLocked(){
+    return !!(this.resultState||this.placementBusy||this.scoringBusy||this.clockUpEnding||this.clockUpIntro||this.currentSide!=='player');
+  },
+  // 盤面横のターン終了／クロックアップボタンの有効状態だけを更新（全体の再描画をせずに済ませる）
+  refreshSideButtons(){
+    if(!this.container) return;
+    const tb=this.container.querySelector('.board-turnend-btn'); if(tb) tb.disabled=!this.canEndTurnNow();
+    const cb=this.container.querySelector('.board-clockup-btn'); if(cb) cb.disabled=this.clockUpActive?false:!this.canClockUpNow();
+  },
   async executePlacement(targets,card,isOverlay=false){
+    if(this.isPlayerInputLocked()) return;
+    this.placementBusy=true; this.refreshSideButtons();
+    try{ return await this._executePlacementCore(targets,card,isOverlay); }
+    finally{ this.placementBusy=false; this.refreshSideButtons(); }
+  },
+  async _executePlacementCore(targets,card,isOverlay=false){
     const mainCi=targets[0];
     const fxPre=(typeof StageFX!=='undefined')?StageFX.snapshot(this):null; // #演出 配置前の盤面（サンダー・引き直しの対象）
     const isPaint=card.trait==='塗りつぶし'||card.trait==='塗りつぶし(レリック)';
@@ -1941,10 +2139,13 @@ const GameMainScene = {
     // #4 エクステンド：このカードを置いたターンはビンゴ判定を行わない（次の自分の配置で解除・判定される）
     const isExtending2 = card.enhance==='エクステンド';
     const extendHold2 = this.extendActive && this.turnInRound<=(this.extendTurn||0); // v14 #3
-    const newBingos = (isExtending2 || extendHold2) ? [] : this.detectNewBingos();
-    if(isExtending2){ this.extendActive=true; this.extendTurn=this.turnInRound; this.addLog('エクステンド：次の自分のターンまでビンゴ判定を行わない'); }
+    // #クロックアップ 発動中は盤面にエクステンド付与：ビンゴ判定・ターン消費は終了時にまとめて行う
+    const clockUp=!!this.clockUpActive;
+    const newBingos = (clockUp || isExtending2 || extendHold2) ? [] : this.detectNewBingos();
+    if(clockUp){ /* 終了時に判定 */ }
+    else if(isExtending2){ this.extendActive=true; this.extendTurn=this.turnInRound; this.addLog('エクステンド：次の自分のターンまでビンゴ判定を行わない'); }
     else if(this.extendActive && !extendHold2){ this.extendActive=false; }
-    if(!isNeg){ this.turnInRound++; this.applyPerTurnEnhances(); }
+    if(!isNeg&&!clockUp){ this.turnInRound++; this.applyPerTurnEnhances(); }
     // #10 拡張・拡大で追加配置されたマスのジャミング効果もすべて発動する（リンクは全マスの十字マスの和集合）
     if(card.jamming){ this._jamFromPlacement=true; try{ this.queueJammingEffectMulti(card.jamming,targets); } finally{ this._jamFromPlacement=false; } }
     this.applyAllLink(mainCi,card); // #10
@@ -1952,13 +2153,14 @@ const GameMainScene = {
       targets.forEach(ci=>{ (this.pendingDelayedJamming=this.pendingDelayedJamming||[]).push({jamming:card.jamming,cellIdx:ci,afterTurns:1}); });
     }
     // #8 ドロー強化：ネガティブカード配置時は発動させず、ターンが4の倍数になった時のみ発動する
-    if(!isNeg && this.turnInRound%4===0){ const n=this.relicActive()?GameState.relics.filter(r=>r.id==='draw_boost').length:0; for(let i=0;i<n&&GameState.handCountForLimit()<GameState.effectiveHandSize();i++) this.drawOne(); }
+    if(!isNeg && !clockUp && this.turnInRound%4===0){ const n=this.relicActive()?GameState.relics.filter(r=>r.id==='draw_boost').length:0; for(let i=0;i<n&&GameState.handCountForLimit()<GameState.effectiveHandSize();i++) this.drawOne(); }
     this.selectedCardId=null; this.boardInfoCell=null; this.activeRelicId=null; this.expandPending=null; this.paintPending=null;
     this.renderAll();
     // #演出 カード効果ごとの配置演出（ビンゴがある時だけ点数演出と重ならないよう短く待つ。それ以外は進行をブロックしない）
     const fxP=fxPre?StageFX.placement(card,targets,fxPre):null;
     if(fxP&&newBingos.length>0) await fxP;
     if(newBingos.length>0) await this.playScoreSequence(newBingos);
+    if(clockUp){ this.renderAll(); return; } // クロックアップ中は手番を渡さない
     const endByBingo=this.shouldBingoEndRound(newBingos,breakActive);
     if(endByBingo||this.turnInRound>GameState.effectiveTurnsPerRound()){this.renderAll();await this.sleep(300);this.endRound();return;}
     if(isNeg){this.renderAll();return;}
@@ -2039,7 +2241,7 @@ const GameMainScene = {
     // #15 残りターンが少なくなったら警告表示：分母-6以上で黄色発光、分母-2以上で赤色＋拡縮アニメーション
     const tNow=this.turnInRound;
     const turnCls=tNow>=turnMax-2?' turn-danger':(tNow>=turnMax-6?' turn-warn':'');
-    turnEl.innerHTML=`${this.currentSide==='player'?'あなたの番':'NPCの番'}（<span class="turn-count${turnCls}">ターン ${tNow} / ${turnMax}</span>）`;
+    turnEl.innerHTML=`${this.clockUpActive?'<span class="turn-cu-tag">CLOCK UP</span>':''}${this.currentSide==='player'?'あなたの番':'NPCの番'}（<span class="turn-count${turnCls}">ターン ${tNow} / ${turnMax}</span>）`;
     // #演出 ボス効果は盤面上の常設枠をやめ、ターン表示の横のコンパクトなバッジにする（タップで一覧を吹き出し表示）
     const turnRow=document.createElement('div'); turnRow.className='turn-row';
     turnRow.appendChild(turnEl);
@@ -2059,7 +2261,9 @@ const GameMainScene = {
     }
     const ba=document.createElement('div'); ba.className='board-area';
     ba.appendChild(this.renderBoard());
-    ba.appendChild(this.renderFFButton()); // 早送りトグル：レリック一覧ボタンの下（盤面の右上の外側）に常設
+    // 早送りトグル：レリック一覧ボタンの下（盤面の右上の外側）に常設。その下にターン終了・クロックアップ
+    ba.appendChild(this.renderBoardSideButtons());
+    if(this.clockUpActive) wrap.classList.add('clockup-active');
     wrap.appendChild(ba);
     const bi=this.renderBoardInfoPanel(); if(bi) wrap.appendChild(bi);
     wrap.appendChild(this.renderHand());
@@ -2378,6 +2582,14 @@ const GameMainScene = {
       board.style.gridTemplateRows=`repeat(${bs},${cellPx}px)`;
     }
     const hints=this.computeHints();
+    // NPC次手予告：次にNPCがバツを置くマスを弱く点滅。そこでバツビンゴが成立するなら点数予測も表示
+    //   （選択中のカードでプレイヤーが先にビンゴできる場合はバツ点数予測を非表示）
+    this.npcNextCell=this.predictNpcCell();
+    let npcHint=null;
+    if(this.npcNextCell!==null&&Object.keys(hints).length===0){
+      const h=this.computeHints({npcCell:this.npcNextCell});
+      if(h[this.npcNextCell]!==undefined) npcHint=h[this.npcNextCell];
+    }
     const sc=this.scoringAnim?this.scoringAnim.cells:[];
     const expandTargets=this.expandPending?new Set(this.expandPending.targets):new Set();
     const paintTarget=this.paintPending;
@@ -2428,6 +2640,12 @@ const GameMainScene = {
       }else if(hints[i]!==undefined){
         cellEl.classList.add('hint-blink');
         const bubble=document.createElement('div');bubble.className='cell-bubble';bubble.textContent=`予測${GlobalFunctions.formatSigned(hints[i])}`;if(hints[i]<0) bubble.classList.add('negative');cellEl.appendChild(bubble);
+      }
+      if(i===this.npcNextCell&&!cd&&!isBlocked){
+        cellEl.classList.add('npc-next-cell');
+        if(npcHint!==null){
+          const nb=document.createElement('div');nb.className='cell-bubble npc-cross-bubble';nb.textContent=`バツ予測${GlobalFunctions.formatSigned(npcHint)}`;if(npcHint<0) nb.classList.add('negative');cellEl.appendChild(nb);
+        }
       }
       if(expandTargets.has(i)) cellEl.classList.add('expand-highlight');
       if(paintTarget===i) cellEl.classList.add('paint-highlight');
@@ -2584,8 +2802,21 @@ const GameMainScene = {
 
       this.attachHoverTip(c,card);
       c.addEventListener('click',()=>this.onCardClick(card.id));
+      wrapper.__cardId=card.id;
       wrapper.appendChild(c);
       row.appendChild(wrapper);
+    }
+    // リロール：手札をなぞって複数選択／解除
+    if(this.rerollMode&&typeof SwipeSelect!=='undefined'){
+      row.classList.add('swipe-select-zone');
+      SwipeSelect.attach(row,{
+        item:'.card-wrapper', scrollable:false,
+        getKey:el=>el.__cardId!==undefined?el.__cardId:null,
+        isSelected:k=>this.rerollSelected.has(k), canSelect:()=>true,
+        set:(k,on)=>{ if(on) this.rerollSelected.add(k); else this.rerollSelected.delete(k); },
+        paint:(el,on)=>{ const cc=el.querySelector('.card'); if(cc) cc.classList.toggle('reroll-selected',on); },
+        commit:()=>{ if(this.rerollMode) this.renderAll(); },
+      });
     }
     area.appendChild(row); return area;
   },
@@ -2916,8 +3147,7 @@ const GameMainScene = {
       const cancelBtn=document.createElement('button');cancelBtn.textContent='キャンセル';cancelBtn.addEventListener('click',()=>this.cancelReroll());controls.appendChild(cancelBtn);
     }else{
       const rBtn=document.createElement('button');rBtn.innerHTML=`${GIcon('btn_reroll',{cls:'gi-btn'})}(${GameState.rerollCount})`;rBtn.title='リロール';rBtn.disabled=GameState.rerollCount<=0||this.currentSide!=='player'||this.hasBossEffect('reroll_limit');rBtn.addEventListener('click',()=>this.enterRerollMode());controls.appendChild(rBtn);
-      // #7 ターンスキップボタン
-      const skipBtn=document.createElement('button');skipBtn.innerHTML=GIcon('btn_skip',{cls:'gi-btn gi-gap'})+'スキップ';skipBtn.disabled=this.currentSide!=='player';skipBtn.addEventListener('click',()=>this.manualSkipTurn());controls.appendChild(skipBtn);
+      // #7 ターン終了ボタン（旧スキップ）は盤面右上の早送りボタンの下へ移動（renderBoardSideButtons）
     }
     // #4 デッキ/山札/捨て札/廃棄札確認ボタン（上画面に配置。GameIcons のSVGアイコン表記）
     const deckBtn=document.createElement('button'); deckBtn.innerHTML=`${GIcon('btn_deck',{cls:'gi-btn'})}(${GameState.currentDeck.length})`; deckBtn.title='デッキ'; deckBtn.addEventListener('click',()=>this.showDeckModal('deck')); controls.appendChild(deckBtn);
@@ -2984,8 +3214,8 @@ const GameMainScene = {
         <span>性質${traitN}</span>
       </div>`;
     };
-    // #7 シカクパッシブ3：デッキ画面でシカクカード同士の強化効果を入れ替えられる
-    const swapEnabled = type==='deck' && GameState.symbolPassiveTier.Square>=3;
+    // シカクパッシブ3は「シカク・クロックアップ」に変更されたため、旧スワップ（強化効果の入れ替え）は無効
+    const swapEnabled = false;
     let swapSelected=null;
     modal.innerHTML=`<h3>${titles[type]}（${sourceCards.length}枚）</h3>${swapEnabled?'<div class="swap-hint">シカクパッシブ3：シカクカードを2枚タップすると強化効果を入れ替えられます</div>':''}`;
     const statsWrap=document.createElement('div'); statsWrap.innerHTML=buildStatsHtml(sourceCards); modal.appendChild(statsWrap.firstElementChild);
@@ -3123,7 +3353,7 @@ const GameMainScene = {
     box.appendChild(grid);
     // #14 スキップも表示する
     const skipBtn=document.createElement('button'); skipBtn.className='passive-skip-btn'; skipBtn.textContent='スキップ';
-    skipBtn.addEventListener('click',()=>this.skipPassiveChoice());
+    skipBtn.addEventListener('click',()=>confirmSkip(()=>this.skipPassiveChoice()));
     box.appendChild(skipBtn);
     el.appendChild(box);
     return el;
@@ -3151,7 +3381,7 @@ const GameMainScene = {
   },
   choosePassive(idx){
     const cand=this.pendingPassiveChoice[idx]; if(!cand) return;
-    GameState.symbolPassiveTier[cand.symbol]=cand.nextTier; GameData.refreshPassiveEnhance(); // v14 #1
+    GameState.symbolPassiveTier[cand.symbol]=cand.nextTier; GameData.refreshPassiveEnhance(); GameData.enforceCrossAll(); // v14 #1 / v1.00 #9
     this.addLog(`記号パッシブ習得：${GIconSym(cand.symbol)}${GameData.SYMBOL_PASSIVE_NAMES[cand.symbol]}Lv${cand.nextTier}`);
     this.pendingPassiveChoice=null;
     this.passiveModalOpen=false;
