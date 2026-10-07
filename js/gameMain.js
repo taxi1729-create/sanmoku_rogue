@@ -1927,8 +1927,6 @@ const GameMainScene = {
     const endByBingo=this.shouldBingoEndRound(newBingos,breakActive);
     if(endByBingo||this.turnInRound>GameState.effectiveTurnsPerRound()){this.renderAll();await this.sleep(300);this.endRound();return;}
     if(isNeg){this.renderAll();return;}
-    // v11 #7 NPC強化：1回目の行動後は手番をNPCのまま保持し、scheduleAIMove側で2回目の行動を行う
-    if(owner==='npc'&&this._npcHold){ this._npcHold=false; this.renderAll(); return; }
     this.currentSide=this.currentSide==='player'?'npc':'player';
     // #6 階層10特有ボス効果：ターン6,11,16…は強制的にNPCの番にする
     if(GameState.floor10SpecialBoss&&this.isForcedNpcTurn(this.turnInRound+1)) this.currentSide='npc';
