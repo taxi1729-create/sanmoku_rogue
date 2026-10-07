@@ -811,6 +811,13 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .relic-card .relic-name{display:flex;align-items:center;justify-content:center;gap:1px;flex-wrap:wrap;}
 .passive-bar.passive-bar-inline{display:flex;flex-wrap:nowrap;}
 .passive-bar-inline .passive-icon{flex:1 1 0;max-width:44px;}
+/* STAR変数インジケーター（ホシパッシブ枠の直下） */
+.passive-icon.has-star-var{overflow:visible;}
+.star-var-ind{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:1px;display:inline-flex;align-items:center;gap:1px;padding:0 3px;border-radius:6px;background:rgba(15,18,30,.85);border:1px solid rgba(251,191,36,.35);font-size:9px;line-height:12px;font-weight:800;color:#fde68a;white-space:nowrap;z-index:5;cursor:pointer;}
+.star-var-ind .gi{width:11px;height:11px;}
+.star-var-ind.boosted{color:#fff7cc;border-color:#fbbf24;box-shadow:0 0 6px rgba(251,191,36,.85),0 0 2px rgba(251,191,36,.9) inset;text-shadow:0 0 4px rgba(251,191,36,.9);}
+.star-var-bubble{display:none;position:absolute;top:calc(100% + 4px);right:-6px;width:150px;padding:5px 7px;border-radius:6px;background:rgba(15,18,30,.96);border:1px solid rgba(251,191,36,.6);color:#f1f5f9;font-size:10px;font-weight:600;line-height:1.4;white-space:normal;text-align:left;text-shadow:none;z-index:30;}
+.star-var-ind.show .star-var-bubble{display:block;}
 
 /* #7 図鑑のアイコン */
 .gallery-head{display:flex;align-items:center;gap:6px;}

@@ -6,7 +6,7 @@
  *       title 指定時は <title> と role="img"、省略時は aria-hidden="true"。
  *   GameIcons.has(key) -> boolean
  *   GameIcons.KEYS           … 全キー一覧
- *   GameIcons.byGuiId        … 'GUI-001' → key（91件）
+ *   GameIcons.byGuiId        … 'GUI-001' → key（92件）
  *   GameIcons.byEmoji        … 元の絵文字 → 代表key
  *   GameIcons.COLOR          … 使用色
  *   GameIcons.meta(key)      … {label, tint:'current'|'fixed'}
@@ -171,6 +171,10 @@ const GameIcons = (function(){
     sym_square:{ label:'シカク', tint:'current', body:`<rect x="4.8" y="4.8" width="14.4" height="14.4" rx="1.2" stroke-width="2.6"/>` },
     sym_cross:{ label:'バツ', tint:'current', body:`<path d="M5.8 5.8l12.4 12.4M18.2 5.8L5.8 18.2" stroke-width="2.8"/>` },
     passive_hoshi:{ label:'ホシ', tint:'current', body:`<path d="${star5(12,12.8,9.6,4.1)}" stroke-width="2.2"/>` },
+    star_var:{ label:'STAR', tint:'fixed', body:
+        `<path d="${star5(10.8,13,9.4,4.3)}"${s(C.gold)}${tf(C.gold,0.55)} stroke-width="2" stroke-linejoin="round"/>`
+      + `<path d="${star5(10.8,13.4,4.2,1.9)}"${F(C.goldL)}/>`
+      + star4(19.6,4.4,3.6,F(C.white)) },
     passive_check:{ label:'チェック', tint:'current', body:`<path d="M4 12.8l5.2 5.2L20 6.5" stroke-width="2.8"/>` },
     passive_seven:{ label:'セブン', tint:'current', body:`<path d="M5.5 4.8h13L10.5 20.5M8.5 12.5h7" stroke-width="2.6"/>` },
 
@@ -720,6 +724,7 @@ const GameIcons = (function(){
     'GUI-081':'fx_sparkle','GUI-082':'fx_sparkle','GUI-083':'fx_sparkle','GUI-084':'fx_sparkle','GUI-085':'fx_sparkle',
     'GUI-086':'all_clear','GUI-087':'pack_explosive','GUI-088':'pack_explosive','GUI-089':'pack_explosive','GUI-090':'pack_relic'
     ,'GUI-091':'pack_bingo_focus'
+    ,'GUI-092':'star_var'
   };
 
   // 元の絵文字 → 代表キー（同じ絵文字で意味が異なる場合は主な用途を採用。文脈で分けるときは byGuiId を使う）

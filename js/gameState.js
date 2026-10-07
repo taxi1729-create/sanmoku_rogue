@@ -102,6 +102,8 @@ const GameState = {
     if(relic?.id==='pinnacle') return this.effectiveMaxRelics();
     return 1;
   },
+  // v1.01 パッシブ変数STAR：初期値1、ホシパッシブLv3で2になる（各パッシブの効果量に乗算）
+  star(){ return (this.symbolPassiveTier&&this.symbolPassiveTier.Hoshi>=3)?2:1; },
   // v12 #2 パッシブ所持数（各記号パッシブの取得レベルの合計）
   passiveCount(){ return Object.values(this.symbolPassiveTier||{}).reduce((t,v)=>t+(v>0?v:0),0); },
   relicCount(){

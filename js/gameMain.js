@@ -98,19 +98,14 @@ const GameMainScene = {
     this._circleNegCards=null;
     if(GameState.symbolPassiveTier.Circle>=1){
       const n=Math.floor((GameData.BINGO_MULTIPLIER_BASE.Circle||0)/10);
-      const count=1*n;
+      const count=n*GameState.star(); // v1.01 n×STAR枚
       const candidates=GameState.currentDeck.filter(c=>c.symbol==='Circle'&&(!c.trait||c.trait==='塗りつぶし(レリック)'||c.trait==='塗りつぶし'));
       const targets=GlobalFunctions.shuffle(candidates.slice()).slice(0,count);
       targets.forEach(c=>{ c.trait='ネガティブ(パッシブ)'; });
       this._circleNegCards=targets;
       this.addLog(`マルパッシブ1：マルカード${targets.length}枚にネガティブ(パッシブ)を付与`);
     }
-    // #3 ホシパッシブ3：ゲーム開始時、目標点数の30%を現在の点数に加算
-    if(GameState.symbolPassiveTier.Hoshi>=3){
-      const bonus=Math.round(GameState.targetScore*0.3);
-      GameState.currentScore=Math.max(0,GameState.currentScore+bonus);
-      this.addLog(`ホシパッシブ3：目標点数の30%（+${bonus}点）を開始時に加算`);
-    }
+    // v1.01 ホシパッシブ3は「パッシブ変数STAR=2」に変更（GameState.star()）。旧効果（開始時に目標点数30%加算）は廃止
     GameState.bingoCountThisStage=0;
     // #1 ゲーム開始時のパッシブ選択は廃止し、代わりに？カードパックを1パック無料で獲得できるようにする
     if(!GameState.initialPassiveGranted){
@@ -259,7 +254,7 @@ const GameMainScene = {
   isNpcCrossCell(c){ return !!c && c.symbol==='Cross' && c.owner==='npc' && !c.card; },
   npcCrossScore(c){
     if(this.hasBossEffect('cross5000')) return c.baseScore;
-    if(GameState.symbolPassiveTier.Cross>=1) return GameState.currentDeck.length*3;
+    if(GameState.symbolPassiveTier.Cross>=1) return GameState.currentDeck.length*3*GameState.star(); // v1.01 ×STAR
     return c.baseScore;
   },
   // #20 チェックパッシブ3：このラウンドで同じ記号のビンゴが2回目になるまで盤面がエクステンド状態
@@ -842,7 +837,7 @@ const GameMainScene = {
     if(owner==='npc') this.lastNpcCell=cellIdx;
     // #3 シカクパッシブ1：プレイしたシカクカード自身にも基礎点+1を永続付与（盤面配置時点で反映）
     if(card&&card.symbol==='Square'&&owner==='player'&&GameState.symbolPassiveTier.Square>=1){
-      card.baseScore+=1; this.board[cellIdx].baseScore+=1;
+      const sq1=GameState.star(); card.baseScore+=sq1; this.board[cellIdx].baseScore+=sq1; // v1.01 +STAR
     }
     // #6 配置演出：置いた瞬間のポップアニメーション
     this.justPlacedCell=cellIdx;
@@ -853,15 +848,15 @@ const GameMainScene = {
     // #9/#8 マルパッシブ2：マルカードをプレイした時、盤面のマル枚数×マル倍率×10点を加算（Lv1/Lv2入れ替えによりLv2条件に変更）
     if(card&&card.symbol==='Circle'&&owner==='player'&&GameState.symbolPassiveTier.Circle>=2){
       const n=this.board.filter(c=>c&&c.symbol==='Circle').length;
-      const add=Math.round(n*GameData.BINGO_MULTIPLIER_BASE.Circle*10);
+      const add=Math.round(n*GameData.BINGO_MULTIPLIER_BASE.Circle*10*GameState.star()); // v1.02 マル枚数×マル倍率×10×STAR
       GameState.currentScore=Math.max(0,GameState.currentScore+add);
-      this.addLog(`マルパッシブ：マル${n}枚×倍率×10 = ${GlobalFunctions.formatSigned(add)}`);
+      this.addLog(`マルパッシブ：マル${n}枚×倍率×10×STAR${GameState.star()} = ${GlobalFunctions.formatSigned(add)}`);
     }
     // #2 肥大化などビンゴを介さない加点でも目標点数到達で即座にゲームクリアにする
     if(GameState.currentScore>=GameState.targetScore){ this.renderAll(); this.finishStage('win'); return; }
     if(card?.enhance==='ドロー'){ this.drawOne(); if(card?.symbol==='Square'&&GameState.symbolPassiveTier.Square>=2) this.drawOne(); }
     // #A シカクパッシブ3：シカクカードをプレイした時、カードを1枚ドロー
-    if(card&&card.symbol==='Square'&&owner==='player'&&GameState.symbolPassiveTier.Square>=1){ const dc=this.drawOne(); if(dc) dc.baseScore+=1; }
+    if(card&&card.symbol==='Square'&&owner==='player'&&GameState.symbolPassiveTier.Square>=1){ const dc=this.drawOne(); /* v1.02 ドローしたカードには加算しない */ }
     // #4 エクステンド：このカードを置いたターンはビンゴ判定を行わない（次の自分の配置で解除・判定される）
     const isExtending1 = card?.enhance==='エクステンド' && owner==='player';
     // #2 エクステンド中はNPCの配置でもビンゴ判定・点数計算を行わない（次に自分がカードを置いた時に解除・判定）
@@ -949,7 +944,7 @@ const GameMainScene = {
         if(c.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=1){
           const total=GameState.currentDeck.length||1;
           const n=GameState.currentDeck.filter(cc=>cc.symbol==='Triangle').length/total;
-          v*=(1+n);
+          v*=(1+n)*GameState.star(); // v1.01 ×STAR
         }
         // #1 ハブ：2つ以上のビンゴに関わるマスはカード基礎点×1.5（シカクパッシブ3はシカクカードのみ×2）
         if(c.card?.enhance==='ハブ'&&(cellBingoCount[ci]||0)>=2){
@@ -1184,7 +1179,7 @@ const GameMainScene = {
     if(GameState.symbolPassiveTier.Check>=1&&results.length>0){
       const nKinds=this.bingoSymbolsThisRound.size;
       if(nKinds>=2){
-        const v=nKinds-1;
+        const v=(nKinds-1)*GameState.star(); // v1.01 n×STAR
         results.forEach(b=>{ b.finalMultiplier+=v; b.finalMultParts.push({label:'チェックパッシブ1',op:'+',val:v,sym:'Check'}); b.score=Math.round(b.totalBase*b.mult*b.finalMultiplier)+b.finalAdd; });
         markPassive('Check',v);
       }
@@ -1212,7 +1207,8 @@ const GameMainScene = {
     // #20 チェックパッシブ3：同じ記号のビンゴが2回目になるまでは盤面がエクステンド状態（ビンゴしてもラウンドが終了しない）
     if(this.isCheckExtendActive()){
       const cnt=this.bingoSymbolCountThisRound||{};
-      if(Object.values(cnt).some(v=>v>=2)){ this.checkExtendReleased=true; this.addLog('チェックパッシブ3：同じ記号のビンゴが2回目になり、オールブレイクが解除された'); }
+      const need=1+GameState.star(); // v1.01 同じ記号のビンゴが1+STAR回目で解除
+      if(Object.values(cnt).some(v=>v>=need)){ this.checkExtendReleased=true; this.addLog(`チェックパッシブ3：同じ記号のビンゴが${need}回目になり、オールブレイクが解除された`); }
       else{ this.addLog('チェックパッシブ3：オールブレイクのため、ビンゴしてもラウンドは終了しない'); return false; }
     }
     if(breakActive) return bingos.some(b=>b.symbol!=='Cross');
@@ -1534,7 +1530,8 @@ const GameMainScene = {
   // ===== #シカクパッシブ3 シカク・クロックアップ =====
   // ゲーム（ステージ）中1回、自分のターンに発動。30秒間エクステンド状態でターンを消費せず自由に配置でき、
   // ターン終了ボタン or 30秒経過でターンを1消費→ビンゴ判定・点数計算→通常の手番終了処理へ
-  CLOCKUP_DURATION_MS:30000,
+  CLOCKUP_BASE_MS:15000, // v1.01 15×STAR秒
+  get CLOCKUP_DURATION_MS(){ return this.CLOCKUP_BASE_MS*GameState.star(); },
   hasClockUp(){ return (GameState.symbolPassiveTier.Square||0)>=3; },
   canClockUpNow(){
     return this.hasClockUp()&&!this.clockUpUsed&&!this.clockUpActive&&!this.isPlayerInputLocked()&&!this.rerollMode;
@@ -1601,7 +1598,7 @@ const GameMainScene = {
       // 配置処理（ドロー等の配置時効果）の完了を待つ
       for(let i=0;i<200&&this.placementBusy;i++) await this.sleep(50);
       if(this._clockUpToken!==token||this.resultState) return;
-      this.addLog(reason==='timeout'?'クロックアップ終了：30秒経過（ターンを1消費）':'クロックアップ終了：ターン終了（ターンを1消費）');
+      this.addLog(reason==='timeout'?`クロックアップ終了：${Math.round(this.CLOCKUP_DURATION_MS/1000)}秒経過（ターンを1消費）`:'クロックアップ終了：ターン終了（ターンを1消費）');
       this.renderAll();
       await this.playClockUpFx('end');
       if(this._clockUpToken!==token||this.resultState) return;
@@ -1824,7 +1821,7 @@ const GameMainScene = {
         const sim=this.board.slice();
         let bs=card.baseScore;
         // #6 シカクパッシブ1：シカクカードをプレイした時に自身の基礎点+1が永続付与されるため、予測もこの適用後の値で計算する
-        if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1) bs+=1;
+        if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1) bs+=GameState.star();
         const simCard={...card,baseScore:bs};
         if(npcCi!==null) sim[npcCi]={symbol:'Cross',baseScore:bs,owner:'npc',card:null};
         else targets.forEach(t=>{ sim[t]={symbol:card.symbol,baseScore:bs,owner:'player',card:t===targets[0]?simCard:{...simCard,_ghostOf:card.id}}; });
@@ -1870,7 +1867,7 @@ const GameMainScene = {
             if(c.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=1){
               const tot=GameState.currentDeck.length||1;
               const n=GameState.currentDeck.filter(cc=>cc.symbol==='Triangle').length/tot;
-              v*=(1+n);
+              v*=(1+n)*GameState.star(); // v1.01 ×STAR
             }
             if(c.card?.enhance==='ハブ'&&(cellBingoCount[cidx]||0)>=2){ v*=(sqP3&&c.symbol==='Square')?2:1.5; }
             return v;
@@ -1985,7 +1982,7 @@ const GameMainScene = {
         let checkAdd=0;
         if(GameState.symbolPassiveTier.Check>=1&&simResults.length>0){
           const kinds=new Set([...(this.bingoSymbolsThisRound||[]),...simResults.map(r=>r.s)]);
-          if(kinds.size>=2) checkAdd=kinds.size-1;
+          if(kinds.size>=2) checkAdd=(kinds.size-1)*GameState.star(); // v1.01
         }
         const cDoubleP=noRelic?0:GameState.relicCountOf('double');
         const doubleF=(cDoubleP>0&&simResults.length>=2)?Math.pow(1.5,cDoubleP):1;
@@ -2107,7 +2104,7 @@ const GameMainScene = {
     const fxPre=(typeof StageFX!=='undefined')?StageFX.snapshot(this):null; // #演出 配置前の盤面（サンダー・引き直しの対象）
     const isPaint=card.trait==='塗りつぶし'||card.trait==='塗りつぶし(レリック)';
     // #3 シカクパッシブ1：プレイしたシカクカード自身にも基礎点+1を永続付与
-    if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1) card.baseScore+=1;
+    if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1) card.baseScore+=GameState.star(); // v1.01 +STAR
     for(const ci of targets){
       if(this.board[ci]?.card&&!this.board[ci].card._ghostOf&&(isPaint||isOverlay)) this.pushToDiscard(this.board[ci].card);
       // #6 拡張・拡大で追加配置されるマスにも同じ効果を乗せる（表示用の分身カード。捨て札等への移動は本体のみ）
@@ -2127,15 +2124,15 @@ const GameMainScene = {
     // #9/#8 マルパッシブ2：マルカードをプレイした時、盤面のマル枚数×マル倍率×10点を加算（Lv1/Lv2入れ替えによりLv2条件に変更）
     if(card.symbol==='Circle'&&GameState.symbolPassiveTier.Circle>=2){
       const n=this.board.filter(c=>c&&c.symbol==='Circle').length;
-      const add=Math.round(n*GameData.BINGO_MULTIPLIER_BASE.Circle*10);
+      const add=Math.round(n*GameData.BINGO_MULTIPLIER_BASE.Circle*10*GameState.star()); // v1.02 マル枚数×マル倍率×10×STAR
       GameState.currentScore=Math.max(0,GameState.currentScore+add);
-      this.addLog(`マルパッシブ：マル${n}枚×倍率×10 = ${GlobalFunctions.formatSigned(add)}`);
+      this.addLog(`マルパッシブ：マル${n}枚×倍率×10×STAR${GameState.star()} = ${GlobalFunctions.formatSigned(add)}`);
     }
     // #2 肥大化などビンゴを介さない加点でも目標点数到達で即座にゲームクリアにする
     if(GameState.currentScore>=GameState.targetScore){ this.renderAll(); this.finishStage('win'); return; }
     if(card.enhance==='ドロー'){ this.drawOne(); if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=2) this.drawOne(); }
     // #A シカクパッシブ3
-    if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1){ const dc=this.drawOne(); if(dc) dc.baseScore+=1; }
+    if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1){ const dc=this.drawOne(); /* v1.02 ドローしたカードには加算しない */ }
     // #4 エクステンド：このカードを置いたターンはビンゴ判定を行わない（次の自分の配置で解除・判定される）
     const isExtending2 = card.enhance==='エクステンド';
     const extendHold2 = this.extendActive && this.turnInRound<=(this.extendTurn||0); // v14 #3
@@ -2467,7 +2464,7 @@ const GameMainScene = {
     if(card.symbol==='Triangle'&&GameState.symbolPassiveTier.Triangle>=1){
       const total=GameState.currentDeck.length||1;
       const n=GameState.currentDeck.filter(cc=>cc.symbol==='Triangle').length/total;
-      displayScore=Math.round(baseForDisplay*(1+n)); scoreIsPassive=true;
+      displayScore=Math.round(baseForDisplay*(1+n)*GameState.star()); scoreIsPassive=true;
     }
     const numHtml=scoreIsPassive?`<span class="passive-value">${displayScore}</span>`:`${baseForDisplay}`;
     let scoreHtml=`<span class="card-number">${dotsSpan}${numHtml}${bonusHtml}</span>`;
@@ -2539,7 +2536,7 @@ const GameMainScene = {
     if(allLink>0&&this.relicActive()) round.push({icon:ic('ren_all_link'),name:'レリック強化効果：オールリンク',count:allLink>1?allLink:0,desc:'配置するカードに常にジャミング「リンク」が付与される'});
     const cmd=cellsWith(c=>c.trait==='指令官');
     if(cmd.length>0){ const on=this.turnInRound>=7&&this.turnInRound<=10; round.push({icon:ic('trait_commander'),name:'性質変化：司令官',count:cmd.length,desc:`ターン7〜10のビンゴで補正倍率×1.2${on?'（発動中）':`（現在ターン${this.turnInRound}）`}`,where:posList(cmd)}); }
-    if(this.isCheckExtendActive()){ const cnt=this.bingoSymbolCountThisRound||{}; const mx=Math.max(0,...Object.values(cnt)); round.push({icon:`<span class="sym-Check">${ic('passive_check')}</span>`,name:'オールブレイク（チェックパッシブ3）',desc:`どの記号でビンゴしてもラウンドが終了しない。同じ記号のビンゴが2回目で解除（最大${mx}/2）`}); }
+    if(this.isCheckExtendActive()){ const cnt=this.bingoSymbolCountThisRound||{}; const mx=Math.max(0,...Object.values(cnt)); round.push({icon:`<span class="sym-Check">${ic('passive_check')}</span>`,name:'オールブレイク（チェックパッシブ3）',desc:`どの記号でビンゴしてもラウンドが終了しない。同じ記号のビンゴが${1+GameState.star()}回目で解除（最大${mx}/${1+GameState.star()}）`}); }
     // ---- 次ターンで有効 ----
     const ef=this.effects||{};
     if(ef.stunNextNpc) next.push({icon:ic('jam_stun'),name:'ジャミング：スタン',desc:'次のNPC行動を封じる'});
@@ -3416,6 +3413,15 @@ const GameMainScene = {
       const bubbleHtml=(isScoring&&scoreVal!=null)?`<div class="scoring-value-bubble">${scoreVal>=0?'+':''}${Math.round(scoreVal*100)/100}</div>`:'';
       btn.innerHTML=`${bubbleHtml}<span class="passive-sym">${GameData.SYMBOL_LABEL[sym]}</span><span class="passive-tier">Lv${tier}</span>`;
       btn.addEventListener('click',()=>{ this.activePassiveInfo=(this.activePassiveInfo===sym)?null:sym; redraw(); });
+      // STAR変数：ホシパッシブの下に「[★]=n」を表示（タップで説明吹き出し）
+      if(sym==='Hoshi'){
+        const sv=(GameState.star?GameState.star():1);
+        const ind=document.createElement('span'); ind.className=`star-var-ind${sv>=2?' boosted':''}`;
+        ind.title='STAR：パッシブ効果の倍率。初期値1、ホシパッシブLv3でSTAR=2';
+        ind.innerHTML=`${GIcon('star_var')}<b>=${sv}</b><span class="star-var-bubble">STAR：パッシブ効果の倍率。初期値1、ホシパッシブLv3でSTAR=2</span>`;
+        ind.addEventListener('click',(e)=>{ e.stopPropagation(); ind.classList.toggle('show'); });
+        btn.classList.add('has-star-var'); btn.appendChild(ind);
+      }
       row.appendChild(btn);
     });
     // #1 パッシブ「魔力」：付与されている時のみ表示（レベル制ではないため所持ステージ数を表示）
