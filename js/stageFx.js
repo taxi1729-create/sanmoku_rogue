@@ -629,7 +629,7 @@ const StageFX = (function(){
     if(open){
       const bub=el('div','stfx-boss-bubble');
       bub.innerHTML=`<div class="stfx-boss-bubble-title">${BOSS_ICON()}ボス効果一覧（${list.length}）<span class="stfx-boss-bubble-close">タップで閉じる</span></div>`+
-        list.map(b=>`<div class="stfx-boss-entry${isPowered(b)?' pw2':''}${b.special?' special':''}"><div class="stfx-boss-entry-name">${esc(b.name)}${powerTag(b)}${b.special?'<span class="stfx-boss-sp">階層10</span>':''}</div><div class="stfx-boss-entry-desc">${esc(b.desc)}</div></div>`).join('');
+        list.map(b=>`<div class="stfx-boss-entry${isPowered(b)?' pw2':''}${b.special?' special':''}"><div class="stfx-boss-entry-name">${esc(b.name)}${powerTag(b)}${b.special?'<span class="stfx-boss-sp">階層10</span>':''}</div><div class="stfx-boss-entry-desc">${(b.desc)}</div></div>`).join('');
       bub.addEventListener('click',(e)=>{ e.stopPropagation(); onToggle&&onToggle(); });
       wrap.appendChild(bub);
       // 吹き出しを画面内に収め、しっぽをバッジに向ける（absolute 配置。レイアウトに影響しない／スクロールにも追従）
@@ -716,7 +716,7 @@ const StageFX = (function(){
     const kicker=`ボス効果${n>1?` ${i+1}/${n}`:''}${be.special?' ・ 階層10':''}`;
     const plate=el('div','stfx-boss-plate'+(pw?' pw2':'')+(be.special?' special':''),
       `${pw?`<div class="stfx-boss-plate-flame"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>`:''}`+
-      `<div class="stfx-boss-plate-k">${esc(kicker)}${powerTag(be,'onplate')}</div><div class="stfx-boss-plate-n">${esc(be.name)}</div><div class="stfx-boss-plate-d">${esc(be.desc)}</div>`);
+      `<div class="stfx-boss-plate-k">${esc(kicker)}${powerTag(be,'onplate')}</div><div class="stfx-boss-plate-n">${esc(be.name)}</div><div class="stfx-boss-plate-d">${(be.desc)}</div>`);
     plate.style.visibility='hidden'; ui.ov.appendChild(plate);
     const ph=plate.offsetHeight||110;
     const c=plateSpot(br, plan.target, ph);
@@ -1215,7 +1215,7 @@ const StageFX = (function(){
       <div class="stfx-pv-list">${opts.items.map((it,i)=>`
         <button type="button" class="stfx-pv-card" data-idx="${i}">
           <span class="stfx-pv-emblem sym-${esc(it.sym)}"><span class="stfx-pv-emblem-ring"></span><span class="stfx-pv-sym">${it.symHtml}</span><span class="stfx-pv-lv">Lv${esc(it.tier)}</span></span>
-          <span class="stfx-pv-text"><b>${esc(it.name)}</b><span class="stfx-pv-desc">${esc(it.desc)}</span><span class="stfx-pv-live">${esc(it.live)}</span></span>
+          <span class="stfx-pv-text"><b>${esc(it.name)}</b><span class="stfx-pv-desc">${(it.desc)}</span><span class="stfx-pv-live">${(it.live)}</span></span>
         </button>`).join('')}</div>
       <button type="button" class="stfx-pv-skip">スキップ</button>
       <div class="stfx-pv-hint">タップでスキップ</div>`;

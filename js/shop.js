@@ -714,7 +714,7 @@ const ShopScene = {
       item.innerHTML = `<div class="relic-shop-badge">レリック</div><div class="relic-name"><span class="relic-ico">${GameIcons.relic(relic)}</span>${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}`;
       wrap.appendChild(item);
       const desc = document.createElement('div'); desc.className='card-pick-desc';
-      desc.textContent = relic.desc + (ren?` ／【${ren.name}】${ren.desc}`:'');
+      desc.innerHTML = relic.desc + (ren?` ／【${ren.name}】${ren.desc}`:'');
       wrap.appendChild(desc);
       wrap.addEventListener('click', () => this.pickRelicPackCard(idx));
       grid.appendChild(wrap);

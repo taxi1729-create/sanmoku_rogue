@@ -24,3 +24,5 @@
 .gi-gap-l{ margin-left:.25em; }
 /* 操作ボタン内のアイコン（文字よりやや大きく） */
 .gi-btn{ width:1.15em; height:1.15em; vertical-align:-0.22em; }
+/* v1.04 説明文中のSTARアイコン */
+.gi-star-inline{ width:1.15em; height:1.15em; vertical-align:-0.2em; margin:0 .05em; }

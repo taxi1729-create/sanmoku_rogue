@@ -211,7 +211,9 @@ const GameState = {
     if(this.symbolPassiveTier.Hoshi===undefined) this.symbolPassiveTier.Hoshi=0;
     if(this.symbolPassiveTier.Check===undefined) this.symbolPassiveTier.Check=0;
     if(this.symbolPassiveTier.Seven===undefined) this.symbolPassiveTier.Seven=0;
-    try{ GameData.refreshPassiveEnhance(); GameData.enforceCrossAll(); }catch(e){} // v14 #1 / v1.00 #9
+    try{ GameData.refreshPassiveEnhance(); GameData.enforceCrossAll(); }catch(e){}
+    // v1.04 保存済みレリックの説明文を最新（改行・表記）に揃える
+    try{ (this.relics||[]).forEach(r=>{ const b=r.id==='majin_seal'?GameData.MAJIN_SEAL_RELIC:GameData.RELIC_POOL.find(x=>x.id===r.id); if(b&&b.desc) r.desc=b.desc; }); }catch(e){} // v14 #1 / v1.00 #9
     this.totalBingoCount=d.totalBingoCount||0;
     this.sevenPendingMultBoost=d.sevenPendingMultBoost||false;
     this.bossRerollUsed=d.bossRerollUsed||false;

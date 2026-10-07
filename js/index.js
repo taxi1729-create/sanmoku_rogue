@@ -178,11 +178,11 @@ const App = {
       const table=GameData.SYMBOL_PASSIVES[sym]||{}; const max=Math.max(Object.keys(table).length,tier);
       pItems.push({ html:`<span class="br-p-ico sym-${esc(sym)}">${GameData.SYMBOL_ICON_KEY[sym]?GIcon(GameData.SYMBOL_ICON_KEY[sym]):esc(GameData.SYMBOL_LABEL?.[sym]||sym)}</span><span class="br-p-main"><span class="br-p-name">${esc(GameData.SYMBOL_PASSIVE_NAMES[sym]||sym)}</span><span class="br-p-lv">Lv${tier}<span class="br-p-pips">${Array.from({length:max},(_,k)=>`<i class="${k<tier?'on':''}"></i>`).join('')}</span></span></span>`,
         detail:`<div class="br-d-head"><span class="br-p-ico sym-${esc(sym)}">${GameData.SYMBOL_ICON_KEY[sym]?GIcon(GameData.SYMBOL_ICON_KEY[sym]):''}</span><b>${esc(GameData.SYMBOL_PASSIVE_NAMES[sym]||sym)} Lv${tier}</b></div>`+
-          Object.keys(table).map(Number).filter(t=>t<=tier).sort((a,c)=>a-c).map(t=>`<div class="br-d-line"><span class="br-d-lv">Lv${t}</span><span><b>${esc(table[t].name)}</b><br>${esc(table[t].desc)}</span></div>`).join('') });
+          Object.keys(table).map(Number).filter(t=>t<=tier).sort((a,c)=>a-c).map(t=>`<div class="br-d-line"><span class="br-d-lv">Lv${t}</span><span><b>${esc(table[t].name)}</b><br>${(table[t].desc)}</span></div>`).join('') });
     });
     manaKeys.forEach(k=>{ const d=GameData.MANA_STAGES[k];
       pItems.push({ html:`<span class="br-p-ico br-p-mana">${GIcon('passive_mana')}</span><span class="br-p-main"><span class="br-p-name">${esc(d.name)}</span><span class="br-p-lv">魔力</span></span>`,
-        detail:`<div class="br-d-head"><span class="br-p-ico br-p-mana">${GIcon('passive_mana')}</span><b>${esc(d.name)}</b></div><div class="br-d-desc">${esc(d.desc)}</div>` }); });
+        detail:`<div class="br-d-head"><span class="br-p-ico br-p-mana">${GIcon('passive_mana')}</span><b>${esc(d.name)}</b></div><div class="br-d-desc">${(d.desc)}</div>` }); });
     html+=`<section class="br-sec"><h3 class="br-sec-h">パッシブ<small>${pItems.length}種</small></h3>${pItems.length?`<div class="br-passives">${pItems.map((it,i)=>`<button type="button" class="br-passive" data-pi="${i}">${it.html}</button>`).join('')}</div><div class="br-detail br-passive-detail" hidden></div>`:'<div class="br-none">なし</div>'}</section>`;
     // ---- レリック：アイコン＋名称＋強化効果アイコン＋グレード演出のチップ（タップで詳細） ----
     html+=`<section class="br-sec"><h3 class="br-sec-h">レリック<small>${relics.length}個</small><span class="br-sec-hint">タップで詳細</span></h3>${relics.length?`<div class="br-relics">${relics.map((r,i)=>`<button type="button" class="br-relic ${GM.relicGradeClass(r)}${r.relicEnhance?' has-ren':''}" data-ri="${i}"><span class="relic-ico">${GameIcons.relic(r)}</span><span class="br-relic-name">${esc(r.name)}</span>${GM.relicEnhanceBadgeHtml(r)}</button>`).join('')}</div><div class="br-detail br-relic-detail" hidden></div>`:'<div class="br-none">なし</div>'}</section>`;
@@ -211,8 +211,8 @@ const App = {
       const r=relics[rSel]; const ren=GM.relicEnhanceOf(r);
       rDetail.classList.add(GM.relicGradeClass(r));
       rDetail.hidden=false;
-      rDetail.innerHTML=`<div class="br-d-head">${GM.relicGradeIconHtml(r,'relic-ico-lg')}<b>${esc(r.name)}</b>${GM.relicGradeBadgeHtml(r)}<span class="br-d-no">${rSel+1}/${relics.length}</span></div><div class="br-d-desc">${esc(r.desc||'')}${r.sealValue!=null?`<br>n = <b>${esc(r.sealValue)}</b>`:''}</div>`+
-        (ren?`<div class="relic-ren-detail"><span class="relic-ren-detail-ico">${GameIcons.has(ren.id)?GameIcons.svg(ren.id):''}</span><div class="relic-ren-detail-text"><div class="relic-ren-detail-name">レリック強化：${esc(ren.name)}</div><div class="info-desc relic-enhance-desc">${esc(ren.desc)}</div></div></div>`:'');
+      rDetail.innerHTML=`<div class="br-d-head">${GM.relicGradeIconHtml(r,'relic-ico-lg')}<b>${esc(r.name)}</b>${GM.relicGradeBadgeHtml(r)}<span class="br-d-no">${rSel+1}/${relics.length}</span></div><div class="br-d-desc">${(r.desc||'')}${r.sealValue!=null?`<br>n = <b>${esc(r.sealValue)}</b>`:''}</div>`+
+        (ren?`<div class="relic-ren-detail"><span class="relic-ren-detail-ico">${GameIcons.has(ren.id)?GameIcons.svg(ren.id):''}</span><div class="relic-ren-detail-text"><div class="relic-ren-detail-name">レリック強化：${esc(ren.name)}</div><div class="info-desc relic-enhance-desc">${(ren.desc)}</div></div></div>`:'');
     };
     el.querySelectorAll('.br-relic').forEach(btn=>btn.addEventListener('click',()=>showRelic(+btn.dataset.ri)));
 
@@ -239,9 +239,9 @@ const App = {
       return arr; };
     const cardDetailHtml=(c)=>{
       const lines=[];
-      if(c.enhance) lines.push(`<div class="br-d-line"><span class="br-d-ico">${GameData.iconFor('enhance',c.enhance)}</span><span><b class="desc-enhance">【${esc(c.enhance)}】</b>${esc(GameData.ENHANCE_DESC[c.enhance]||'')}</span></div>`);
-      if(c.jamming) lines.push(`<div class="br-d-line"><span class="br-d-ico">${GameData.iconFor('jamming',c.jamming)}</span><span><b class="desc-jamming">【${esc(c.jamming)}】</b>${esc(GameData.JAMMING_DESC[c.jamming]||'')}</span></div>`);
-      if(c.trait) lines.push(`<div class="br-d-line"><span class="br-d-ico">${GameData.iconFor('trait',c.trait)}</span><span><b class="desc-trait">【${esc(c.trait)}】</b>${esc(GameData.TRAIT_DESC[c.trait]||'')}</span></div>`);
+      if(c.enhance) lines.push(`<div class="br-d-line"><span class="br-d-ico">${GameData.iconFor('enhance',c.enhance)}</span><span><b class="desc-enhance">【${esc(c.enhance)}】</b>${(GameData.ENHANCE_DESC[c.enhance]||'')}</span></div>`);
+      if(c.jamming) lines.push(`<div class="br-d-line"><span class="br-d-ico">${GameData.iconFor('jamming',c.jamming)}</span><span><b class="desc-jamming">【${esc(c.jamming)}】</b>${(GameData.JAMMING_DESC[c.jamming]||'')}</span></div>`);
+      if(c.trait) lines.push(`<div class="br-d-line"><span class="br-d-ico">${GameData.iconFor('trait',c.trait)}</span><span><b class="desc-trait">【${esc(c.trait)}】</b>${(GameData.TRAIT_DESC[c.trait]||'')}</span></div>`);
       return `<div class="br-d-head"><span class="br-p-ico sym-${esc(c.symbol)}">${GameData.SYMBOL_ICON_KEY[c.symbol]?GIcon(GameData.SYMBOL_ICON_KEY[c.symbol]):''}</span><b>基礎点 ${esc(c.baseScore??0)}</b></div>`+(lines.length?lines.join(''):'<div class="br-d-desc">付与効果なし</div>');
     };
     const rebuild=()=>{

@@ -3,7 +3,7 @@ const GameMainScene = {
   board:[], windows:[], quadSiblings:{}, scoredWindowKeys:new Set(),
   prevRoundBingoSymbol:null, prevRoundScore:0, chargeActive:false,
   turnInRound:1, currentSide:'player', selectedCardId:null, boardInfoCell:null,
-  logs:[], resultState:null, scoringAnim:null,
+  logs:[], resultState:null, scoringAnim:null, scoringAnims:[],
   rerollMode:false, rerollSelected:new Set(),
   effects:{ stunNextNpc:false, confuseNextNpc:false, breakUntilTurn:null, linkRestrict:null, redirectBan:null, sealCell:null, lureRestrict:false },
   bossEffect:null, blockedCells:new Set(), bossBlackedOut:false,
@@ -19,7 +19,7 @@ const GameMainScene = {
   toggleFastForward(){
     this.scoreFastForward=!this.scoreFastForward;
     document.querySelectorAll('.board-ff-btn').forEach(b=>this.updateFFButton(b));
-    if(typeof ScoreFX!=='undefined'&&ScoreFX.el&&ScoreFX.el.ff) ScoreFX.updateFF();
+    if(typeof ScoreFX!=='undefined'&&ScoreFX.updateFF) ScoreFX.updateFF();
   },
   updateFFButton(btn){
     const on=!!this.scoreFastForward;
@@ -70,7 +70,7 @@ const GameMainScene = {
     GameData.BOARD_SIZE = GameState.symbolPassiveTier.Hoshi>=2 ? 5 : 4;
     this.board=new Array(GameData.BOARD_SIZE*GameData.BOARD_SIZE).fill(null);
     this.windows=this.buildWindows(GameData.BOARD_SIZE);
-    this.logs=[]; this.resultState=null; this.boardInfoCell=null; this.scoringAnim=null;
+    this.logs=[]; this.resultState=null; this.boardInfoCell=null; this.scoringAnim=null; this.scoringAnims=[];
     this.rerollMode=false; this.rerollSelected=new Set();
     this.prevRoundBingoSymbol=null; this.prevRoundScore=0; this.chargeActive=false; this.chargeN=0; this._chargeUpdatedThisRound=false; this.roundCorrMultBonus=0; this.roundBoostAdd=0; // #3 チャージn・ジャミング増強の今ラウンド補正
     this.bossEffect=null; this.bossEffects=null; this.blockedCells=new Set(); this.bossBlackedOut=false;
@@ -1215,7 +1215,50 @@ const GameMainScene = {
     return true;
   },
 
-  async playScoreSequence(bingos){ const prev=this.scoringBusy; this.scoringBusy=true; try{ for(const b of bingos) await this.showScoreStep(b); } finally{ this.scoringBusy=prev; } },
+  // #同時ビンゴ演出 2つ以上のビンゴは、前の計算の「開始」から0.3秒後に次の計算を並行して開始する（吹き出しは互いに極力重ならない位置）。
+  //   現在の点数への加算はビンゴ順に直列化（ctx.commit）するため、最終点数は従来の逐次計算と厳密に一致する。
+  //   全ての計算が出揃ったら、合計加算点数のフィナーレを表示してから解決する
+  async playScoreSequence(bingos){
+    const prev=this.scoringBusy; this.scoringBusy=true;
+    const ctx={commit:Promise.resolve()};
+    const startScore=GameState.currentScore;
+    try{
+      const runs=[];
+      for(let i=0;i<bingos.length;i++){
+        if(i>0) await this.sleep(this.scoreFastForward?Math.max(20,Math.round(300/8)):300);
+        runs.push(this.showScoreStep(bingos[i],ctx));
+      }
+      const res=await Promise.allSettled(runs);
+      await ctx.commit;
+      const err=res.find(r=>r.status==='rejected');
+      if(err) throw err.reason;
+      if(bingos.length>=2&&typeof ScoreFX!=='undefined'&&ScoreFX.finale){
+        const total=bingos.reduce((t,b)=>t+(b.score||0),0);
+        await ScoreFX.finale({ total, count:bingos.length, targetScore:GameState.targetScore,
+          getSpeed:()=>this.scoreFastForward?8:1,
+          scoreEl:document.querySelector('.score-combined-stat .value'),
+          shakeEl:document.querySelector('.game-screen') });
+        this.addLog(`${bingos.length}ビンゴ！ 合計${GlobalFunctions.formatSigned(total)}（${GlobalFunctions.formatScore(startScore)}→${GlobalFunctions.formatScore(GameState.currentScore)}）`);
+      }
+    } finally{
+      this.scoringBusy=prev;
+      this.scoringAnims=[]; this.scoringAnim=null; this._scorePops={};
+      this.scoringRelicIds=[]; this.scoringRelicValues={}; this.scoringPassiveIds=[]; this.scoringPassiveValues={};
+      this.renderAll();
+    }
+  },
+  // 並行する各計算ステップのポップ対象（レリック・パッシブ）を和集合にまとめて反映する
+  setScorePop(key,relicIds,passiveSyms){
+    if(!this._scorePops) this._scorePops={};
+    if((!relicIds||!relicIds.length)&&(!passiveSyms||!passiveSyms.length)) delete this._scorePops[key];
+    else this._scorePops[key]={r:relicIds||[],p:passiveSyms||[]};
+    const r=new Set(), p=new Set();
+    Object.values(this._scorePops).forEach(v=>{ v.r.forEach(x=>r.add(x)); v.p.forEach(x=>p.add(x)); });
+    const k=[...r].join(',')+'|'+[...p].join(',');
+    const changed=k!==this._scorePopKey;
+    this._scorePopKey=k; this.scoringRelicIds=[...r]; this.scoringPassiveIds=[...p];
+    return changed;
+  },
   // v12 #9 レリック「チャージ」：全てのビンゴ計算が終わりラウンドが上がるタイミングでのみ、手札の基礎点合計をnに加算する
   updateCharge(sum){
     if(!(GameState.hasRelic('charge')&&this.relicActive())) return;
@@ -1228,9 +1271,13 @@ const GameMainScene = {
   // #演出刷新 ビンゴ時の点数計算演出：盤面・倍率表・パッシブ・レリックに重ならない位置に半透明の吹き出し（ScoreFX）を出し、
   //   基礎点×倍率→列補正→最終乗算補正→最終加算補正→加算点数→現在の点数 の順にカウントアップで見せる。
   //   吹き出しは document.body 直下の永続要素なので renderAll() でゲーム画面のレイアウトは一切動かない。
-  async showScoreStep(b){
-    const before=GameState.currentScore, after=Math.max(0,before+b.score);
-    const FX=(typeof ScoreFX!=='undefined')?ScoreFX:null;
+  async showScoreStep(b,ctx){
+    // 現在の点数への反映順をビンゴ順に確保（最初の await より前に同期的に予約する）
+    if(!ctx) ctx={commit:Promise.resolve()};
+    const prevCommit=ctx.commit; let releaseCommit; ctx.commit=new Promise(r=>{ releaseCommit=r; });
+    let before=null, after=null, committed=false;
+    const FX=(typeof ScoreFX!=='undefined'&&ScoreFX.create)?ScoreFX.create():null;
+    const stepKey='s'+(this._scoreStepSeq=(this._scoreStepSeq||0)+1);
     // #2 早送りボタン：一度ONにしたら次にOFFにするまで持続する（このシーケンス開始時にはリセットしない）
     const ffSleep=(ms)=>this.sleep(this.scoreFastForward?Math.max(20,Math.round(ms/8)):ms);
     const lineLabel=b.isPenta?'5列':(b.isQuad?'4列':'3列');
@@ -1240,19 +1287,16 @@ const GameMainScene = {
     const sgNum=(v)=>(v>=0?'+':'')+fmtNum(v);
     const partText=(p)=>p.op==='×'?('×'+fmtNum(p.val)):sgNum(p.val);
     // #3 レリック・パッシブは、その内訳が実際に画面に反映されるステップの間だけポップさせる（それ以外は非表示にする）
-    let popKey='';
-    const popFor=(relicIds,passiveSyms)=>{
-      this.scoringRelicIds=relicIds||[]; this.scoringPassiveIds=passiveSyms||[];
-      const k=this.scoringRelicIds.join(',')+'|'+this.scoringPassiveIds.join(',');
-      if(k!==popKey){ popKey=k; this.renderAll(); }
-    };
+    const popFor=(relicIds,passiveSyms)=>{ if(this.setScorePop(stepKey,relicIds,passiveSyms)) this.renderAll(); };
     const popClear=()=>popFor([],[]);
     const popSrc=()=>document.querySelector('.relic-display-row .relic-card.bounce')||document.querySelector('.passive-bar .passive-icon.bounce');
     const partPop=(p)=>{ popFor(p.id?[p.id]:[],p.sym?[p.sym]:[]); return (p.id||p.sym)?popSrc():null; };
 
-    this.scoringAnim={phase:0,cells:[],symbol:b.symbol,liveScore:before,before,score:b.score,reached:false,popCell:null};
+    const anim={phase:0,cells:[],symbol:b.symbol,liveScore:GameState.currentScore,before:GameState.currentScore,score:b.score,reached:false,popCell:null};
+    if(!this.scoringAnims) this.scoringAnims=[];
+    this.scoringAnims.push(anim); this.scoringAnim=anim;
     this.scoreBoxes=null;
-    popKey='x'; popClear();
+    popClear(); this.renderAll();
     // デバッグログ：計算式と計算値の出所を表示
     if(b.debugMsg){ this.addLog(b.debugMsg); console.log(b.debugMsg); }
     try{
@@ -1271,11 +1315,11 @@ const GameMainScene = {
       let chips=0;
       for(let i=0;i<b.cells.length;i++){
         const ci=b.cells[i];
-        this.scoringAnim.popCell=ci; this.renderAll();
+        anim.popCell=ci; this.renderAll();
         const v=b.cardScores[i]||0; chips+=v;
         await chip('a',sg(v),chips,{from:document.querySelector(`.board .cell[data-ci="${ci}"]`),cls:'c-base',ms:230});
       }
-      this.scoringAnim.popCell=null; this.scoringAnim.cells=b.cells; this.renderAll();
+      anim.popCell=null; anim.cells=b.cells; this.renderAll();
       if(Math.abs(b.cardBaseSum-chips)>1e-9){ // ペアルック等、カード基礎点に加わるボーナス
         popFor(b.baseRelicIds,[]);
         cap('カード基礎点ボーナス','cap-base');
@@ -1412,10 +1456,14 @@ const GameMainScene = {
       await ffSleep(300);
 
       // 9. 加算点数が現在の点数へ吸い込まれ、段階的にカウントアップする
+      //    同時ビンゴ時は前のビンゴの加算が終わるのを待ってから加算する（点数の二重加算・競合を防ぐ）
+      await prevCommit;
+      before=GameState.currentScore; after=Math.max(0,before+b.score);
       const scoreEl=document.querySelector('.score-combined-stat .value');
       if(FX) await FX.flyTo(scoreEl);
       await this.animateScoreCountUp(before,after);
-      this.scoringAnim.liveScore=GameState.currentScore; this.scoringAnim.reached=GameState.currentScore>=GameState.targetScore; this.scoringAnim.phase=8;
+      GameState.currentScore=after; committed=true; releaseCommit();
+      anim.liveScore=GameState.currentScore; anim.reached=GameState.currentScore>=GameState.targetScore; anim.phase=8;
       this.addLog(`${GIconSym(b.symbol)}${lineLabel}ビンゴ！ ${GlobalFunctions.formatSigned(b.score)}（計${GlobalFunctions.formatScore(GameState.currentScore)}）`);
       this.renderAll();
       if(FX&&before<GameState.targetScore&&GameState.currentScore>=GameState.targetScore){
@@ -1423,12 +1471,17 @@ const GameMainScene = {
         await ffSleep(1100);
       }else await ffSleep(520);
     }finally{
-      GameState.currentScore=after; // 途中で例外が起きても最終点数は厳密に一致させる
-      if(FX) await FX.close();
+      if(!committed){ // 途中で例外が起きても最終点数は厳密に一致させる（順番は守る）
+        try{ await prevCommit; }catch(e){}
+        GameState.currentScore=Math.max(0,GameState.currentScore+b.score); committed=true; releaseCommit();
+      }
+      if(FX){ try{ await FX.close(); }finally{ ScoreFX.release(FX); } }
       // #2 早送りのON/OFF状態は次にプレイヤーが切り替えるまで保持する（ここではリセットしない）
-      this.scoringAnim=null; this.scoreBoxes=null;
-      // #3 演出が終わったら、レリック・パッシブの「ポップ」状態を必ず解除する（点数計算に関わったタイミング以外は表示しない）
-      this.scoringRelicIds=[]; this.scoringRelicValues={}; this.scoringPassiveIds=[]; this.scoringPassiveValues={};
+      this.scoringAnims=(this.scoringAnims||[]).filter(a=>a!==anim);
+      this.scoringAnim=this.scoringAnims.length?this.scoringAnims[this.scoringAnims.length-1]:null;
+      if(!this.scoringAnim) this.scoreBoxes=null;
+      // #3 演出が終わったら、このステップのレリック・パッシブの「ポップ」状態を必ず解除する
+      this.setScorePop(stepKey,[],[]);
       this.renderAll();
     }
   },
@@ -2267,7 +2320,7 @@ const GameMainScene = {
     // #17 ビンゴ倍率と盤面効果は手札の下に配置する
     const belowHand=document.createElement('div'); belowHand.className='below-hand-row';
     const multLegend=this.renderMultLegend();
-    if(this.scoringAnim?.phase===2) multLegend.classList.add('scoring-phase2');
+    if((this.scoringAnims||[]).some(a=>a.phase===2)) multLegend.classList.add('scoring-phase2');
     belowHand.appendChild(multLegend);
     belowHand.appendChild(this.renderEffectsPanel());
     wrap.appendChild(belowHand);
@@ -2305,7 +2358,7 @@ const GameMainScene = {
     const bar=document.createElement('div'); bar.className='status-bar'; bar.style.flexDirection='column'; bar.style.alignItems='flex-start';
     // #3 点数バーは現在の点数(GameState.currentScore)にのみ連動させる。計算中の途中値は反映しない
     const live=GameState.currentScore;
-    const sparkle=this.scoringAnim&&this.scoringAnim.reached;
+    const sparkle=(this.scoringAnims||[]).some(a=>a.reached);
     const pct=Math.min(100,Math.floor((live/GameState.targetScore)*100));
     // #6 ラウンドを大きく表示し、点数は「現在/目標」の1つの表示にまとめる
     const topRow=document.createElement('div'); topRow.className='status-top-row'; // #6 ラウンド・Gの右にパッシブを詰めて配置（折り返さない）
@@ -2587,7 +2640,8 @@ const GameMainScene = {
       const h=this.computeHints({npcCell:this.npcNextCell});
       if(h[this.npcNextCell]!==undefined) npcHint=h[this.npcNextCell];
     }
-    const sc=this.scoringAnim?this.scoringAnim.cells:[];
+    const anims=this.scoringAnims||[];
+    const sc=anims.flatMap(a=>a.cells);
     const expandTargets=this.expandPending?new Set(this.expandPending.targets):new Set();
     const paintTarget=this.paintPending;
     for(let i=0;i<this.board.length;i++){
@@ -2620,14 +2674,15 @@ const GameMainScene = {
         }
         if(sc.includes(i)){
           cellEl.classList.add('scoring-cell');
-          const isPopping=this.scoringAnim?.phase===0&&this.scoringAnim?.popCell===i;
+          const isPopping=anims.some(a=>a.phase===0&&a.popCell===i);
           if(isPopping){
             cellEl.classList.add('scoring-pop');
             const badge=document.createElement('div');badge.className='score-badge';badge.textContent='+'+(this.isNpcCrossCell(cd)?this.npcCrossScore(cd):cd.baseScore);cellEl.appendChild(badge);
           }
           // #2 計算確定時：獲得した合計点数(+N)をビンゴ列の中央セルに大きく表示
-          if(this.scoringAnim?.phase>=8&&sc.length>0&&i===sc[Math.floor(sc.length/2)]){
-            const finalBadge=document.createElement('div');finalBadge.className='score-badge score-badge-final'+(this.scoringAnim.score<0?' negative':'');finalBadge.textContent=GlobalFunctions.formatSigned(this.scoringAnim.score);cellEl.appendChild(finalBadge);
+          const finA=anims.find(a=>a.phase>=8&&a.cells.length>0&&i===a.cells[Math.floor(a.cells.length/2)]);
+          if(finA){
+            const finalBadge=document.createElement('div');finalBadge.className='score-badge score-badge-final'+(finA.score<0?' negative':'');finalBadge.textContent=GlobalFunctions.formatSigned(finA.score);cellEl.appendChild(finalBadge);
           }
         }
         if(this.bossBlackedOut&&cd.owner==='player'){
