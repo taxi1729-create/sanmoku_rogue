@@ -923,3 +923,14 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .mult-legend .mult-eff-cell{white-space:nowrap;}
 .mult-legend .mult-orig{font-size:.75em;color:var(--text-dim);margin-right:2px;}
 .mult-legend .mult-eff-blue{color:#5fb8ff;font-weight:900;}
+
+/* 早送りトグル：レリック「一覧」ボタンの真下＝盤面の右上の外側に常設（盤面には重ねない） */
+.board-area{position:relative;}
+.board-ff-btn{position:absolute;top:0;left:calc(100% + 10px);width:52px;height:40px;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  background:#1e1830;border:1px solid #6a4ad4;border-radius:9px;color:#cfc7ff;font-size:9px;font-weight:700;line-height:1.1;z-index:5;}
+.board-ff-btn .gi{width:16px;height:16px;}
+.board-ff-btn:hover:not(:disabled){background:#2a2148;}
+.board-ff-btn.active{background:linear-gradient(135deg,#f59e0b,#f472b6);border-color:#fde68a;color:#fff;box-shadow:0 0 10px rgba(244,114,182,.6);animation:sfxFFPulse .6s ease-in-out infinite alternate;}
+@media (prefers-reduced-motion: reduce){ .board-ff-btn.active{animation:none;} }
+/* 魔力ステージA・B所持時：倍率表の下に最終補正の注記 */
+.mult-mana-note{margin-top:3px;font-size:9px;line-height:1.3;color:#d8b4fe;max-width:150px;}

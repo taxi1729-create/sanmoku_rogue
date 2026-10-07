@@ -147,3 +147,7 @@
 .sfx-caption.cap-cross-eff{color:#7cc8ff;}
 .sfx-t.t-cross-eff{color:#7cc8ff;}
 .sfx-chip.c-cross-eff{background:linear-gradient(180deg,#a8dcff,#2f8cff);box-shadow:0 0 12px rgba(60,150,255,.85);}
+
+/* 早送りは盤面右上の常設トグル（.board-ff-btn）に移したため、吹き出し内のボタンは出さない */
+.sfx-ff{display:none;}
+.sfx-caption.cap-mana .sfx-cap{color:#e9d5ff;text-shadow:0 0 8px rgba(192,132,252,.8);}

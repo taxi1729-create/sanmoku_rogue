@@ -991,11 +991,11 @@ const ShopScene = {
     const multPanel = document.createElement('div'); multPanel.className='modal-mult-panel';
     const multRows = GameData.SYMBOLS.map(s=>{
       const base=GameData.BINGO_MULTIPLIER_BASE[s]+GameData.CORRECTION_MULTIPLIER;
-      const quad=Math.round(GameData.quadMult(s)+GameData.CORRECTION_MULTIPLIER);
+      const quad=Math.round(GameData.BINGO_MULTIPLIER_BASE[s]*GameData.baseLineFactor('quad')+GameData.CORRECTION_MULTIPLIER);
       const f=v=>v>=0?'+'+Math.round(v):String(Math.round(v));
       return `<tr><td class="sym-${s}">${GameData.SYMBOL_LABEL[s]}</td><td>${f(base)}</td><td>${f(quad)}</td></tr>`;
     }).join('');
-    multPanel.innerHTML=`<div class="mult-legend-modal"><b>ビンゴ倍率</b><table><tr><th></th><th>基礎</th><th>4列</th></tr>${multRows}</table></div>`;
+    multPanel.innerHTML=`<div class="mult-legend-modal"><b>ビンゴ倍率</b><table><tr><th></th><th>基礎</th><th>4列</th></tr>${multRows}</table>${GameData.manaNoteText()?`<div class="mult-mana-note">${GameData.manaNoteText()}</div>`:''}</div>`;
     topRow.appendChild(multPanel);
     const list = document.createElement('div'); list.className='effect-choice-list';
     p.effectPool.forEach(eff => {

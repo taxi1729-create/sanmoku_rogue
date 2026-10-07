@@ -15,6 +15,24 @@ const GameMainScene = {
   unifyRestoreData:null, // #2 統一ボス効果の復元用
 
   sleep(ms){ return new Promise(res=>setTimeout(res,ms)); },
+  // 早送りトグル（盤面右上の常設ボタン）。ONの間は点数計算・NPC手番などの演出を高速化し、点数計算中に押しても即反映される
+  toggleFastForward(){
+    this.scoreFastForward=!this.scoreFastForward;
+    document.querySelectorAll('.board-ff-btn').forEach(b=>this.updateFFButton(b));
+    if(typeof ScoreFX!=='undefined'&&ScoreFX.el&&ScoreFX.el.ff) ScoreFX.updateFF();
+  },
+  updateFFButton(btn){
+    const on=!!this.scoreFastForward;
+    btn.classList.toggle('active',on); btn.setAttribute('aria-pressed',on?'true':'false');
+    btn.innerHTML=`${GameIcons.svg('btn_fast_forward')}<span class="bff-label">${on?'早送りON':'早送り'}</span>`;
+  },
+  renderFFButton(){
+    const btn=document.createElement('button'); btn.type='button'; btn.className='board-ff-btn';
+    btn.setAttribute('aria-label','早送り（ON/OFF）');
+    this.updateFFButton(btn);
+    btn.addEventListener('click',(e)=>{ e.stopPropagation(); this.toggleFastForward(); });
+    return btn;
+  },
 
   render(container,stage){
     this.container=container; this.stage=stage;
@@ -40,6 +58,7 @@ const GameMainScene = {
     this.unifyRestoreData=null;
     this.effects={stunNextNpc:false,confuseNextNpc:false,breakUntilTurn:null,linkRestrict:null,redirectBan:null,sealCell:null,lureRestrict:false};
     GameState.initStage(stage);
+    GameData.refreshPassiveEnhance(); // v14 #1
     this.applyBossEffect();
     this.applyRelicInitEffects();
     this.stageBonusRounds=0;
@@ -173,7 +192,7 @@ const GameMainScene = {
         case 'block_cells': GlobalFunctions.shuffle(Array.from({length:GameData.BOARD_SIZE*GameData.BOARD_SIZE},(_,i)=>i)).slice(0,2*(be.power||1)).forEach(i=>this.blockedCells.add(i)); break; // #8 2マス（階層6以降4マス）
         // #4 パッシブ効果無効：ゲーム開始時に記号パッシブを退避して無効化（魔力は例外）。ゲーム終了時に復元
         case 'blackout':
-          if(!GameState.passiveSuspended){ GameState.passiveSuspended={...GameState.symbolPassiveTier}; Object.keys(GameState.symbolPassiveTier).forEach(k=>GameState.symbolPassiveTier[k]=0); }
+          if(!GameState.passiveSuspended){ GameState.passiveSuspended={...GameState.symbolPassiveTier}; Object.keys(GameState.symbolPassiveTier).forEach(k=>GameState.symbolPassiveTier[k]=0); GameData.refreshPassiveEnhance(); }
           break;
         case 'unify':{
           const ch=GlobalFunctions.randChoice(['Circle','Triangle','Square']);
@@ -197,7 +216,7 @@ const GameMainScene = {
   },
 
   restoreSuspendedPassives(){
-    if(GameState.passiveSuspended){ GameState.symbolPassiveTier={...GameState.passiveSuspended}; GameState.passiveSuspended=null; this.addLog('パッシブ効果無効：パッシブが元に戻った'); }
+    if(GameState.passiveSuspended){ GameState.symbolPassiveTier={...GameState.passiveSuspended}; GameState.passiveSuspended=null; GameData.refreshPassiveEnhance(); this.addLog('パッシブ効果無効：パッシブが元に戻った'); }
   },
   // #4 レリック効果が有効か（ボス効果「レリック使用不可」中は全レリック・レリック強化効果が無効）
   relicActive(){ return !this.hasBossEffect('no_relic'); },
@@ -812,9 +831,11 @@ const GameMainScene = {
     // #4 エクステンド：このカードを置いたターンはビンゴ判定を行わない（次の自分の配置で解除・判定される）
     const isExtending1 = card?.enhance==='エクステンド' && owner==='player';
     // #2 エクステンド中はNPCの配置でもビンゴ判定・点数計算を行わない（次に自分がカードを置いた時に解除・判定）
-    const newBingos = (isExtending1 || (this.extendActive && owner!=='player')) ? [] : this.detectNewBingos();
-    if(isExtending1){ this.extendActive=true; this.addLog('エクステンド：このターンはビンゴ判定を行わない'); }
-    else if(this.extendActive && owner==='player'){ this.extendActive=false; }
+    // v14 #3 エクステンドは「次の自分のターン」でカードを置いた時に解除。ネガティブ等でターンが進まない同一ターン内の配置では解除しない
+    const extendHold1 = this.extendActive && (owner!=='player' || this.turnInRound<=(this.extendTurn||0));
+    const newBingos = (isExtending1 || extendHold1) ? [] : this.detectNewBingos();
+    if(isExtending1){ this.extendActive=true; this.extendTurn=this.turnInRound; this.addLog('エクステンド：次の自分のターンまでビンゴ判定を行わない'); }
+    else if(this.extendActive && !extendHold1){ this.extendActive=false; }
     if(!isNeg){ this.turnInRound++; this.applyPerTurnEnhances(); }
     if(card?.jamming){ this._jamFromPlacement=true; try{ this.queueJammingEffect(card.jamming,cellIdx); } finally{ this._jamFromPlacement=false; } }
     if(owner==='player') this.applyAllLink(cellIdx,card); // #10
@@ -1101,7 +1122,7 @@ const GameMainScene = {
       // #2 デバッグ用：計算式と各値の出所をログに表示
       const debugMsg=`[計算式] 基礎点=(カード基礎点[${cardScores.join('+')}]${cardScores.reduce((s,v)=>s+v,0)} + 補正基礎点(GameData.CORRECTION_BASE_SCORE)${correctionBase} + レリック補正(relicBonus)${relicBonus}) = ${totalBase} ／ 倍率=(ビンゴ倍率(GameData.BINGO_MULTIPLIER_BASE/quadMult)${baseMult} + 補正倍率(GameData.CORRECTION_MULTIPLIER)${GameData.CORRECTION_MULTIPLIER} + レリック加算) = ${Math.round(finalMult*100)/100} ／ 最終乗算補正(GameData.FINAL_MULTIPLIER×レリック)=${Math.round(finalMultiplier*100)/100} ／ 最終加算補正(GameData.FINAL_ADD+山札強化)=${finalAddTotal} ⇒ score=round(totalBase×倍率×最終乗算補正)+最終加算補正 = round(${totalBase}×${Math.round(finalMult*100)/100}×${Math.round(finalMultiplier*100)/100})+${finalAddTotal} = ${score}`;
       console.log('[ScoreCalc]',{symbol:r.sym,cardScores,correctionBase,relicBonus,totalBase,baseMult,correctionMultiplier:GameData.CORRECTION_MULTIPLIER,finalMult,finalMultiplierGlobal:GameData.FINAL_MULTIPLIER,finalMultiplier,finalAddGlobal:GameData.FINAL_ADD,finalAddTotal,score,activeRelics:GameState.relics.map(x=>x.id+(x.relicEnhance?('/'+x.relicEnhance):''))});
-      return {idx,symbol:r.sym,cells:win.cells,cardScores,totalBase,relicBonus,correctionBase,cardBaseSum,correctionBaseTotal:correctionBase+relicBonus,mult:finalMult,pureBaseMult,lineFactor,correctionMultiplier:correctionMultiplierTotal,correctionMultParts,finalMultiplier,finalMultParts,finalAdd:finalAddTotal,finalAddParts,score,isQuad:win.isQuad,isPenta:win.isPenta,debugMsg,baseRelicIds:Array.from(baseRelicIds)};
+      return {idx,symbol:r.sym,cells:win.cells,cardScores,totalBase,relicBonus,correctionBase,cardBaseSum,correctionBaseTotal:correctionBase+relicBonus,mult:finalMult,pureBaseMult,lineFactor,correctionMultiplier:correctionMultiplierTotal,correctionMultParts,finalMultiplier,finalMultParts,finalAdd:finalAddTotal,finalAddParts,score,isQuad:win.isQuad,isPenta:win.isPenta,manaFactor:GameData.manaFactor(win.isPenta?'penta':(win.isQuad?'quad':'tri')),debugMsg,baseRelicIds:Array.from(baseRelicIds)};
     };
 
     // #3 ホシパッシブ2：5列ビンゴを最優先で判定（内包する4列・3列窓は同時に消費済みにする）
@@ -1255,16 +1276,28 @@ const GameMainScene = {
       const bingoMult=b.mult-b.correctionMultiplier; // 列補正込みのビンゴ倍率（detectNewBingos の baseMult）
       await chip('b','×'+fmtNum(m),m,{from:document.querySelector('.mult-legend'),cls:crossEffOn?'c-mult c-cross-eff':'c-mult',ms:320});
       tr(`${hasMultParts?'(':''}${fmtNum(m)}`,crossEffOn?'t-mult t-cross-eff':'t-mult');
-      if(b.lineFactor!==1||Math.abs(bingoMult-m)>1e-9){
-        const lf=m!==0?bingoMult/m:b.lineFactor;
+      // 魔力ステージA・Bは「元の列補正」とは別の最終補正として、列補正の後に独立したステップで見せる
+      const manaF=(b.manaFactor!=null)?b.manaFactor:1;
+      const lineKind=b.isPenta?'penta':(b.isQuad?'quad':'tri');
+      const lfAll=m!==0?bingoMult/m:b.lineFactor; // 列補正×魔力（＋倍率に畳み込まれた補正）
+      const lfBase=manaF!==0?lfAll/manaF:GameData.baseLineFactor(lineKind);
+      if(Math.abs(lfBase-1)>1e-9){
         cap(`${lineLabel}ビンゴ補正`,'cap-mod');
-        m=bingoMult;
-        await chip('b','×'+fmtNum(lf),m,{from:document.querySelector('.mult-legend'),cls:'c-mod',ms:380,strength:2});
+        m=manaF!==1?m*lfBase:bingoMult;
+        await chip('b','×'+fmtNum(lfBase),m,{from:document.querySelector('.mult-legend'),cls:'c-mod',ms:380,strength:2});
         if(FX) FX.shake(1);
-        tr('×'+fmtNum(lf),'t-mod');
+        tr('×'+fmtNum(lfBase),'t-mod');
       }else{ // 3列は×1のため、補正名だけを短く見せる
         cap(`${lineLabel}ビンゴ補正 ×1`,'cap-mod');
         await ffSleep(200);
+      }
+      if(manaF!==1){
+        const manaSt=['A','B'].filter(k=>GameState.hasMana(k)).map(k=>'魔力ステージ'+k).join('・')||'魔力';
+        cap(`${manaSt} ×${fmtNum(manaF)}`,'cap-mod cap-mana');
+        m=bingoMult;
+        await chip('b','×'+fmtNum(manaF),m,{cls:'c-mod',ms:380,strength:2});
+        if(FX) FX.shake(1);
+        tr('×'+fmtNum(manaF),'t-mod');
       }
       if(GameData.CORRECTION_MULTIPLIER!==0){
         m+=GameData.CORRECTION_MULTIPLIER;
@@ -1455,7 +1488,7 @@ const GameMainScene = {
   },
 
   async scheduleAIMove(){
-    await this.sleep(500);
+    await this.sleep(this.scoreFastForward?150:500);
     if(this.currentSide!=='npc'||this.resultState) return;
     const npcDouble=GameState.relics.some(r=>r.relicEnhance==='ren_npc')&&this.relicActive();
 
@@ -1506,7 +1539,7 @@ const GameMainScene = {
     await this.placeCard(ci,'Cross',this.npcCrossBase(),'npc',null);
     const held=npcDouble&&!this._npcHold; this._npcHold=false;
     if(held&&!this.resultState&&this.currentSide==='npc'&&GameState.round===roundBefore){
-      await this.sleep(400);
+      await this.sleep(this.scoreFastForward?120:400);
       if(this.resultState||this.currentSide!=='npc') return;
       this.addLog('NPC強化：NPCがもう一度行動');
       const ci2=this.chooseAICell();
@@ -1595,6 +1628,7 @@ const GameMainScene = {
 
     // #予測修正 エクステンド：このカードを置いたターンはビンゴ判定を行わないため予測も出さない
     if(card.enhance==='エクステンド') return hints;
+    if(this.extendActive&&this.turnInRound<=(this.extendTurn||0)) return hints; // v14 #3 同一ターン内（ネガティブ配置後など）はエクステンド継続中のため判定しない
     const noRelic=this.hasBossEffect('no_relic');
     const quadOnly=this.hasBossEffect('quad_only');
 
@@ -1906,9 +1940,10 @@ const GameMainScene = {
     if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1){ const dc=this.drawOne(); if(dc) dc.baseScore+=1; }
     // #4 エクステンド：このカードを置いたターンはビンゴ判定を行わない（次の自分の配置で解除・判定される）
     const isExtending2 = card.enhance==='エクステンド';
-    const newBingos = isExtending2 ? [] : this.detectNewBingos();
-    if(isExtending2){ this.extendActive=true; this.addLog('エクステンド：このターンはビンゴ判定を行わない'); }
-    else if(this.extendActive){ this.extendActive=false; }
+    const extendHold2 = this.extendActive && this.turnInRound<=(this.extendTurn||0); // v14 #3
+    const newBingos = (isExtending2 || extendHold2) ? [] : this.detectNewBingos();
+    if(isExtending2){ this.extendActive=true; this.extendTurn=this.turnInRound; this.addLog('エクステンド：次の自分のターンまでビンゴ判定を行わない'); }
+    else if(this.extendActive && !extendHold2){ this.extendActive=false; }
     if(!isNeg){ this.turnInRound++; this.applyPerTurnEnhances(); }
     // #10 拡張・拡大で追加配置されたマスのジャミング効果もすべて発動する（リンクは全マスの十字マスの和集合）
     if(card.jamming){ this._jamFromPlacement=true; try{ this.queueJammingEffectMulti(card.jamming,targets); } finally{ this._jamFromPlacement=false; } }
@@ -2024,6 +2059,7 @@ const GameMainScene = {
     }
     const ba=document.createElement('div'); ba.className='board-area';
     ba.appendChild(this.renderBoard());
+    ba.appendChild(this.renderFFButton()); // 早送りトグル：レリック一覧ボタンの下（盤面の右上の外側）に常設
     wrap.appendChild(ba);
     const bi=this.renderBoardInfoPanel(); if(bi) wrap.appendChild(bi);
     wrap.appendChild(this.renderHand());
@@ -2218,7 +2254,7 @@ const GameMainScene = {
       bonusHtml=`<span class="card-score-bonus${sqP3?' passive-value':' gold-text'}">+${val}</span>`;
     } else if(card.enhance==='加重'){
       // #4 加重：付与時に加算された値を「+◯」で表示
-      bonusHtml=`<span class="card-score-bonus gold-text">+${GameData.weightedBonus(card)}</span>`;
+      bonusHtml=`<span class="card-score-bonus gold-text${sqP3?' passive-value':''}">+${GameData.weightedBonus(card)}</span>`;
     }
 
     // #4 パッシブ効果でカード基礎点が変化する場合、青字で実効値を表示する
@@ -2265,10 +2301,11 @@ const GameMainScene = {
     const legend=document.createElement('div'); legend.className='mult-legend';
     // #バツ実効倍率 バツパッシブLv2（ミラー）・Lv3（×4）有効時は、変化後のバツ倍率を青色で表示する（元の値は小さく打ち消し線）
     const crossEff=this.crossEffectiveBaseMult();
-    const rows=GameData.SYMBOLS.map(s=>{const base=GameData.BINGO_MULTIPLIER_BASE[s]+GameData.CORRECTION_MULTIPLIER;const quad=Math.round(GameData.quadMult(s)+GameData.CORRECTION_MULTIPLIER);const f=v=>v>=0?'+'+Math.round(v):String(Math.round(v));
-      if(s==='Cross'&&crossEff!=null){const eb=crossEff+GameData.CORRECTION_MULTIPLIER, eq=crossEff*GameData.lineFactor('quad')+GameData.CORRECTION_MULTIPLIER;const cell=(o,e)=>`<td class="mult-eff-cell">${Math.round(o)!==Math.round(e)?`<s class="mult-orig">${f(o)}</s>`:''}<span class="mult-eff-blue">${f(e)}</span></td>`;return`<tr class="mult-row-cross-eff"><td class="sym-${s}">${GameData.SYMBOL_LABEL[s]}</td>${cell(base,eb)}${cell(quad,eq)}</tr>`;}
+    const rows=GameData.SYMBOLS.map(s=>{const base=GameData.BINGO_MULTIPLIER_BASE[s]+GameData.CORRECTION_MULTIPLIER;const quad=Math.round(GameData.BINGO_MULTIPLIER_BASE[s]*GameData.baseLineFactor('quad')+GameData.CORRECTION_MULTIPLIER);const f=v=>v>=0?'+'+Math.round(v):String(Math.round(v));
+      if(s==='Cross'&&crossEff!=null){const eb=crossEff+GameData.CORRECTION_MULTIPLIER, eq=crossEff*GameData.baseLineFactor('quad')+GameData.CORRECTION_MULTIPLIER;const cell=(o,e)=>`<td class="mult-eff-cell">${Math.round(o)!==Math.round(e)?`<s class="mult-orig">${f(o)}</s>`:''}<span class="mult-eff-blue">${f(e)}</span></td>`;return`<tr class="mult-row-cross-eff"><td class="sym-${s}">${GameData.SYMBOL_LABEL[s]}</td>${cell(base,eb)}${cell(quad,eq)}</tr>`;}
       return`<tr><td class="sym-${s}">${GameData.SYMBOL_LABEL[s]}</td><td>${f(base)}</td><td>${f(quad)}</td></tr>`;}).join('');
-    legend.innerHTML=`<table><tr><th></th><th>基礎</th><th>4列</th></tr>${rows}</table>`;
+    const manaNote=GameData.manaNoteText();
+    legend.innerHTML=`<table><tr><th></th><th>基礎</th><th>4列</th></tr>${rows}</table>${manaNote?`<div class="mult-mana-note">${manaNote}</div>`:''}`;
     return legend;
   },
 
@@ -2308,7 +2345,7 @@ const GameMainScene = {
     if(ef.redirectBan&&ef.redirectBan.size>0) next.push({icon:ic('jam_redraw'),name:'ジャミング：引き直し',desc:'次のNPCは除去したマスに置けない',where:posList(ef.redirectBan)});
     if(ef.sealCell&&ef.sealCell.size>0) next.push({icon:ic('jam_seal'),name:'ジャミング：封印',desc:`次のNPCは封印マス（${ef.sealCell.size}マス）に置けない`});
     if(ef.confuseNextNpc) next.push({icon:ic('jam_confuse'),name:'ジャミング：混乱',desc:'次のNPCは最低点マスに置く'});
-    if(this.extendActive) next.push({icon:ic('enh_extend'),name:'カード強化：エクステンド',desc:'次に自分がカードを置くまでビンゴ判定を行わない'});
+    if(this.extendActive) next.push({icon:ic('enh_extend'),name:'カード強化：エクステンド',desc:'次の自分のターンでカードを置くまでビンゴ判定を行わない'});
     return {round,next};
   },
   renderEffectsPanel(){
@@ -3114,7 +3151,7 @@ const GameMainScene = {
   },
   choosePassive(idx){
     const cand=this.pendingPassiveChoice[idx]; if(!cand) return;
-    GameState.symbolPassiveTier[cand.symbol]=cand.nextTier;
+    GameState.symbolPassiveTier[cand.symbol]=cand.nextTier; GameData.refreshPassiveEnhance(); // v14 #1
     this.addLog(`記号パッシブ習得：${GIconSym(cand.symbol)}${GameData.SYMBOL_PASSIVE_NAMES[cand.symbol]}Lv${cand.nextTier}`);
     this.pendingPassiveChoice=null;
     this.passiveModalOpen=false;

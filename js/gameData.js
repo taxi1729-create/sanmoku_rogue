@@ -32,10 +32,22 @@ const GameData = {
   QUAD_MULTIPLIER_FACTOR: 1.5,
   // #3 ホシパッシブLv2用：5列ビンゴは3列ビンゴの倍率の2倍
   PENTA_MULTIPLIER_FACTOR: 2,
-  // 列補正（3列=1／4列=1.5／5列=2）に魔力ステージA・Bの倍率を掛けたもの
-  lineFactor(kind){
-    const base = kind==='penta' ? this.PENTA_MULTIPLIER_FACTOR : (kind==='quad' ? this.QUAD_MULTIPLIER_FACTOR : 1);
-    return base * ((typeof GameState!=='undefined'&&GameState.manaLineMul)?GameState.manaLineMul(kind):1);
+  // 元々の列補正（3列=1／4列=1.5／5列=2）。表示はこちらを使う（魔力は含まない）
+  baseLineFactor(kind){
+    return kind==='penta' ? this.PENTA_MULTIPLIER_FACTOR : (kind==='quad' ? this.QUAD_MULTIPLIER_FACTOR : 1);
+  },
+  // 魔力ステージA・Bによる、ビンゴ倍率への最終補正（持っていなければ1）
+  manaFactor(kind){
+    return (typeof GameState!=='undefined'&&GameState.manaLineMul)?GameState.manaLineMul(kind):1;
+  },
+  // 得点計算・予測用：元の列補正 × 魔力の最終補正
+  lineFactor(kind){ return this.baseLineFactor(kind) * this.manaFactor(kind); },
+  // 魔力ステージA・Bを持っている時の倍率表の注記（無ければ空文字）
+  manaNoteText(){
+    if(typeof GameState==='undefined'||!GameState.hasMana) return '';
+    const st=['A','B'].filter(k=>GameState.hasMana(k)); if(st.length===0) return '';
+    const f=v=>Math.round(v*100)/100;
+    return `${st.map(k=>'魔力ステージ'+k).join('・')}：最終的に3列×${f(this.manaFactor('tri'))}／4列×${f(this.manaFactor('quad'))}／5列×${f(this.manaFactor('penta'))}`;
   },
   triMult(symbol){ return this.BINGO_MULTIPLIER_BASE[symbol] * this.lineFactor('tri'); },
   pentaMult(symbol){ return this.BINGO_MULTIPLIER_BASE[symbol] * this.lineFactor('penta'); },
@@ -44,8 +56,8 @@ const GameData = {
 
   // #1 パッシブ「魔力」（魔神イベントで付与。レベル制ではなくステージA〜Eを個別に所持）
   MANA_STAGES: {
-    A:{ name:'魔力ステージA', desc:'3列ビンゴの列補正を0.75倍、4列ビンゴの列補正を2倍、5列ビンゴの列補正を3倍にする' },
-    B:{ name:'魔力ステージB', desc:'3列ビンゴの列補正を3倍、4列ビンゴと5列ビンゴの列補正を0倍にする' },
+    A:{ name:'魔力ステージA', desc:'ビンゴ倍率に最終補正として、3列ビンゴは×0.75、4列ビンゴは×2、5列ビンゴは×3を掛ける' },
+    B:{ name:'魔力ステージB', desc:'ビンゴ倍率に最終補正として、3列ビンゴは×3、4列ビンゴと5列ビンゴは×0を掛ける' },
     C:{ name:'魔力ステージC', desc:'捧げられたレリックの個数分、レリックの所持数上限が増加する' },
     D:{ name:'魔力ステージD', desc:'付与された階層のボスクリア時のパッシブ報酬の数を3つにする' },
     E:{ name:'魔力ステージE', desc:'カードが得られるパックのカードは、カード強化・ジャミング・性質変化の全てが付与された状態で出現する。レリックパックとピックアップレリックのレリックには全てレリック強化効果が付与される' },
@@ -148,7 +160,7 @@ const GameData = {
     if(matched && card.symbol === matched) card.baseScore += 20*mul;
     // #3 加重は即時加算をやめ、ビンゴ時にデッキ内の同じ記号の枚数×1を加算する（GameData.weightedBonus）
     // #4 トップスピード：カード基礎点+5（付与時に即時加算。デッキ先頭配置は別途ステージ開始時に処理）
-    if(card.enhance === 'トップスピード') card.baseScore += 5;
+    if(card.enhance === 'トップスピード') card.baseScore += 5*mul; // v14 #1 シカクパッシブLv2はシカクカードのみ2倍
     card._enhAdd = card.baseScore - before;
   },
   // #5 現在の強化効果による即時加算（数値強化・トップスピード・同記号マルチ）を取り除く。強化効果を変更する直前に呼ぶ
@@ -161,6 +173,16 @@ const GameData = {
     }
     card.baseScore-=add; delete card._enhAdd;
     return add;
+  },
+  // v14 #1 シカクパッシブLv2の取得・解除・無効化に合わせて、即時加算型の強化（数値強化・トップスピード・同記号マルチ）の加算量を現在の状態で付け直す
+  refreshPassiveEnhance(){
+    if(typeof GameState==='undefined') return;
+    const seen=new Set();
+    [...(GameState.currentDeck||[]),...(GameState.hand||[]),...(GameState.drawPile||[]),...(GameState.discardPile||[]),...(GameState.reserve||[])].forEach(c=>{
+      if(!c||seen.has(c)||!c.enhance) return; seen.add(c);
+      if(!['数値強化','トップスピード','マルマルチ','サンカクマルチ','シカクマルチ','バツマルチ'].includes(c.enhance)) return;
+      this.removeEnhanceBonus(c); this.applyGrantSideEffects(c, GameState.gold, 'enhance');
+    });
   },
   // 強化効果を差し替える（旧強化の即時加算を戻してから新強化の副次効果を適用）
   setEnhance(card, enh, gold){
@@ -178,7 +200,8 @@ const GameData = {
   // #3 加重：デッキ内の同じ記号のカード枚数×1。強化効果が付いている間だけ加算
   weightedBonus(card){
     if(!card||card.enhance!=='加重'||typeof GameState==='undefined') return 0;
-    return GameState.currentDeck.filter(c=>c.symbol===card.symbol).length;
+    const mul=(GameState.symbolPassiveTier?.Square>=2&&card.symbol==='Square')?2:1; // v14 #1 シカクパッシブLv2：シカクカードは2倍
+    return GameState.currentDeck.filter(c=>c.symbol===card.symbol).length*mul;
   },
   // #7 図鑑・カード表示用：効果名→アイコンキー
   ENHANCE_ICON: { '数値強化':'enh_number','拡大':'enh_expand_rect','横拡張':'enh_expand_h','縦拡張':'enh_expand_v','マルマルチ':'multi_circle','サンカクマルチ':'multi_triangle','シカクマルチ':'multi_square','バツマルチ':'multi_cross','ハブ':'enh_hub','連鎖':'enh_chain','オールマルチ':'multi_all','巨大化':'enh_giant','肥大化':'enh_bloat','ブルジョワ':'enh_bourgeois','ドロー':'enh_draw','エクステンド':'enh_extend','加重':'enh_weighted','ギャンブル':'enh_gamble','トップスピード':'enh_top_speed','重ね掛け':'enh_overlay' },
@@ -233,7 +256,7 @@ const GameData = {
       // #13 手札上限+1の代わりに、ショップでのパック購入時の選択可能カード枚数+1
       1: { name:'シカク・ドロー', desc:'シカクカードをプレイした時、そのカード自身の基礎点+1を永続付与し、カードを1枚ドローする。また、ショップでパック購入時の選択可能カード枚数+1',
         live(){ return 'シカクカードプレイ時：自身の基礎点+1（永続）、ドロー+1枚（そのカードにも基礎点+1）'; } },
-      2: { name:'シカク・アンプ', desc:'シカクカードの強化効果を強化する。数値強化・シカクマルチ・ハブ・連鎖・巨大化・肥大化・ブルジョワ・ドローは効果2倍、横拡張・縦拡張は4マスに、拡大は4×4マスに拡張される',
+      2: { name:'シカク・アンプ', desc:'シカクカードの強化効果を強化する。数値強化・シカクマルチ・ハブ・連鎖・巨大化・肥大化・ブルジョワ・ドロー・トップスピード・加重は効果2倍、横拡張・縦拡張は4マスに、拡大は4×4マスに拡張される',
         live(){ return '対象の強化効果が強化される（数値・枚数2倍／拡張は4マス／拡大は4×4マス）'; } },
       3: { name:'シカク・スワップ', desc:'マップ・ショップ画面でデッキを確認中、シカクカード同士に限り強化効果を入れ替えられる。デッキ画面でシカクカードを2枚タップすると、その2枚の強化効果が交換される',
         live(){ const n=GameState.currentDeck.filter(c=>c.symbol==='Square').length; return `対象のシカクカード：${n}枚（デッキ確認画面でタップして交換）`; } },

@@ -209,6 +209,7 @@ const GameState = {
     if(this.symbolPassiveTier.Hoshi===undefined) this.symbolPassiveTier.Hoshi=0;
     if(this.symbolPassiveTier.Check===undefined) this.symbolPassiveTier.Check=0;
     if(this.symbolPassiveTier.Seven===undefined) this.symbolPassiveTier.Seven=0;
+    try{ GameData.refreshPassiveEnhance(); }catch(e){} // v14 #1
     this.totalBingoCount=d.totalBingoCount||0;
     this.sevenPendingMultBoost=d.sevenPendingMultBoost||false;
     this.bossRerollUsed=d.bossRerollUsed||false;

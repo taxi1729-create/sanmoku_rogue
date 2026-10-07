@@ -95,7 +95,7 @@ const ScoreFX = {
 
   // ---------- 配置：空き領域を実測 ----------
   obstacleRects(){
-    const list=[['.board',16],['.mult-legend',6],['.passive-bar',6],['.relic-display-row',6],['.score-combined-stat',4]];
+    const list=[['.board',16],['.mult-legend',6],['.passive-bar',6],['.relic-display-row',6],['.score-combined-stat',4],['.board-ff-btn',4]];
     const out=[];
     list.forEach(([sel,m])=>document.querySelectorAll(sel).forEach(e=>{
       const r=e.getBoundingClientRect(); if(r.width<=0||r.height<=0) return;

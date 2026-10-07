@@ -329,7 +329,7 @@ const MajinEvent = (function(){
           return { key:s, icon:GameData.SYMBOL_LABEL[s], iconCls:'sym-'+s, label:`${GameData.SYMBOL_PASSIVE_NAMES[s]} Lv${t}`, desc:GameData.SYMBOL_PASSIVES[s][t].name };
         }), {title:'捧げる記号パッシブを1つ選べ'});
         const oldT=G().symbolPassiveTier[key];
-        G().symbolPassiveTier[key]=0;
+        G().symbolPassiveTier[key]=0; GameData.refreshPassiveEnhance();
         G().grantMana('D', G().currentFloor);
         return `<div class="mj-sub-label">捧げたパッシブ</div>${passiveHtml(key,0,`（Lv${oldT} → Lv0）を捧げた`)}${manaHtml('D')}`;
       } },
@@ -411,7 +411,7 @@ const MajinEvent = (function(){
       return { key:s, icon:GameData.SYMBOL_LABEL[s], iconCls:'sym-'+s, label:`${GameData.SYMBOL_PASSIVE_NAMES[s]} Lv${nt}「${p.name}」`, desc:p.desc };
     }), {title:`記号パッシブを1つ選べ（${cands.length}択）`, head:headHtml});
     const nt=(G().symbolPassiveTier[key]||0)+1;
-    G().symbolPassiveTier[key]=nt;
+    G().symbolPassiveTier[key]=nt; GameData.refreshPassiveEnhance();
     return passiveHtml(key, nt);
   }
 
