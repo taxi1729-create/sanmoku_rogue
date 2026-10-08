@@ -58,7 +58,7 @@ const GameMainScene = {
     btn.setAttribute('aria-label',this.rerollMode?'リロールをやめる':'リロール');
     btn.setAttribute('aria-pressed',this.rerollMode?'true':'false');
     btn.innerHTML=`${GIcon('btn_reroll')}<span class="brr-label">リロール(${GameState.rerollCount})</span>`;
-    btn.disabled=this.rerollMode?false:(GameState.rerollCount<=0||this.currentSide!=='player'||this.hasBossEffect('reroll_limit'));
+    btn.disabled=this.rerollMode?false:(GameState.rerollCount<=0||this.currentSide!=='player'); /* v1.13 リロール制限-3は回数を減らすだけ（0回なら押せない） */
     btn.addEventListener('click',(e)=>{ e.stopPropagation(); if(this.rerollMode) this.cancelReroll(); else this.enterRerollMode(); });
     col.appendChild(btn);
     if(this.rerollMode){

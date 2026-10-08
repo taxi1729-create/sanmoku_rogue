@@ -1,9 +1,11 @@
 // 投射ミニゲーム「投射チャレンジ」
 // ThrowGame.open({floor}) -> Promise<{win:boolean}>
-// カード8枚（デッキのコピー）を引き、基礎点×sin(2θ) m 飛ばして 10m→30m→50m の目標を順に達成する。
+// カード8枚（デッキのコピー）を引き、威力×sin(2θ) m 飛ばして 10m→30m→50m の目標を順に達成する。
+// 威力＝カードの実効基礎点（強化効果・性質変化・パッシブ効果込み）。最大3枚まで合わせて投げられる（威力を合計）。
 // 報酬の付与は呼び出し側で行う（ここでは表示のみ）。
 const ThrowGame = {
   TARGETS: [10, 30, 50],
+  MAX_SELECT: 3,
   FIELD_MAX: 64,          // フィールド表示上の最大距離(m)
   PX_PER_M: 5,            // SVG座標系での 1m あたりの px
   ORIGIN_X: 18,
@@ -22,6 +24,29 @@ const ThrowGame = {
 
   distanceFor(base, deg) {
     return Math.max(0, base * Math.sin(2 * deg * Math.PI / 180));
+  },
+
+  // カード1枚の威力：本編のビンゴ時のカード基礎点計算（perCellScore）に合わせる。
+  // 盤面・ビンゴ文脈に依存する効果（ハブ・連鎖・肥大化・巨大化・ミニマム/マキシマム等）は対象外。
+  // 数値強化・同記号マルチ・トップスピード・エクステンド・竜頭蛇尾の即時加算は baseScore に含まれている。
+  effectivePower(card) {
+    if (!card) return 0;
+    const GS = (typeof GameState !== 'undefined') ? GameState : null;
+    const GD = (typeof GameData !== 'undefined') ? GameData : null;
+    let v = Number(card.baseScore) || 0;
+    try {
+      if (card._passiveScoreAdd) v += Number(card._passiveScoreAdd) || 0;
+      if (GD && GD.bourgeoisBonus) v += GD.bourgeoisBonus(card) || 0;   // ブルジョワ：現在G×4（シカクP2で×8）
+      if (GD && GD.weightedBonus) v += GD.weightedBonus(card) || 0;     // 加重：デッキ内の同記号枚数×1（シカクP2で×2）
+      if (GS && card.symbol === 'Triangle' && GS.symbolPassiveTier && GS.symbolPassiveTier.Triangle >= 1) {
+        const deck = GS.currentDeck || [];
+        const total = deck.length || 1;
+        const n = deck.filter(c => c && c.symbol === 'Triangle').length / total;
+        v *= (1 + n) * (GS.star ? GS.star() : 1);                       // サンカク・レシオ ×(1+n)×STAR
+      }
+      if (GS && card.trait === 'レリック特攻' && GS.relicCount) v += 10 * GS.relicCount(); // 基礎点+10n
+    } catch (e) { /* 失敗時は素の基礎点 */ }
+    return Math.max(0, Math.round(v));
   },
 
   _rewardText() {
@@ -44,7 +69,7 @@ const ThrowGame = {
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-    return pool.slice(0, 8).map((c, i) => ({ card: c, base: Number(c.baseScore) || 0, used: false, idx: i }));
+    return pool.slice(0, 8).map((c, i) => ({ card: c, base: Number(c.baseScore) || 0, power: this.effectivePower(c), used: false, idx: i }));
   },
 
   _cardInner(card) {
@@ -60,11 +85,12 @@ const ThrowGame = {
   _build() {
     this.hand = this._drawCards();
     this.targetIdx = 0;
-    this.selected = -1;
+    this.sel = [];
     this.angle = 45;
     this.busy = false;
     this.done = false;
     this.win = false;
+    this.quit = false;
 
     const ov = document.createElement('div');
     ov.className = 'tg-overlay';
@@ -73,9 +99,10 @@ const ThrowGame = {
         <div class="tg-title">投射チャレンジ</div>
         <div class="tg-rules">
           <p>デッキからランダムに<b>8枚</b>のカードを引きます。</p>
-          <p>カードの<b>基礎点</b>が飛距離のもとになります。<br>角度は<b>0°〜90°</b>で選べます。</p>
-          <p class="tg-ex">例：基礎点30・角度45° → <b>30m</b></p>
-          <p>カードは1回投げると使い切り。<br><b>10m → 30m → 50m</b> の旗に順番に届かせよう。</p>
+          <p>カードの<b>威力</b>が飛距離のもとになります。<br>威力には<b>強化効果・性質変化・パッシブ効果</b>も反映されます。<br>角度は<b>0°〜90°</b>で選べます。</p>
+          <p class="tg-ex">例：威力30・角度45° → <b>30m</b></p>
+          <p><b>最大3枚</b>まで合わせて投げられる（威力を合計）。</p>
+          <p>投げたカードは使い切り。<br><b>10m → 30m → 50m</b> の旗に順番に届かせよう。</p>
           <p>8枚以内に<b>50m</b>まで届けばクリア！</p>
         </div>
         <div class="tg-reward">クリア報酬：${this._rewardText()}</div>
@@ -127,19 +154,21 @@ const ThrowGame = {
         <div class="tg-head">
           <div class="tg-title sm">投射チャレンジ</div>
           <div class="tg-prog"></div>
+          <button class="tg-quit" type="button">ゲーム終了</button>
         </div>
         <div class="tg-field">${this._fieldSvg()}<div class="tg-readout"></div></div>
         <div class="tg-ctrl">
-          <div class="tg-angle-row"><span>角度</span><b class="tg-angle-v">45°</b></div>
+          <div class="tg-angle-row"><span>角度</span><b class="tg-angle-v">45°</b><span class="tg-pow">合計威力 <b class="tg-pow-v">0</b></span></div>
           <input type="range" class="tg-slider" min="0" max="90" step="1" value="45" aria-label="投射角度">
         </div>
-        <div class="tg-hand-label">カードを選んでください（残り<span class="tg-left">${this.hand.length}</span>枚）</div>
+        <div class="tg-hand-label">カードを最大3枚選んでください（<span class="tg-selc">0</span>/3・残り<span class="tg-left">${this.hand.length}</span>枚）</div>
         <div class="tg-hand"></div>
         <button class="tg-btn tg-throw" disabled>投げる</button>
       </div>`;
     this.slider = ov.querySelector('.tg-slider');
     this.slider.addEventListener('input', () => this._setAngle(parseInt(this.slider.value, 10)));
     ov.querySelector('.tg-throw').addEventListener('click', () => this._throw());
+    ov.querySelector('.tg-quit').addEventListener('click', () => this._confirmQuit());
     this._setAngle(this.angle);
     this._renderHand();
     this._renderProg();
@@ -165,36 +194,57 @@ const ThrowGame = {
     });
   },
 
+  _selPower() {
+    return this.sel.reduce((a, i) => a + (this.hand[i] ? this.hand[i].power : 0), 0);
+  },
+
   _renderHand() {
     const h = this.ov.querySelector('.tg-hand');
     h.innerHTML = '';
     this.hand.forEach((e, i) => {
       const slot = document.createElement('div');
-      slot.className = 'tg-slot' + (e.used ? ' used' : '') + (i === this.selected ? ' sel' : '');
-      slot.innerHTML = `<div class="tg-cardscale"><div class="card">${this._cardInner(e.card)}</div></div>`;
+      const order = this.sel.indexOf(i);
+      slot.className = 'tg-slot' + (e.used ? ' used' : '') + (order >= 0 ? ' sel' : '');
+      const diff = e.power !== e.base;
+      slot.innerHTML = `<div class="tg-cardscale"><div class="card${e.card.trait ? ' trait-' + String(e.card.trait).replace(/[()]/g, '') : ''}">${this._cardInner(e.card)}</div></div>`
+        + (order >= 0 ? `<span class="tg-order">${order + 1}</span>` : '')
+        + `<div class="tg-power${diff ? ' boosted' : ''}">${diff ? `<span class="tg-pbase">基礎${e.base}→</span>` : ''}<span class="tg-pval">威力${e.power}</span></div>`;
       if (!e.used) slot.addEventListener('click', () => {
         if (this.busy || this.done) return;
-        this.selected = (this.selected === i) ? -1 : i;
+        const k = this.sel.indexOf(i);
+        if (k >= 0) this.sel.splice(k, 1);
+        else if (this.sel.length < this.MAX_SELECT) this.sel.push(i);
+        else {
+          const lab = this.ov.querySelector('.tg-hand-label');
+          lab.classList.remove('warn'); void lab.offsetWidth; lab.classList.add('warn');
+          return;
+        }
         this._renderHand();
       });
       h.appendChild(slot);
     });
     const left = this.hand.filter(e => !e.used).length;
     this.ov.querySelector('.tg-left').textContent = left;
-    this.ov.querySelector('.tg-throw').disabled = this.busy || this.done || this.selected < 0;
+    this.ov.querySelector('.tg-selc').textContent = this.sel.length;
+    this.ov.querySelector('.tg-pow-v').textContent = this._selPower();
+    const btn = this.ov.querySelector('.tg-throw');
+    btn.disabled = this.busy || this.done || this.sel.length === 0;
+    btn.textContent = this.sel.length ? `投げる（${this.sel.length}枚・威力${this._selPower()}）` : '投げる';
   },
 
   _throw() {
-    if (this.busy || this.done || this.selected < 0) return;
-    const e = this.hand[this.selected];
-    if (!e || e.used) return;
+    if (this.busy || this.done || this.sel.length === 0) return;
+    const picks = this.sel.map(i => this.hand[i]).filter(e => e && !e.used);
+    if (!picks.length) return;
+    const power = picks.reduce((a, e) => a + e.power, 0);
     this.busy = true;
-    e.used = true;
-    this.selected = -1;
+    picks.forEach(e => { e.used = true; });
+    this.sel = [];
     this._renderHand();
-    const dist = this.distanceFor(e.base, this.angle);
+    const dist = this.distanceFor(power, this.angle);
+    this.lastPower = power;
     this.lastDistance = dist;
-    this._animate(e.base, this.angle, dist).then(() => this._afterThrow(dist));
+    this._animate(power, this.angle, dist).then(() => this._afterThrow(dist));
   },
 
   _animate(base, deg, dist) {
@@ -221,6 +271,7 @@ const ThrowGame = {
       const pts = [];
       const t0 = performance.now();
       const step = now => {
+        if (!this.ov || this.quit) { res(); return; }
         const t = Math.min(1, (now - t0) / dur);
         const [x, y] = pos(t);
         pts.push(x.toFixed(1) + ',' + y.toFixed(1));
@@ -271,6 +322,7 @@ const ThrowGame = {
   },
 
   _afterThrow(dist) {
+    if (!this.ov || this.quit) return;
     let hit = 0;
     while (this.targetIdx < this.TARGETS.length && dist >= this.TARGETS[this.targetIdx] && hit < 1) {
       // 1投で達成できるのは「現在の目標」1つのみ
@@ -299,7 +351,33 @@ const ThrowGame = {
     }
   },
 
+  _confirmQuit() {
+    if (!this.ov || this.done || this.ov.querySelector('.tg-result-wrap')) return;
+    const r = document.createElement('div');
+    r.className = 'tg-result-wrap tg-confirm-wrap';
+    r.innerHTML = `<div class="tg-panel tg-confirm">
+      <div class="tg-title sm">ゲームを終了しますか？</div>
+      <div class="tg-rules"><p>${this.targetIdx >= this.TARGETS.length ? '50mを達成済みのためクリア扱いになります。' : '50mに未到達のため<b class="tg-ng">失敗</b>になります。'}</p></div>
+      <div class="tg-confirm-btns">
+        <button class="tg-btn tg-sub tg-cancel" type="button">続ける</button>
+        <button class="tg-btn tg-danger tg-yes" type="button">終了する</button>
+      </div></div>`;
+    this.ov.appendChild(r);
+    r.querySelector('.tg-cancel').addEventListener('click', () => r.remove());
+    r.querySelector('.tg-yes').addEventListener('click', () => {
+      r.remove();
+      if (this.done) return;
+      this.quit = true;
+      this.done = true;
+      this.busy = false;
+      const proj = this.ov.querySelector('.tg-proj'); if (proj) proj.style.display = 'none';
+      this._renderHand();
+      this._result(this.targetIdx >= this.TARGETS.length);
+    });
+  },
+
   _result(win) {
+    if (!this.ov || this.ov.querySelector('.tg-result-wrap:not(.tg-confirm-wrap)')) return;
     this.win = win;
     const r = document.createElement('div');
     r.className = 'tg-result-wrap';
@@ -307,7 +385,7 @@ const ThrowGame = {
       <div class="tg-title">${win ? 'クリア！' : '失敗…'}</div>
       <div class="tg-rules">${win
         ? `<p>50mの旗まで届きました！</p><div class="tg-reward">報酬：${this._rewardText()}</div>`
-        : `<p>${this.TARGETS[this.targetIdx]}mの旗に届きませんでした。</p><p class="tg-dim">達成：${this.targetIdx}/3</p>`}
+        : `${this.quit ? '<p>ゲームを終了しました。</p>' : ''}<p>${this.TARGETS[this.targetIdx]}mの旗に届きませんでした。</p><p class="tg-dim">達成：${this.targetIdx}/3</p>`}
       </div>
       <button class="tg-btn tg-back">戻る</button></div>`;
     this.ov.appendChild(r);

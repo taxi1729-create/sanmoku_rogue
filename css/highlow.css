@@ -96,6 +96,13 @@
 .hl-decl.show{ opacity:1; transform:scale(1); }
 .hl-decl.bet{ background:var(--hl-bet); color:#2a0718; box-shadow:0 0 10px rgba(244,114,182,.7); }
 .hl-decl.check{ background:#1e293b; color:var(--hl-check); border:1px solid #38bdf8; }
+.hl-decl.call{ background:#facc15; color:#2a1a00; box-shadow:0 0 10px rgba(250,204,21,.6); }
+.hl-decl.fold{ background:#334155; color:#cbd5e1; border:1px solid #64748b; text-decoration:line-through; text-decoration-color:#f87171; }
+.hl-speech.call{ box-shadow:0 0 12px rgba(250,204,21,.5); }
+.hl-speech.fold{ border-color:#64748b; background:rgba(30,41,59,.85); color:#cbd5e1; }
+.hl-speech.fold::before{ border-right-color:#64748b; }
+.hl-flip.folded{ animation:hlFold .45s cubic-bezier(.5,0,.7,.4) forwards; transform-origin:50% 100%; }
+@keyframes hlFold{ 0%{ transform:none; filter:none; } 40%{ transform:translateY(-6px) rotate(-6deg); } 100%{ transform:translateY(16px) rotate(18deg) scale(.86); opacity:.45; filter:grayscale(1); } }
 .hl-play-in{ position:relative; animation:hlSlideUp .3s ease-out; }
 @keyframes hlSlideUp{ from{ transform:translateY(30px); opacity:0; } to{ transform:none; opacity:1; } }
 .hl-play-in .hl-cscale{ transform:none; width:66px; height:104px; }

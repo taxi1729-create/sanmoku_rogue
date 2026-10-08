@@ -819,7 +819,7 @@ const StageFX = (function(){
       }
       case 'reroll_limit':{
         const v=signedNum(be); const ban=!v; // 強化版「リロール禁止」は数値なし → 0回
-        const r=rectOf('.controls-row button');
+        const r=rectOf('.board-reroll-btn')||rectOf('.controls-row button'); // v1.13 リロールボタンは盤面左上へ移動済み
         return P(r, ()=>{ frame(r,esc(be.name)); stampOn(r, ban?`<span class="ban"></span><b>0</b>`:`<b>${esc(fmtMinus(v))}</b>`, 'num'+(ban?' banned':''),120); });
       }
       case 'hand_limit':{

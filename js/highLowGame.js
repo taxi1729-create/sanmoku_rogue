@@ -3,14 +3,20 @@
  *   HighLowGame.open({floor}) -> Promise<{win:boolean}>  オーバーレイを閉じたときに resolve
  *   HighLowGame.isOpen()
  *   HighLowGame.npcDecide(npcVal, playerVal, round, rng) -> 'bet'|'check'   NPCのベット判断（純粋関数）
+ *   HighLowGame.npcRespond(npcVal, playerVal, round, rng) -> 'call'|'fold'  プレイヤーのベットへの応答（純粋関数）
+ *   HighLowGame.npcCallProb(npcVal, playerVal, round) -> 0..1               コール確率
  *   HighLowGame.roundPoints(npcBet, playerBet) -> 1|2|4                      ラウンド勝者の得点
- *   HighLowGame._debug  テスト用（rng 上書き / npcPick 上書き / state 参照 / delayScale）
+ *   HighLowGame._debug  テスト用（rng 上書き / respondRng 上書き / npcPick 上書き / state 参照 / delayScale）
  * 報酬の付与は行わない（呼び出し側の責務）。表示のみ。
  * ルール:
  *   プレイヤーはデッキからランダムに8枚（コピー）を引き、値は baseScore。NPCの手札は [0,10,20,40,100]。
  *   各ラウンド：プレイヤーが表向きで1枚選ぶ → NPCはランダムに1枚選び（伏せ）、勝敗を透視してベット/チェック宣言
  *   （勝ち確定 80%ベット・負け確定 20%ベット・引き分け 50%、3・5回戦は千里眼不調で常に50%）
- *   → プレイヤーがベット/チェック → 公開。高い方が勝ち、基本1点・NPCベットで×2・プレイヤーベットで×2。同値は0点。
+ *   → プレイヤーがベット/チェック。
+ *     チェック：公開。高い方が勝ち、基本1点・NPCベットで×2。同値は0点。
+ *     ベット：NPCがコール/フォールドを選ぶ（勝ち・引き分けが視えればコール、負けが視えればフォールド。
+ *       3・5回戦は50%。NPCの札が0なら常にフォールド）。
+ *       コール→公開、プレイヤーベットでさらに×2。フォールド→即終了、プレイヤーがベット倍化なしの得点を獲得。
  *   最大5回戦・先に3点で勝利。5回戦終了時に点数が多い方の勝ち、同点はプレイヤーの敗北。使ったカードは消費。
  */
 const HighLowGame = (function(){
@@ -20,7 +26,7 @@ const HighLowGame = (function(){
   const MAX_ROUNDS = 5, WIN_POINTS = 3, HAND_SIZE = 8;
   const FALTER_ROUNDS = [3, 5];
 
-  const _debug = { rng:null, npcPick:null, delayScale:1, state:null };
+  const _debug = { rng:null, respondRng:null, npcPick:null, delayScale:1, state:null };
   const rnd = () => (_debug.rng ? _debug.rng() : Math.random());
 
   let st = null, root = null, resolveFn = null;
@@ -35,6 +41,18 @@ const HighLowGame = (function(){
   function npcDecide(npcVal, playerVal, round, rng){
     const r = (rng || rnd)();
     return r < npcBetProb(npcVal, playerVal, round) ? 'bet' : 'check';
+  }
+  // プレイヤーのベットに対するNPCのコール確率
+  function npcCallProb(npcVal, playerVal, round){
+    if(npcVal === 0) return 0;                    // 0の札は必ずフォールド（不調回でも）
+    if(FALTER_ROUNDS.includes(round)) return 0.5; // 千里眼不調：ランダム
+    if(npcVal > playerVal) return 1;              // 勝ちが視えている → コール
+    if(npcVal < playerVal) return 0;              // 負けが視えている → フォールド
+    return 1;                                     // 引き分け → コール（失うものはない）
+  }
+  function npcRespond(npcVal, playerVal, round, rng){
+    const r = (rng || _debug.respondRng || rnd)();
+    return r < npcCallProb(npcVal, playerVal, round) ? 'call' : 'fold';
   }
   function roundPoints(npcBet, playerBet){
     return 1 * (npcBet ? 2 : 1) * (playerBet ? 2 : 1);
@@ -195,7 +213,8 @@ const HighLowGame = (function(){
   function setDecl(who, kind){
     const el = $(who === 'n' ? '.hl-decl-npc' : '.hl-decl-player');
     el.className = 'hl-decl ' + (who === 'n' ? 'hl-decl-npc' : 'hl-decl-player') + (kind ? ' show ' + kind : '');
-    el.textContent = kind === 'bet' ? 'ベット ×2' : kind === 'check' ? 'チェック' : '';
+    el.textContent = kind === 'bet' ? 'ベット ×2' : kind === 'check' ? 'チェック'
+      : kind === 'call' ? 'コール' : kind === 'fold' ? 'フォールド' : '';
   }
   function renderAll(){ renderRounds(); renderNpc(); renderScore(); renderHand(); }
 
@@ -216,9 +235,11 @@ const HighLowGame = (function(){
       <ul class="hl-rules">
         <li>デッキから<b>8枚</b>を引き、毎回1枚を出す（基礎点が数値）。相手の札は <b>0・10・20・40・100</b> の5枚。</li>
         <li>相手はあなたの札を見てから<b>ベット／チェック</b>を宣言。続けてあなたも選べる。</li>
-        <li>数値が高い方が勝ち、<b>1点</b>。ベット1つにつき得点<b>×2</b>（最大4点）。同値は0点。</li>
+        <li>あなたが<b>チェック</b>なら公開。数値が高い方が勝ち、<b>1点</b>（相手のベットで<b>×2</b>）。同値は0点。</li>
+        <li>あなたが<b>ベット</b>すると相手は<b>コール／フォールド</b>を選ぶ。勝ち（同値含む）が視えればコール、負けが視えればフォールド。<b>0の札</b>を出していたら必ずフォールド。</li>
+        <li>コール→公開、得点はさらに<b>×2</b>（最大4点）。フォールド→その場であなたの勝ち（ベットの×2はなし）。</li>
         <li>最大<b>5回戦</b>・先に<b>3点</b>で勝利。5回戦終了時に同点なら<b>あなたの負け</b>。</li>
-        <li><span class="hl-falter-txt">3回戦・5回戦</span>は千里眼の調子が悪く、相手の宣言はあてにならない。</li>
+        <li><span class="hl-falter-txt">3回戦・5回戦</span>は千里眼の調子が悪く、相手のベット／コールの判断はランダム。</li>
         <li>出した札は消費される（デッキには影響なし）。</li>
       </ul>
       <div class="hl-reward">勝利報酬：<b>${esc(st.rewardText)}</b></div>
@@ -291,7 +312,7 @@ const HighLowGame = (function(){
     const pts0 = roundPoints(decision === 'bet', false), pts1 = roundPoints(decision === 'bet', true);
     setActions(`
       <button type="button" class="hl-btn hl-btn-check" data-act="check">チェック<small>勝者 ${pts0}点</small></button>
-      <button type="button" class="hl-btn hl-btn-bet" data-act="bet">ベット<small>勝者 ${pts1}点</small></button>`);
+      <button type="button" class="hl-btn hl-btn-bet" data-act="bet">ベット<small>コール ${pts1}点／降り ${pts0}点</small></button>`);
     $('.hl-actions [data-act="check"]').addEventListener('click', () => onDecide(false));
     $('.hl-actions [data-act="bet"]').addEventListener('click', () => onDecide(true));
   }
@@ -303,6 +324,46 @@ const HighLowGame = (function(){
     c.player = bet ? 'bet' : 'check';
     setDecl('p', c.player);
     setActions('');
+    const falter = FALTER_ROUNDS.includes(st.round);
+    if(bet){
+      // NPCの応答：コール or フォールド
+      c.response = npcRespond(c.nv, c.pv, st.round);
+      setMsg('千里眼が応答を考えている…');
+      root.classList.add('gazing');
+      await wait(700);
+      if(!root) return;
+      root.classList.remove('gazing');
+      setDecl('n', c.response);
+      if(c.response === 'call'){
+        setSpeech(falter ? 'む…霞んでよく視えぬ…コールだ' : '…コールだ', (falter ? 'falter ' : '') + 'call');
+        setMsg('千里眼は<b class="hl-t-bet">コール</b>！');
+        await wait(600);
+        if(!root) return;
+      } else {
+        setSpeech(c.nv === 0 ? 'フォールド…この札では勝負にならん' : (falter ? 'む…嫌な予感がする…フォールド…' : 'フォールド…'), (falter ? 'falter ' : '') + 'fold');
+        await wait(350);
+        if(!root) return;
+        const fl = $('.hl-slot-npc .hl-flip');
+        if(fl) fl.classList.add('flipped');
+        await wait(550);
+        if(!root) return;
+        if(fl) fl.classList.add('folded');
+        await wait(450);
+        if(!root) return;
+        const pts = roundPoints(c.npc === 'bet', false);
+        st.history.push({ round:st.round, pv:c.pv, nv:c.nv, npc:c.npc, player:c.player, response:'fold', folded:true, winner:'p', pts });
+        $('.hl-arena').classList.add('res-w');
+        st.score.p += pts;
+        setMsg(`<span class="hl-t-win">千里眼がフォールド（札は${c.nv}）　あなたの勝ち +${pts}点</span>`);
+        renderScore('p');
+        renderRounds();
+        await wait(1200);
+        if(!root) return;
+        return afterRound();
+      }
+    } else {
+      c.response = null;
+    }
     setMsg('公開！');
     await wait(250);
     if(!root) return;
@@ -313,15 +374,19 @@ const HighLowGame = (function(){
     const pts = roundPoints(c.npc === 'bet', bet);
     let winner = 'd';
     if(c.pv > c.nv) winner = 'p'; else if(c.nv > c.pv) winner = 'n';
-    st.history.push({ round:st.round, pv:c.pv, nv:c.nv, npc:c.npc, player:c.player, winner, pts:winner === 'd' ? 0 : pts });
+    st.history.push({ round:st.round, pv:c.pv, nv:c.nv, npc:c.npc, player:c.player, response:c.response, folded:false, winner, pts:winner === 'd' ? 0 : pts });
     $('.hl-arena').classList.add(winner === 'p' ? 'res-w' : winner === 'n' ? 'res-l' : 'res-d');
-    if(winner === 'p'){ st.score.p += pts; setMsg(`<span class="hl-t-win">${c.pv} ＞ ${c.nv}　あなたの勝ち！ +${pts}点</span>`); setSpeech(c.npc === 'bet' ? 'ば、馬鹿な…！' : '……そう来たか。', 'hurt'); }
+    if(winner === 'p'){ st.score.p += pts; setMsg(`<span class="hl-t-win">${c.pv} ＞ ${c.nv}　あなたの勝ち！ +${pts}点</span>`); setSpeech(c.npc === 'bet' || c.response === 'call' ? 'ば、馬鹿な…！' : '……そう来たか。', 'hurt'); }
     else if(winner === 'n'){ st.score.n += pts; setMsg(`<span class="hl-t-lose">${c.pv} ＜ ${c.nv}　千里眼の勝ち +${pts}点</span>`); setSpeech('視えていた通りだ。', 'smug'); }
     else { setMsg(`<span class="hl-t-draw">${c.pv} ＝ ${c.nv}　引き分け（得点なし）</span>`); setSpeech('……相打ちか。', null); }
     renderScore(winner === 'd' ? null : winner);
     renderRounds();
     await wait(1200);
     if(!root) return;
+    afterRound();
+  }
+
+  function afterRound(){
     if(st.score.p >= WIN_POINTS || st.score.n >= WIN_POINTS || st.round >= MAX_ROUNDS){
       st.phase = 'end';
       showResult();
@@ -365,7 +430,7 @@ const HighLowGame = (function(){
 
   return {
     open, isOpen:() => !!root,
-    npcDecide, npcBetProb, roundPoints,
+    npcDecide, npcBetProb, npcRespond, npcCallProb, roundPoints,
     NPC_CARDS, _debug,
   };
 })();
