@@ -595,7 +595,8 @@ const ShopScene = {
 
   leaveShop(){ if(typeof PackFX!=='undefined'&&PackFX.isPlaying()) PackFX.skip&&PackFX.skip(); this._fxPack=null; this.packQueue=[]; this.pendingRelicPacks=0; this.pickingRelicPack=null; this.packBreakdownOpen=false; this.packBreakdownSelected=null; if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup(); this.offers=null; this.fixedFinalShop=false; this.pickingPack=null; this.pickingCardPack=null; this.cardRevealPopup=null; this.message=null; this.activeRelicId=null; this.relicListOpen=false; this.packActiveRelicId=null; this.packRelicListOpen=false; GameState.lastReward=null;
     // ミニショップを出たら一時撤退を終了し、マップ（失敗したステージは未クリアのまま）へ戻る。リロードで再びミニショップに入らないよう保存
-    if(this.miniShop){ this.miniShop=false; this._miniSaveSig=null; GameState.retreat=null; App.saveGame(); }
+    if(this.miniShop){ this.miniShop=false; this._miniSaveSig=null; GameState.retreat=null; }
+    try{ App.saveGame(); }catch(e){ console.error(e); } // v1.11 ショップを出た時は常にセーブ
     App.showMapSelect(); },
 
   // ===== パック開封演出（PackFX） =====

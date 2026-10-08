@@ -600,6 +600,14 @@ const GameMainScene = {
         this.addLog(`オールビンゴ獲得：全記号のビンゴ倍率+${1*cAllBingo}`);
         clearFx.push({kind:'mult', head:'レリック効果が発動', name:'オールビンゴ獲得'+(cAllBingo>1?` ×${cAllBingo}`:''), iconHtml:GameIcons.relic('all_bingo_gain'), grade:this.relicGradeOf('all_bingo_gain'), bodyHtml:this.multDiffHtml(multAfterPassive,GameData.snapshotMult())});
       }
+      // v1.11 レリック強化「オンリーワン」②：レリック所持数が1つの時、ステージクリア時に全記号のビンゴ倍率+1
+      const cOnlyOne=GameState.relics.filter(r=>r.relicEnhance==='ren_only_one').length;
+      if(cOnlyOne>0&&GameState.relicCount()===1&&!this.hasBossEffect('no_relic')){ // v1.12 ①と同じくレリック所持数が1つの時のみ
+        const mb=GameData.snapshotMult();
+        GameData.SYMBOLS.forEach(s=>{GameData.BINGO_MULTIPLIER_BASE[s]+=1*cOnlyOne;});
+        this.addLog(`オンリーワン：全記号のビンゴ倍率+${cOnlyOne}`);
+        clearFx.push({kind:'mult', head:'レリック強化効果が発動', name:'オンリーワン'+(cOnlyOne>1?` ×${cOnlyOne}`:''), iconHtml:(GameIcons.has&&GameIcons.has('ren_only_one'))?GameIcons.svg('ren_only_one'):'', bodyHtml:this.multDiffHtml(mb,GameData.snapshotMult())});
+      }
       // #11 レリック「数値強化1獲得」：ステージクリア時、デッキ内のランダムなカード1枚の基礎点+10（変化はショップ同様に画面右側へ表示）
       const cNumBoost=GameState.relicCountOf('num_boost3');
       if(cNumBoost>0 && GameState.currentDeck.length>0){
@@ -1115,7 +1123,7 @@ const GameMainScene = {
         const cOnko2=GameState.relicCountOf('onko_chishin'); if(cOnko2>0){const v=10*GameState.passiveCount()*cOnko2;if(v){finalMult+=v;correctionMultParts.push({label:'温故知新',op:'+',val:v,id:'onko_chishin'});markRelic('onko_chishin',v);}}
         GameState.relics.forEach(rel=>{
           if(rel.relicEnhance==='ren_general'){finalMult*=1.1;correctionMultParts.push({label:'将軍(レリック強化)',op:'×',val:1.1,id:rel.id});markRelic(rel.id,1.1);}
-          if(rel.relicEnhance==='ren_only_one'&&GameState.relicCount()===1){finalMult+=20;correctionMultParts.push({label:'オンリーワン',op:'+',val:20,id:rel.id});markRelic(rel.id,20);}
+          if(rel.relicEnhance==='ren_only_one'&&GameState.relicCount()===1){finalMult+=40;correctionMultParts.push({label:'オンリーワン',op:'+',val:40,id:rel.id});markRelic(rel.id,40);} /* v1.11 効果量2倍 */
           if(rel.relicEnhance==='ren_grade'){const n=GameState.currentDeck.reduce((s,c)=>{let x=0;if(c.enhance)x++;if(c.jamming)x++;if(c.trait)x++;return s+x;},0);finalMult+=n;correctionMultParts.push({label:'グレードオール',op:'+',val:n,id:rel.id});markRelic(rel.id,n);}
           if(rel.relicEnhance==='ren_discard'){finalMult*=1.5;correctionMultParts.push({label:'ディスカード(レリック強化)',op:'×',val:1.5,id:rel.id});markRelic(rel.id,1.5);}
         });
@@ -2101,7 +2109,7 @@ const GameMainScene = {
             mult+=10*GameState.passiveCount()*GameState.relicCountOf('onko_chishin');
             GameState.relics.forEach(rel=>{
               if(rel.relicEnhance==='ren_general') mult*=1.1;
-              if(rel.relicEnhance==='ren_only_one'&&GameState.relicCount()===1) mult+=20;
+              if(rel.relicEnhance==='ren_only_one'&&GameState.relicCount()===1) mult+=40;
               if(rel.relicEnhance==='ren_grade'){ const n=GameState.currentDeck.reduce((acc,c)=>{let x=0;if(c.enhance)x++;if(c.jamming)x++;if(c.trait)x++;return acc+x;},0); mult+=n; }
               if(rel.relicEnhance==='ren_discard') mult*=1.5; // 廃棄強化
             });

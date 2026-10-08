@@ -261,13 +261,13 @@ const MapSelectScene = {
     const info=GameData.eventCommonInfo(ev.type,GameState.currentFloor);
     const ov=document.createElement('div'); ov.id='ev-choice-overlay'; ov.className='pack-modal-overlay ev-choice-overlay';
     const box=document.createElement('div'); box.className='pack-modal ev-choice-box';
-    const altarShort=ev.type==='altar'&&!ev.altarPaid&&GameState.gold<GameData.ALTAR_COST;
-    const evLabel=ev.type==='altar'?`イベントに挑む（${GameData.ALTAR_COST}G消費）`:'イベントに挑む';
+    const altarShort=ev.type==='altar'&&!ev.altarPaid&&(GameState.lives||0)<GameData.ALTAR_LIFE_COST; // v1.11 捧げるのは残機1
+    const evLabel=ev.type==='altar'?`イベントに挑む（残機${GameData.ALTAR_LIFE_COST}を捧げる）`:'イベントに挑む';
     box.innerHTML=`<div class="ev-choice-head">第${GameState.currentFloor}階層・イベントコモン</div><h3 class="ev-choice-title">${info.name}</h3>`
       +`<div class="ev-choice-desc">${info.desc}</div>`
       +(ev.type==='eliteboss'?`<div class="ev-choice-desc">目標：<b>${GlobalFunctions.formatScore(this.eliteTarget(GameState.currentFloor))}点</b>${ev.eliteEffect?`／ボス効果：<b>${ev.eliteEffect.name}</b>：${ev.eliteEffect.desc}`:''}</div>`:'')
       +`<div class="ev-choice-reward">報酬：${info.reward}</div>`
-      +`<div class="ev-choice-btns"><button class="ev-go-btn" ${altarShort?'disabled':''}>${evLabel}</button>${altarShort?`<div class="ev-choice-warn">所持Gが足りません（${GameData.ALTAR_COST}G必要・所持${GameState.gold}G）</div>`:''}`
+      +`<div class="ev-choice-btns"><button class="ev-go-btn" ${altarShort?'disabled':''}>${evLabel}</button>${altarShort?`<div class="ev-choice-warn">残機が足りません（残機${GameData.ALTAR_LIFE_COST}必要・残り${GameState.lives||0}）</div>`:''}`
       +`<button class="ev-normal-btn">通常のコモンステージを攻略する<small>目標：${GlobalFunctions.formatScore(stage.targetScore)}点</small></button>`
       +`<button class="ev-cancel-btn">やめる</button></div>`;
     ov.appendChild(box);
@@ -315,8 +315,8 @@ const MapSelectScene = {
     if(ev.type==='altar'){
       if(typeof MajinEvent==='undefined'||typeof MajinEvent.makeInfo!=='function') return;
       if(!ev.altarPaid){
-        if(GameState.gold<GameData.ALTAR_COST) return;
-        GameState.gold-=GameData.ALTAR_COST;
+        if((GameState.lives||0)<GameData.ALTAR_LIFE_COST) return;
+        GameState.lives-=GameData.ALTAR_LIFE_COST; // v1.11 残機1を捧げる
         ev.altarPaid=true; ev.committed=true;
         ev.altarInfo=MajinEvent.makeInfo();
         App.saveGame();
