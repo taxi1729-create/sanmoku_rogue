@@ -49,16 +49,27 @@ const GameMainScene = {
     btn.addEventListener('click',(e)=>{ e.stopPropagation(); this.toggleCardDetailHidden(); });
     return btn;
   },
-  // 盤面左上の外側（早送りボタンの左右反転位置）：リロール。リロール中は押すとキャンセル
+  // 盤面左上の外側（早送りボタンの左右反転位置）：リロール。リロール中は真下に「決定」を出す。
+  // リロール中にもう一度リロールを押すとリロールモードを抜ける（トグル。キャンセルボタンは廃止）
   renderBoardLeftButtons(){
     const col=document.createElement('div'); col.className='board-side-col board-side-col-left';
     const btn=document.createElement('button'); btn.type='button';
     btn.className='board-reroll-btn'+(this.rerollMode?' active':'');
-    btn.setAttribute('aria-label',this.rerollMode?'リロールをキャンセル':'リロール');
-    btn.innerHTML=`${GIcon('btn_reroll')}<span class="brr-label">${this.rerollMode?'キャンセル':`リロール(${GameState.rerollCount})`}</span>`;
+    btn.setAttribute('aria-label',this.rerollMode?'リロールをやめる':'リロール');
+    btn.setAttribute('aria-pressed',this.rerollMode?'true':'false');
+    btn.innerHTML=`${GIcon('btn_reroll')}<span class="brr-label">リロール(${GameState.rerollCount})</span>`;
     btn.disabled=this.rerollMode?false:(GameState.rerollCount<=0||this.currentSide!=='player'||this.hasBossEffect('reroll_limit'));
     btn.addEventListener('click',(e)=>{ e.stopPropagation(); if(this.rerollMode) this.cancelReroll(); else this.enterRerollMode(); });
     col.appendChild(btn);
+    if(this.rerollMode){
+      const ok=document.createElement('button'); ok.type='button'; ok.className='board-reroll-ok-btn';
+      const n=this.rerollSelected.size;
+      ok.setAttribute('aria-label',`リロール決定（${n}枚）`);
+      ok.innerHTML=`<span class="brr-ok-label">決定</span><span class="brr-ok-count">${n}枚</span>`;
+      ok.disabled=n===0;
+      ok.addEventListener('click',(e)=>{ e.stopPropagation(); this.confirmReroll(); });
+      col.appendChild(ok);
+    }
     return col;
   },
   // 盤面右上の外側の縦列：早送り → 詳細非表示 → ターン終了 → クロックアップ（シカクパッシブ3所持時）
@@ -629,8 +640,8 @@ const GameMainScene = {
         ShopScene.packQueue=[];
         const cBigExplosion=GameState.relicCountOf('big_explosion');
         if(cBigExplosion>0 && !this.hasBossEffect('no_relic')){
-          const hasBlack=GameState.relics.some(r=>r.relicEnhance==='ren_black');
-          const threshold=hasBlack?5:10;
+          // v1.09 ショップで爆発アップグレードを買う時と同じ値段（ブラックカード1枚につき-1G）
+          const threshold=GameState.shopPriceOf(GameData.SHOP_PRICES.normalExplosiveUpgrade);
           for(let i=0;i<cBigExplosion;i++){
             if(GameState.gold>=threshold && GameState.currentDeck.length>0){
               GameState.gold-=threshold;
@@ -746,7 +757,7 @@ const GameMainScene = {
     }
     // #6 演出：ドロー時にデッキから出現したように見せる
     (this.justDrawnIds=this.justDrawnIds||new Set()).add(card.id);
-    setTimeout(()=>{ if(this.justDrawnIds){ this.justDrawnIds.delete(card.id); this.renderAll(); } },500);
+    setTimeout(()=>{ if(this.justDrawnIds){ this.justDrawnIds.delete(card.id); this.refreshAfterFx(()=>this._stripDrawInClass(card.id)); } },500);
     return card;
   },
 
@@ -873,7 +884,7 @@ const GameMainScene = {
     if(owner==='npc') this.lastNpcCell=cellIdx;
     // #3 シカクパッシブ1：プレイしたシカクカード自身にも基礎点+1を永続付与（盤面配置時点で反映）
     if(card&&card.symbol==='Square'&&owner==='player'&&GameState.symbolPassiveTier.Square>=1){
-      const sq1=GameState.star(); card.baseScore+=sq1; this.board[cellIdx].baseScore+=sq1; // v1.01 +STAR
+      const sq1=2*GameState.star(); /* v1.08 2×STAR */ card.baseScore+=sq1; this.board[cellIdx].baseScore+=sq1; // v1.01 +STAR
     }
     // #6 配置演出：置いた瞬間のポップアニメーション
     this.justPlacedCell=cellIdx;
@@ -1687,6 +1698,8 @@ const GameMainScene = {
     try{
       // 配置処理（ドロー等の配置時効果）の完了を待つ
       for(let i=0;i<200&&this.placementBusy;i++) await this.sleep(50);
+      // 再生中の配置演出が終わってから点数計算へ（最大1.5秒）
+      if(this._clockUpFx&&this._clockUpFx.size) await Promise.race([Promise.all([...this._clockUpFx]),this.sleep(1500)]);
       if(this._clockUpToken!==token||this.resultState) return;
       this.addLog(reason==='timeout'?`クロックアップ終了：${Math.round(this.CLOCKUP_DURATION_MS/1000)}秒経過（ターンを1消費）`:'クロックアップ終了：ターン終了（ターンを1消費）');
       this.renderAll();
@@ -1725,13 +1738,14 @@ const GameMainScene = {
       const due=this.pendingDelayedJamming.filter(p=>p.afterTurns<=0);
       this.pendingDelayedJamming=this.pendingDelayedJamming.filter(p=>p.afterTurns>0);
       // #22 サンダーは配置時に直接発動する効果のためqueueJammingEffect()に処理が無く、再付与時に発動していなかった
+      if(due.length) this._echoApplied=new Set(due.map(p=>p.jamming));
       due.forEach(p=>{ this.addLog(`サンカクパッシブ：ジャミング「${p.jamming}」を再付与`); if(p.jamming==='サンダー') this.applyThunder(); else this.queueJammingEffect(p.jamming,p.cellIdx); });
       this.pendingDelayedJamming.forEach(p=>p.afterTurns--);
     }
 
     // スタン事前チェック
     if(this.effects.stunNextNpc){
-      this.effects.stunNextNpc=false;
+      this.effects.stunNextNpc=false; this._echoApplied=null;
       this.addLog('NPCはスタンした');
       this.turnInRound++;
       this.applyPerTurnEnhances();
@@ -1777,13 +1791,14 @@ const GameMainScene = {
   },
 
   // NPC次手予告：実際の行動（chooseAICell）と同じ判定を副作用なしで行う。同点時の乱択は this._npcSeed で固定するため、
-  //   盤面・効果が同じなら予告と実際の配置マスは必ず一致する。戻り値 {ci, stun, consumed}（consumed=消費されるジャミング効果）
-  decideAICell(){
+  //   盤面・効果が同じなら予告と実際の配置マスは必ず一致する。戻り値 {ci, stun, consumed, allowed}
+  //   （consumed=消費されるジャミング効果, allowed=効果による制限後に置けるマス）。B/ef0 指定時はその盤面・効果で判定する
+  decideAICell(B,ef0){
     if(typeof this._npcSeed!=='number') this._npcSeed=Math.random();
-    const ef=this.effects, consumed=[];
-    let empty=this.board.map((v,i)=>(v===null&&!this.blockedCells.has(i))?i:-1).filter(i=>i>=0);
-    if(ef.redirectBan!==null&&ef.redirectBan&&ef.redirectBan.size>0){const ban=ef.redirectBan;const e2=empty.filter(i=>!ban.has(i));consumed.push('redirectBan');if(e2.length>0) empty=e2;else return {ci:null,stun:true,consumed};}
-    if(ef.sealCell){const sealed=ef.sealCell;const e2=empty.filter(i=>!sealed.has(i));consumed.push('sealCell');if(e2.length>0) empty=e2;else return {ci:null,stun:true,consumed};}
+    const board=B||this.board, ef=ef0||this.effects, consumed=[];
+    let empty=board.map((v,i)=>(v===null&&!this.blockedCells.has(i))?i:-1).filter(i=>i>=0);
+    if(ef.redirectBan!==null&&ef.redirectBan&&ef.redirectBan.size>0){const ban=ef.redirectBan;const e2=empty.filter(i=>!ban.has(i));consumed.push('redirectBan');if(e2.length>0) empty=e2;else return {ci:null,stun:true,consumed,allowed:[]};}
+    if(ef.sealCell){const sealed=ef.sealCell;const e2=empty.filter(i=>!sealed.has(i));consumed.push('sealCell');if(e2.length>0) empty=e2;else return {ci:null,stun:true,consumed,allowed:[]};}
     if(ef.lureRestrict){
       consumed.push('lureRestrict');
       // #4 誘導：4×4なら中央2×2、5×5なら中央1×1マスのみに制限
@@ -1791,40 +1806,82 @@ const GameMainScene = {
       const center=[];
       for(let r=start;r<start+size;r++) for(let c=start;c<start+size;c++) center.push(this.cellIndex(r,c));
       const e2=empty.filter(i=>center.includes(i));
-      if(e2.length>0) empty=e2;else return {ci:null,stun:true,consumed};
+      if(e2.length>0) empty=e2;else return {ci:null,stun:true,consumed,allowed:[]};
     }
     // #10 リンク制限（カードのジャミング「リンク」とレリック強化「オールリンク」はqueueJammingEffect()で合算済み）
-    if(ef.linkRestrict){const r=ef.linkRestrict.filter(i=>empty.includes(i));consumed.push('linkRestrict');if(r.length>0){empty=r;}else return {ci:null,stun:true,consumed};}
+    if(ef.linkRestrict){const r=ef.linkRestrict.filter(i=>empty.includes(i));consumed.push('linkRestrict');if(r.length>0){empty=r;}else return {ci:null,stun:true,consumed,allowed:[]};}
     const weighted=empty.map(ci=>{
       let w=0;
       for(const win of this.windows){
         if(!win.cells.includes(ci)) continue;
-        const cells=win.cells.map(i=>this.board[i]);
+        const cells=win.cells.map(i=>board[i]);
         if(cells.some(c=>c&&c.symbol!=='Cross')) continue;
         const n=cells.filter(c=>c&&c.symbol==='Cross').length;
         w+=(n+1)*(n+1);
       }
       return{ci,w};
     });
-    if(weighted.length===0) return {ci:null,stun:false,consumed};
+    if(weighted.length===0) return {ci:null,stun:false,consumed,allowed:[]};
     // #7 混乱高度化：プレイヤーにとって最も有利な（NPCにとって最も邪魔しにくい）マス＝重み最小を選ぶ
     const isConf=ef.confuseNextNpc;
     if(isConf) consumed.push('confuseNextNpc');
     const tw=isConf?Math.min(...weighted.map(w=>w.w)):Math.max(...weighted.map(w=>w.w));
     const ties=weighted.filter(w=>w.w===tw);
     const pick=ties[Math.min(ties.length-1,Math.floor(this._npcSeed*ties.length))];
-    return {ci:pick.ci,stun:false,consumed};
+    return {ci:pick.ci,stun:false,consumed,allowed:empty};
   },
 
-  // 次にNPCが置くマス（プレイヤーの番のみ。スタン予定・ラウンド結果表示中は予告なし）
-  //   プレイヤーの手番開始時の盤面で決めた「予告マス」を手番中は固定し（_npcIntent）、NPCは原則そのマスに置く。
-  //   予告マスが埋まった場合は再計算。ジャミング（引き直し/封印/誘導/リンク/混乱）が掛かった場合はNPCの行動時に通常判定へ戻る
+  // サンカクパッシブLv3（サンカク・エコー）：次のNPC行動開始時に再付与される遅延ジャミング
+  dueEchoJamming(){ return (this.pendingDelayedJamming||[]).filter(p=>p.afterTurns<=0); },
+  _cloneEffects(ef){ return {...ef, linkRestrict:ef.linkRestrict?[...ef.linkRestrict]:null, redirectBan:ef.redirectBan?new Set(ef.redirectBan):null, sealCell:ef.sealCell?new Set(ef.sealCell):null}; },
+  // queueJammingEffect() のうちNPCの配置先に影響する部分だけを、盤面Bと効果efのコピーに副作用なしで適用する
+  _simJamming(jam,cellIdx,B,ef){
+    const bs=GameData.BOARD_SIZE, free=i=>B[i]===null&&!this.blockedCells.has(i);
+    if(jam==='ビンゴ阻害'&&GameState.relics.some(r=>r.id==='jamming_boost')&&this.relicActive()) ef.stunNextNpc=true;
+    switch(jam){
+      case 'スタン': ef.stunNextNpc=true; break;
+      case '混乱': ef.confuseNextNpc=true; break;
+      case 'サンダー': for(let i=0;i<B.length;i++) if(B[i]?.symbol==='Cross') B[i]=null; break;
+      case '誘導': ef.lureRestrict=true; break;
+      case 'リンク':{
+        const r=Math.floor(cellIdx/bs), c=cellIdx%bs;
+        const e=[[-1,0],[1,0],[0,-1],[0,1]].map(([dr,dc])=>{const nr=r+dr,nc=c+dc;return(nr>=0&&nr<bs&&nc>=0&&nc<bs)?this.cellIndex(nr,nc):-1;}).filter(i=>i>=0&&free(i));
+        if(e.length===0) ef.stunNextNpc=true;
+        else if(ef.linkRestrict){ const m=ef.linkRestrict.filter(i=>e.includes(i)); ef.linkRestrict=m.length>0?m:e; }
+        else ef.linkRestrict=e;
+        break;
+      }
+      case '引き直し':
+        if(this.lastNpcCell!==null&&B[this.lastNpcCell]?.symbol==='Cross'){ B[this.lastNpcCell]=null; ef.redirectBan=new Set(ef.redirectBan||[]); ef.redirectBan.add(this.lastNpcCell); }
+        break;
+      case '封印':{
+        const sr=Math.floor(cellIdx/bs), sc=cellIdx%bs, sealed=new Set(ef.sealCell||[]);
+        for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){ if(dr===0&&dc===0) continue; const nr=sr+dr,nc=sc+dc; if(nr>=0&&nr<bs&&nc>=0&&nc<bs) sealed.add(this.cellIndex(nr,nc)); }
+        ef.sealCell=sealed; break;
+      }
+      default: break;
+    }
+  },
+  // NPCが実際に配置先を選ぶ瞬間の盤面・効果（＝現在の効果＋行動開始時に再付与されるサンカク・エコー）
+  npcOutlook(){
+    const due=this.dueEchoJamming();
+    if(due.length===0) return {board:this.board,ef:this.effects,echo:[]};
+    const board=this.board.slice(), ef=this._cloneEffects(this.effects);
+    due.forEach(p=>this._simJamming(p.jamming,p.cellIdx,board,ef));
+    return {board,ef,echo:due};
+  },
+
+  // 次にNPCが置くマス（プレイヤーの番のみ。スタン・混乱予定・ラウンド結果表示中は予告なし）
+  //   予告マス（_npcIntent）は手番中は原則固定し、NPCはそのマスに置く。ただし手番中にジャミング（リンク/誘導/封印/引き直し等）が
+  //   追加されて予告マスが置けなくなった場合や、予告マスが埋まった場合は、その時点の効果（サンカク・エコー含む）で再計算する
   predictNpcCell(){
-    if(this.currentSide!=='player'||this.resultState||this.effects.stunNextNpc) return null;
+    if(this.currentSide!=='player'||this.resultState) return null;
+    const {board,ef}=this.npcOutlook();
+    if(ef.stunNextNpc||ef.confuseNextNpc) return null;
+    const d=this.decideAICell(board,ef);
+    if(d.stun||d.ci===null) return null;
     const it=this._npcIntent;
-    if(it&&this.board[it.ci]===null&&!this.blockedCells.has(it.ci)) return it.ci;
-    const d=this.decideAICell();
-    if(d.stun||d.ci===null){ this._npcIntent=null; return null; }
+    if(it&&d.allowed.includes(it.ci)) return it.ci;
     this._npcIntent={ci:d.ci};
     return d.ci;
   },
@@ -1835,9 +1892,10 @@ const GameMainScene = {
     this._npcSeed=Math.random(); // 次の手番用に乱択シードを更新
     const ef=this.effects;
     d.consumed.forEach(k=>{ if(k==='lureRestrict'||k==='confuseNextNpc') ef[k]=false; else ef[k]=null; });
+    this._echoApplied=null;
     if(d.stun){ ef.stunNextNpc=true; return null; }
-    // 直前のプレイヤー手番で予告したマスがまだ空いていれば、予告どおりそこに置く
-    if(it&&d.consumed.length===0&&this.board[it.ci]===null&&!this.blockedCells.has(it.ci)) return it.ci;
+    // 直前のプレイヤー手番で予告したマスが（ジャミングの制限を満たしたうえで）まだ空いていれば、予告どおりそこに置く
+    if(it&&!d.consumed.includes('confuseNextNpc')&&d.allowed.includes(it.ci)) return it.ci;
     return d.ci;
   },
 
@@ -1911,7 +1969,7 @@ const GameMainScene = {
         const sim=this.board.slice();
         let bs=card.baseScore;
         // #6 シカクパッシブ1：シカクカードをプレイした時に自身の基礎点+1が永続付与されるため、予測もこの適用後の値で計算する
-        if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1) bs+=GameState.star();
+        if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1) bs+=2*GameState.star();
         const simCard={...card,baseScore:bs};
         if(npcCi!==null) sim[npcCi]={symbol:'Cross',baseScore:bs,owner:'npc',card:null};
         else targets.forEach(t=>{ sim[t]={symbol:card.symbol,baseScore:bs,owner:'player',card:t===targets[0]?simCard:{...simCard,_ghostOf:card.id}}; });
@@ -2186,15 +2244,38 @@ const GameMainScene = {
   async executePlacement(targets,card,isOverlay=false){
     if(this.isPlayerInputLocked()) return;
     this.placementBusy=true; this.refreshSideButtons();
+    // #クロックアップ 発動中はビンゴ判定・手番移動が無いため、配置の状態更新（同期部分）だけを入力ロックの対象にし、
+    // 配置演出（StageFX.placement / place-pop）の再生中でも次のカードを選んで置けるようにする。
+    // 状態更新は同期的に1件ずつ完了するので、連続配置でも状態が混ざらない。演出は _clockUpFx で追跡し、終了処理で待つ
+    if(this.clockUpActive){
+      let p;
+      try{ p=this._executePlacementCore(targets,card,isOverlay); }
+      finally{ this.placementBusy=false; this.refreshSideButtons(); }
+      return p;
+    }
     try{ return await this._executePlacementCore(targets,card,isOverlay); }
     finally{ this.placementBusy=false; this.refreshSideButtons(); }
+  },
+  // 配置・ドロー演出の後片付け。クロックアップ中は全体を再描画せず（タップ中の要素が作り直されて操作が消えるのを防ぐ）クラスだけ外す
+  refreshAfterFx(patch){
+    if(this.clockUpActive&&this.container&&this.container.querySelector('.game-screen')){ try{ patch(); return; }catch(e){} }
+    this.renderAll();
+  },
+  _stripPlacePopClass(){
+    this.container.querySelectorAll('.board .cell.place-pop').forEach(el=>{
+      const ci=parseInt(el.dataset.ci,10);
+      if(ci!==this.justPlacedCell&&!(this.justPlacedCells&&this.justPlacedCells.includes(ci))) el.classList.remove('place-pop');
+    });
+  },
+  _stripDrawInClass(id){
+    this.container.querySelectorAll('.card-wrapper').forEach(w=>{ if(w.__cardId===id){ const c=w.querySelector('.card'); if(c) c.classList.remove('card-draw-in'); } });
   },
   async _executePlacementCore(targets,card,isOverlay=false){
     const mainCi=targets[0];
     const fxPre=(typeof StageFX!=='undefined')?StageFX.snapshot(this):null; // #演出 配置前の盤面（サンダー・引き直しの対象）
     const isPaint=card.trait==='塗りつぶし'||card.trait==='塗りつぶし(レリック)';
     // #3 シカクパッシブ1：プレイしたシカクカード自身にも基礎点+1を永続付与
-    if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1) card.baseScore+=GameState.star(); // v1.01 +STAR
+    if(card.symbol==='Square'&&GameState.symbolPassiveTier.Square>=1) card.baseScore+=2*GameState.star(); // v1.08 +2×STAR
     for(const ci of targets){
       if(this.board[ci]?.card&&!this.board[ci].card._ghostOf&&(isPaint||isOverlay)) this.pushToDiscard(this.board[ci].card);
       // #6 拡張・拡大で追加配置されるマスにも同じ効果を乗せる（表示用の分身カード。捨て札等への移動は本体のみ）
@@ -2204,7 +2285,7 @@ const GameMainScene = {
     this.lastPlacedCell=mainCi;
     // #6 配置演出：複数マス配置時も全マスをポップ表示
     this.justPlacedCells=targets.slice();
-    setTimeout(()=>{ this.justPlacedCells=null; this.renderAll(); },550);
+    setTimeout(()=>{ this.justPlacedCells=null; this.refreshAfterFx(()=>this._stripPlacePopClass()); },550);
     this.paintPending=null;
     GameState.hand=GameState.hand.filter(c=>c.id!==card.id);
     if(card.jamming==='サンダー') this.applyThunder();
@@ -2245,6 +2326,10 @@ const GameMainScene = {
     this.renderAll();
     // #演出 カード効果ごとの配置演出（ビンゴがある時だけ点数演出と重ならないよう短く待つ。それ以外は進行をブロックしない）
     const fxP=fxPre?StageFX.placement(card,targets,fxPre):null;
+    if(fxP&&clockUp){ // クロックアップ中は演出を待たずに操作へ戻す（終了処理 endClockUp で残りの演出を待つ）
+      const set=(this._clockUpFx=this._clockUpFx||new Set()); set.add(fxP);
+      fxP.then(()=>set.delete(fxP),()=>set.delete(fxP));
+    }
     if(fxP&&newBingos.length>0) await fxP;
     if(newBingos.length>0) await this.playScoreSequence(newBingos);
     if(clockUp){ this.renderAll(); return; } // クロックアップ中は手番を渡さない
@@ -2637,6 +2722,18 @@ const GameMainScene = {
     if(ef.redirectBan&&ef.redirectBan.size>0) next.push({icon:ic('jam_redraw'),name:'ジャミング：引き直し',desc:'次のNPCは除去したマスに置けない',where:posList(ef.redirectBan)});
     if(ef.sealCell&&ef.sealCell.size>0) next.push({icon:ic('jam_seal'),name:'ジャミング：封印',desc:`次のNPCは封印マス（${ef.sealCell.size}マス）に置けない`});
     if(ef.confuseNextNpc) next.push({icon:ic('jam_confuse'),name:'ジャミング：混乱',desc:'次のNPCは最低点マスに置く'});
+    // サンカクパッシブLv3（サンカク・エコー）：前ターンに発動したサンカクカードのジャミングは、次のNPC行動の直前に再付与される
+    const jamIcon={'スタン':'jam_stun','混乱':'jam_confuse','ブレイク':'jam_break','リンク':'jam_link','引き直し':'jam_redraw','封印':'jam_seal','誘導':'jam_guide','サンダー':'jam_thunder','ビンゴ阻害':'jam_bingo_block','延命':'jam_prolong'};
+    const echoDesc={'スタン':'NPC行動を封じる','混乱':'NPCは最低点マスに置く','リンク':'NPCは指定マスにしか置けない','誘導':'NPCは盤面中央にしか置けない','封印':'NPCは封印マスに置けない','引き直し':'直前のバツを除去し、そのマスにNPCは置けない','サンダー':'盤面のバツをすべて除去','ブレイク':'バツでビンゴしてもラウンドが終了しない'};
+    const echoWhere=(p)=>{ const B=this.board.slice(), e={}; this._simJamming(p.jamming,p.cellIdx,B,e);
+      if(e.linkRestrict) return posList(e.linkRestrict); if(e.sealCell) return posList(e.sealCell); if(e.redirectBan) return posList(e.redirectBan); return pos(p.cellIdx)+'（発動元）'; };
+    (this.pendingDelayedJamming||[]).forEach(p=>{
+      const due=p.afterTurns<=0;
+      const item={icon:ic(jamIcon[p.jamming]||'jam_link'),name:`ジャミング：${p.jamming}（サンカク・エコー）`,desc:(due?'次のNPC行動の直前に再付与：':'次の次のNPC行動の直前に再付与：')+(echoDesc[p.jamming]||'同じ効果をもう一度付与'),where:echoWhere(p)};
+      (due?next:round).push(item);
+    });
+    // 再付与されて有効になったエコー効果には（サンカク・エコー）を付記
+    if(this._echoApplied&&this._echoApplied.size) next.forEach(e=>{ const m=e.name.match(/^ジャミング：(.+)$/); if(m&&this._echoApplied.has(m[1])) e.name+='（サンカク・エコー）'; });
     if(this.extendActive) next.push({icon:ic('enh_extend'),name:'カード強化：エクステンド',desc:'次の自分のターンでカードを置くまでビンゴ判定を行わない'});
     return {round,next};
   },
@@ -3233,13 +3330,9 @@ const GameMainScene = {
 
   renderControls(){
     const controls=document.createElement('div'); controls.className='controls-row';
-    if(this.rerollMode){
-      const okBtn=document.createElement('button');okBtn.textContent=`確定（${this.rerollSelected.size}枚）`;okBtn.disabled=this.rerollSelected.size===0;okBtn.addEventListener('click',()=>this.confirmReroll());controls.appendChild(okBtn);
-      const cancelBtn=document.createElement('button');cancelBtn.textContent='キャンセル';cancelBtn.addEventListener('click',()=>this.cancelReroll());controls.appendChild(cancelBtn);
-    }else{
-      // リロールボタンは盤面の左上（早送りボタンの左右反転位置）へ移動（renderBoardLeftButtons）
-      // #7 ターン終了ボタン（旧スキップ）は盤面右上の早送りボタンの下へ移動（renderBoardSideButtons）
-    }
+    // リロールボタンは盤面の左上（早送りボタンの左右反転位置）、リロール決定はその真下（renderBoardLeftButtons）。
+    // リロール中の「キャンセル」ボタンは廃止（リロールボタン再押下で抜ける）
+    // #7 ターン終了ボタン（旧スキップ）は盤面右上の早送りボタンの下へ移動（renderBoardSideButtons）
     // #4 デッキ/山札/捨て札/廃棄札確認ボタン（上画面に配置。GameIcons のSVGアイコン表記）
     const deckBtn=document.createElement('button'); deckBtn.innerHTML=`${GIcon('btn_deck',{cls:'gi-btn'})}(${GameState.currentDeck.length})`; deckBtn.title='デッキ'; deckBtn.addEventListener('click',()=>this.showDeckModal('deck')); controls.appendChild(deckBtn);
     const drawBtn=document.createElement('button'); drawBtn.innerHTML=`${GIcon('btn_drawpile',{cls:'gi-btn'})}(${GameState.drawPile.length})`; drawBtn.title='山札'; drawBtn.addEventListener('click',()=>this.showDeckModal('drawpile')); controls.appendChild(drawBtn);

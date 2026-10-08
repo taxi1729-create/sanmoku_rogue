@@ -114,7 +114,8 @@ const GameState = {
   // #1(B) 所持スロット数（表示・購入判定はこれを基準にする。relics.length ではなく実際の消費枠数）
   usedRelicSlots(){ return this.relicCount(); },
   canAddRelic(relic){ return this.usedRelicSlots() + this.slotsForRelic(relic) <= this.effectiveMaxRelics(); },
-  shopPriceOf(basePrice){ return this.relics.some(r=>r.relicEnhance==='ren_black')?Math.ceil(basePrice/2):basePrice; },
+  // v1.08 ブラックカード：品替え更新以外の販売価格を1G減少（所持数分重複。0G未満にはならない）
+  shopPriceOf(basePrice){ const n=this.relics.filter(r=>r.relicEnhance==='ren_black').length; return Math.max(0, basePrice-n); },
   // #11 レリックの並び替え（メイン画面・ショップ・マップで共通利用。処理順は常に配列の左から右）
   moveRelic(index,dir){
     const to=index+dir;
@@ -129,7 +130,7 @@ const GameState = {
     this.currentDeck=GameData.buildDeckForMode(this.gameMode);
     this.gold=0; this.relics=[]; this.clearedStages=[];
     this.finalShopDone=false; // #6 階層10特殊構成の初回フラグをリセット
-    this.floor5RevelationDone=false; // 第5階層踏破の啓示（Revelation）を再生済みか（1ランに1回）
+    this.floor5RevelationDone=false; this.floor5GiftPending=false; // v1.08 啓示の特別アップグレード（未受取） // 第5階層踏破の啓示（Revelation）を再生済みか（1ランに1回）
     this.rerollCount=GameData.INITIAL_REROLL;
     this.handSizeBonus=0; this.roundsBonus=0; this.turnsBonus=0;
     this.relicSlotBonus=0; this.rerollBonus=0; this.packCardBonus=0;
@@ -184,7 +185,7 @@ const GameState = {
       sevenPendingMultBoost:this.sevenPendingMultBoost,
       bossRerollUsed:this.bossRerollUsed,
       finalShopDone:this.finalShopDone,
-      floor5RevelationDone:!!this.floor5RevelationDone,
+      floor5RevelationDone:!!this.floor5RevelationDone, floor5GiftPending:!!this.floor5GiftPending,
       gameMode:this.gameMode,
       initialPassiveGranted:this.initialPassiveGranted,
       lives:this.lives, retreat:this.retreat,
@@ -220,7 +221,7 @@ const GameState = {
     this.sevenPendingMultBoost=d.sevenPendingMultBoost||false;
     this.bossRerollUsed=d.bossRerollUsed||false;
     this.finalShopDone=d.finalShopDone||false;
-    this.floor5RevelationDone=!!d.floor5RevelationDone;
+    this.floor5RevelationDone=!!d.floor5RevelationDone; this.floor5GiftPending=!!d.floor5GiftPending;
     this.gameMode=d.gameMode||'normal';
     this.initialPassiveGranted=d.initialPassiveGranted||false;
     // 残機（旧セーブは残機フィールドが無いので最大値2）・一時撤退中の情報

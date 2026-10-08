@@ -1,6 +1,6 @@
 /* revelation.js — 「神の啓示」演出（聖なる声）
  *  1. 第5階層踏破の啓示：第5階層ボス撃破後、クリア報酬（爆発アップグレード等のショップ）へ進む直前に一度だけ発生。
- *     聖なる声が踏破を祝い、ドリームカードパック（2枚から1枚）を授け、第6階層以降の深層を示唆する。
+ *     聖なる声が踏破を祝い、特別アップグレードを授け（クリア報酬の爆発アップグレードより先に開く）、第6階層以降の深層を示唆する。
  *  2. エンディングの啓示：第10階層（最終決戦）クリア時、エンドロールの前に旅を振り返るエピローグを語る。
  * 見た目はスタートイベント（css/startevent.css の sev- クラス）を流用し、差分のみ css/revelation.css（rev- プレフィックス）。
  * チュートリアル非表示設定に関係なく、常に再生する。
@@ -37,7 +37,7 @@ const Revelation = (function(){
     { line:'祭壇を覆っていた穢れは晴れ、聖なる灯が再び燃え上がりました。あなたの並べた印が、この地に光を還したのです。',
       tip:{ icon:'divine_favor', title:'聖なる灯', body:'__STATS__' } },
     { line:'その歩みに、心からの祝福を。……そして、約束の褒美を授けましょう。',
-      tip:{ icon:'pack_dream', title:'踏破の褒美', body:'<b>ドリームカードパック</b>を授かる。全ての効果を宿した夢の札、2枚から1枚を選べ。' } },
+      tip:{ icon:'pack_special', title:'踏破の褒美', body:'<b>特別アップグレード</b>を授かる。啓示の後、クリア報酬より先に開かれる。' } },
   ];
   const FLOOR5_OMEN = [
     { line:'……ですが、迷える者よ。祭壇のさらに下、光の届かぬ深層から、なお冷たい気配が昇ってきます。',
@@ -307,19 +307,11 @@ const Revelation = (function(){
     const g=G();
     return !!g && g.currentFloor===5 && Array.isArray(g.clearedStages) && g.clearedStages.includes('boss') && !g.floor5RevelationDone;
   }
-  async function grantDream(){
-    const cands=[ShopScene.genDreamCard(), ShopScene.genDreamCard()];
-    await playPack('dream_card', cands.map(c=>({html:cardHtml(c)})));
-    if(!ui) return '';
-    say('夢より紡がれし二枚の札。あなたの束に加えるものを選びなさい。');
-    const i=await pickCard(cands,'ドリームカードを1枚選べ');
-    const card=cands[i];
-    const d0=G().currentDeck.length;
-    G().currentDeck.push(card);
-    try{ GlobalFunctions.recordCard(card); }catch(e){}
-    if(ui){ ui.deckV.textContent=G().currentDeck.length; ui.deckV.classList.add('sev-up'); }
+  // v1.08 褒美はドリームカードパックから特別アップグレードに変更。啓示の後、ショップで爆発アップグレードより先に開く
+  async function grantSpecial(){
+    G().floor5GiftPending=true;
     pulse('rx-bless',1600); pulse('rx-flash',700); spawnRise(22);
-    return `<div class="sev-sub">デッキに加わったドリームカード</div><div class="sev-card-row">${cardHtml(card,'sev-reveal')}</div>${cardDescHtml(card)}<div class="sev-note">デッキ ${d0}枚 → <b>${G().currentDeck.length}枚</b></div>`;
+    return `<div class="sev-grant"><span class="sev-grant-ico">${ico('pack_special')}</span><div><b>特別アップグレード</b>を授かった<div class="sev-grant-desc">啓示の後、クリア報酬（爆発アップグレード）より先に開かれる</div></div></div>`;
   }
   async function openFloor5(){
     if(ui) return;
@@ -330,12 +322,12 @@ const Revelation = (function(){
       await story(FLOOR5_CELEBRATE);
       if(!ui) return done;
       let html='';
-      try{ html=await grantDream(); }catch(e){ console.error('Revelation dream error', e); html='<div class="sev-note">（褒美の途中で異変が起きた）</div>'; }
+      try{ html=await grantSpecial(); }catch(e){ console.error('Revelation gift error', e); html='<div class="sev-note">（褒美の途中で異変が起きた）</div>'; }
       if(!ui) return done;
       finishFlag(); // 褒美を受け取った時点で記録（以降リロードしても再発生しない）
       ui.ov.classList.add('sev-granted');
-      const resP=button('踏破の褒美：ドリームカード', html, '深層の声に耳を傾ける');
-      say('夢の札が、あなたの束に宿りました。');
+      const resP=button('踏破の褒美：特別アップグレード', html, '深層の声に耳を傾ける');
+      say('特別な技を、あなたに授けます。');
       await resP;
       if(!ui) return done;
       ui.ov.classList.add('rev-dusk'); // 深層の示唆：光が翳る

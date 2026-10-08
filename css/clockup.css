@@ -15,6 +15,13 @@
 .board-reroll-btn:hover:not(:disabled){background:#2a2148;}
 .board-reroll-btn:disabled{opacity:.4;}
 .board-reroll-btn.active{background:#14304a;border-color:#7dd3fc;color:#e0f2fe;box-shadow:0 0 8px rgba(125,211,252,.55);}
+/* リロール決定（リロール中のみ、リロールボタンの真下） */
+.board-reroll-ok-btn{width:52px;height:40px;padding:0;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  background:#0f3a2c;border:1px solid #34d399;border-radius:9px;color:#d1fae5;font-weight:700;line-height:1.05;white-space:nowrap;box-shadow:0 0 8px rgba(52,211,153,.45);}
+.board-reroll-ok-btn .brr-ok-label{font-size:11px;}
+.board-reroll-ok-btn .brr-ok-count{font-size:8.5px;opacity:.9;}
+.board-reroll-ok-btn:hover:not(:disabled){background:#145a42;}
+.board-reroll-ok-btn:disabled{opacity:.4;box-shadow:none;}
 .board-turnend-btn{width:52px;height:40px;padding:0;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
   background:#1e1830;border:1px solid #6a4ad4;border-radius:9px;color:#cfc7ff;font-size:9px;font-weight:700;line-height:1.1;}
 .board-turnend-btn .gi{width:16px;height:16px;}

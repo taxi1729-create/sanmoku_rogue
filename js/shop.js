@@ -31,8 +31,28 @@ const ShopScene = {
     } else if(!this.offers){
       this.offers = this.generateOffers();
     }
+    this.grantFloor5Gift();
     this.renderAll();
     TutorialOverlay.show('shop');
+  },
+  // v1.08 第5階層踏破の啓示の褒美：無料の特別アップグレードを、クリア報酬の爆発アップグレードより先に開く
+  buildSpecialUpgradePack(){
+    const pool = GameData.SPECIAL_SELECT_POOL.filter(e => !GameState.usedSpecialEffectIds.includes(e.id));
+    if(pool.length===0 || GameState.currentDeck.length===0) return null;
+    const effectPool = GlobalFunctions.shuffle(pool).slice(0, Math.min(2, pool.length));
+    const pickCount = Math.min(GameState.packCardCount(false), GameState.currentDeck.length);
+    const cardIndexes = GlobalFunctions.shuffle(GameState.currentDeck.map((_,idx)=>idx)).slice(0, pickCount);
+    return { slotType:'special', slotRef:{}, effectPool, chosenEffect:null, cardIndexes, selectedTargets:new Set(), packType:'special_upgrade', revelationGift:true };
+  },
+  grantFloor5Gift(){
+    if(!GameState.floor5GiftPending || this.miniShop) return;
+    GameState.floor5GiftPending=false;
+    const pk=this.buildSpecialUpgradePack();
+    if(!pk){ this.message='特別セレクトの効果はすべて入手済みのため、啓示の褒美は授けられなかった'; return; }
+    if(this.pickingPack){ this.packQueue=this.packQueue||[]; this.packQueue.unshift({pack:this.pickingPack}); }
+    this.pickingPack=pk;
+    this.message='啓示の褒美：特別アップグレード';
+    try{ App.saveGame(); }catch(e){}
   },
 
 
@@ -118,7 +138,7 @@ const ShopScene = {
 
   // #1(B) ブラックカードは重複所持不可
   canAcquireRelic(relic){
-    // #1 ブラックカードは複数所持できる（効果は重複しない：shopPriceOf は所持の有無だけで半額判定）
+    // v1.08 ブラックカードは複数所持でき、効果も所持数分重複する（shopPriceOf）
     return GameState.canAddRelic(relic);
   },
 
@@ -193,7 +213,7 @@ const ShopScene = {
       default: break;
     }
     // #22 ブラックカード即時反映
-    if(relic.relicEnhance === 'ren_black') this.message = (this.message||'') + '（ショップ金額が半額になった）';
+    if(relic.relicEnhance === 'ren_black') this.message = (this.message||'') + '（品替え更新以外の販売価格が1G下がった）';
   },
 
   // ===== Card pack =====
@@ -360,6 +380,7 @@ const ShopScene = {
   advancePackQueue(){
     while(this.packQueue&&this.packQueue.length>0){
       const item=this.packQueue.shift();
+      if(item&&item.pack){ this.pickingPack=item.pack; this.message=null; return true; } // v1.08 退避していたパック（クリア報酬の爆発アップグレード）を再開
       if(GameState.currentDeck.length===0) continue;
       const pk=this.buildExplosiveUpgradePack(null); pk.relicTrigger=item.relic;
       this.pickingPack=pk; this.message=`レリック効果が発動：${item.relic}`;
@@ -547,7 +568,7 @@ const ShopScene = {
 
   // #4 ホシパッシブ1を取得するまでショップの品揃え更新は解放されない
   rerollOffers(){
-    const price=GameState.shopPriceOf(GameData.SHOP_PRICES.reroll); if(GameState.gold<price||GameState.symbolPassiveTier.Hoshi<1) return;
+    const price=GameData.SHOP_PRICES.reroll /* v1.08 品替え更新はブラックカード対象外 */; if(GameState.gold<price||GameState.symbolPassiveTier.Hoshi<1) return;
     GameState.gold-=price;
     if(this.miniShop){
       // ミニショップ：構成は変えずにランダム2枠だけ再抽選（固定2枠は復活）。品揃えと所持Gを保存
@@ -672,7 +693,7 @@ const ShopScene = {
       // #6 最終ショップ（階層10）は品揃え更新不可
       // #4 サンカクパッシブ1を取得するまでロック
       const rerollLocked=GameState.symbolPassiveTier.Hoshi<1;
-      const rerollBtn = document.createElement('button'); rerollBtn.innerHTML=rerollLocked?'品揃え更新'+GIcon('btn_lock',{cls:'gi-gap-l',title:'ロック中'}):`品揃え更新（${GameState.shopPriceOf(GameData.SHOP_PRICES.reroll)}G）`; rerollBtn.disabled=rerollLocked||GameState.gold<GameState.shopPriceOf(GameData.SHOP_PRICES.reroll); rerollBtn.addEventListener('click',()=>this.rerollOffers()); actions.appendChild(rerollBtn);
+      const rerollBtn = document.createElement('button'); rerollBtn.innerHTML=rerollLocked?'品揃え更新'+GIcon('btn_lock',{cls:'gi-gap-l',title:'ロック中'}):`品揃え更新（${GameData.SHOP_PRICES.reroll /* v1.08 品替え更新はブラックカード対象外 */}G）`; rerollBtn.disabled=rerollLocked||GameState.gold<GameData.SHOP_PRICES.reroll /* v1.08 品替え更新はブラックカード対象外 */; rerollBtn.addEventListener('click',()=>this.rerollOffers()); actions.appendChild(rerollBtn);
     }
     const backBtn = document.createElement('button'); backBtn.textContent=this.miniShop?'マップに戻って再挑戦':'マップに戻る'; backBtn.addEventListener('click',()=>this.leaveShop()); actions.appendChild(backBtn);
     el.appendChild(actions);
