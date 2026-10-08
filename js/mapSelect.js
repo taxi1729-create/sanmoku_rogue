@@ -12,6 +12,7 @@ const MapSelectScene = {
     this._initBossEffect();
     // 魔神イベント：階層侵入時にハイレベルが魔神イベントになるか判定（判定済みなら保存値を使う）
     if(typeof MajinEvent!=='undefined') MajinEvent.ensureDecided(GameState.currentFloor);
+    this.ensureFloorEvent(GameState.currentFloor); // v1.10 イベントコモン（第3・8階層）
     this.renderAll();
     TutorialOverlay.show('mapSelect');
   },
@@ -86,8 +87,11 @@ const MapSelectScene = {
         return;
       }
       const card=document.createElement('div');
+      // v1.10 イベントコモン：コモンのカードにイベント内容を表示し、挑戦時に「イベント／通常コモン」を選ばせる
+      const ev=(stage.key==='common')?this.floorEventFor(GameState.currentFloor):null;
+      const evInfo=ev?GameData.eventCommonInfo(ev.type,GameState.currentFloor):null;
       // #4 「クリア済み・再挑戦」表記を廃止
-      card.className='stage-card'+(locked?' locked':'');
+      card.className='stage-card'+(locked?' locked':'')+(evInfo?' event-common-card ev-'+ev.type:'');
       let bossInfoHtml='';
       let bossRerollBtnHtml='';
       if(stage.key==='boss'&&GameState.pendingBossEffect){
@@ -106,13 +110,23 @@ const MapSelectScene = {
         const sr=GameState.calcSkipReward(); // #8
         skipBonusHtml=`<div class="skip-bonus-tag">スキップ報酬：G+${sr.total}${skipBonus?`　＋　${skipBonus.label}`:'（追加報酬なし）'}</div>`;
       }
+      const evCommitted=!!(ev&&ev.committed&&!ev.done&&!isCleared);
+      if(evCommitted) skipBonusHtml='';
+      const evHtml=evInfo?this.eventCardHtml(ev,evInfo,stage,isCleared):'';
       const actionsHtml=isCleared
         ? `<div class="stage-actions"><div class="stage-done-tag">クリア済み</div></div>`
-        : `<div class="stage-actions"><button class="challenge-btn" ${locked?'disabled':''}>挑戦する</button>${stage.skippable?`<button class="skip-btn" ${locked?'disabled':''}>スキップ</button>`:''}</div>`;
-      card.innerHTML=`<div class="stage-tag">${stage.tag}</div><div class="stage-name">${stage.name}</div><div class="stage-goal">目標：${GlobalFunctions.formatScore(stage.targetScore)}点</div>${bossInfoHtml}${bossRerollBtnHtml}${skipBonusHtml}${actionsHtml}`;
+        : `<div class="stage-actions"><button class="challenge-btn" ${locked?'disabled':''}>${evCommitted?'イベントを再開する':'挑戦する'}</button>${(stage.skippable&&!evCommitted)?`<button class="skip-btn" ${locked?'disabled':''}>スキップ</button>`:''}</div>`;
+      card.innerHTML=`<div class="stage-tag">${stage.tag}${evInfo?`<span class="ev-tag">EVENT</span>`:''}</div><div class="stage-name">${stage.name}</div><div class="stage-goal">目標：${GlobalFunctions.formatScore(stage.targetScore)}点</div>${evHtml}${bossInfoHtml}${bossRerollBtnHtml}${skipBonusHtml}${actionsHtml}`;
       path.appendChild(card);
       const challengeBtn=card.querySelector('.challenge-btn');
-      if(challengeBtn) challengeBtn.addEventListener('click',()=>{ if(locked) return; App.showGameMain(stage); });
+      if(challengeBtn) challengeBtn.addEventListener('click',()=>{
+        if(locked) return;
+        if(ev&&!ev.done&&!isCleared){
+          if(evCommitted) this.startEvent(stage,ev); else this.openEventChoice(stage,ev);
+          return;
+        }
+        App.showGameMain(stage);
+      });
       // #3 ホシパッシブ1：ボス効果リロール
       const bossRerollBtn=card.querySelector('.boss-reroll-btn');
       if(bossRerollBtn) bossRerollBtn.addEventListener('click',()=>{
@@ -184,6 +198,7 @@ const MapSelectScene = {
     this.container.appendChild(el);
     const pip=GameMainScene.renderPassiveInfoPanel(()=>this.renderAll()); if(pip) this.container.appendChild(pip); // #16
     if(this.pendingReward) this.container.appendChild(this.renderRewardPopup());
+    if(this.pendingEventResult) this.container.appendChild(this.renderEventResultPopup());
     window.scrollTo(0,scrollY);
   },
 
@@ -204,6 +219,122 @@ const MapSelectScene = {
       if(rp) area.appendChild(rp);
     }
     return area;
+  },
+
+  // ===================== v1.10 イベントコモン（第3・8階層） =====================
+  floorEventFor(floor){ return (GameState.floorEvents&&GameState.floorEvents[floor])||null; },
+  // 階層侵入時に一度だけ抽選して保存（リロードしても同じイベント・同じボス効果）
+  ensureFloorEvent(floor){
+    if(!GameData.EVENT_COMMON_FLOORS.includes(floor)) return null;
+    if(!GameState.floorEvents||typeof GameState.floorEvents!=='object') GameState.floorEvents={};
+    if(GameState.floorEvents[floor]) return GameState.floorEvents[floor];
+    if(GameState.clearedStages.includes('common')) return null; // 旧セーブ等で既にコモンが終わっている
+    const type=GlobalFunctions.randChoice(GameData.EVENT_COMMON_TYPES);
+    const ev={type, committed:false, done:false, result:null};
+    if(type==='eliteboss'&&GameData.BOSS_EFFECT_POOL.length>0){
+      ev.eliteEffect=GameData.bossEffectForFloor(GlobalFunctions.randChoice(GameData.BOSS_EFFECT_POOL),floor);
+    }
+    GameState.floorEvents[floor]=ev;
+    try{ App.saveGame(); }catch(e){}
+    return ev;
+  },
+  eliteTarget(floor){
+    const boss=GameData.buildFloorStages(floor).find(s=>s.key==='boss');
+    return Math.round((boss?boss.targetScore:0)*1.5);
+  },
+  eventCardHtml(ev,info,stage,isCleared){
+    const floor=GameState.currentFloor;
+    let extra='';
+    if(ev.type==='eliteboss'){
+      const b=ev.eliteEffect;
+      extra=`<div class="ev-line">目標：<b>${GlobalFunctions.formatScore(this.eliteTarget(floor))}点</b>（ボスの1.5倍）</div>`+(b?`<div class="ev-line">ボス効果：<b>${b.name}</b>：${b.desc}</div>`:'');
+    }
+    let status='';
+    if(ev.done) status=`<div class="ev-status">${ev.result==='win'?'イベント成功':ev.result==='lose'?'イベント失敗':'イベント終了'}</div>`;
+    else if(isCleared) status=`<div class="ev-status">通常コモンとして攻略済み</div>`;
+    else if(ev.committed) status=`<div class="ev-status">イベント挑戦中</div>`;
+    return `<div class="ev-box"><div class="ev-title">${info.name}</div><div class="ev-desc">${info.desc}</div>${extra}<div class="ev-reward">報酬：${info.reward}</div>${status}</div>`;
+  },
+  closeEventChoice(){ const o=document.getElementById('ev-choice-overlay'); if(o) o.remove(); },
+  openEventChoice(stage,ev){
+    this.closeEventChoice();
+    const info=GameData.eventCommonInfo(ev.type,GameState.currentFloor);
+    const ov=document.createElement('div'); ov.id='ev-choice-overlay'; ov.className='pack-modal-overlay ev-choice-overlay';
+    const box=document.createElement('div'); box.className='pack-modal ev-choice-box';
+    const altarShort=ev.type==='altar'&&!ev.altarPaid&&GameState.gold<GameData.ALTAR_COST;
+    const evLabel=ev.type==='altar'?`イベントに挑む（${GameData.ALTAR_COST}G消費）`:'イベントに挑む';
+    box.innerHTML=`<div class="ev-choice-head">第${GameState.currentFloor}階層・イベントコモン</div><h3 class="ev-choice-title">${info.name}</h3>`
+      +`<div class="ev-choice-desc">${info.desc}</div>`
+      +(ev.type==='eliteboss'?`<div class="ev-choice-desc">目標：<b>${GlobalFunctions.formatScore(this.eliteTarget(GameState.currentFloor))}点</b>${ev.eliteEffect?`／ボス効果：<b>${ev.eliteEffect.name}</b>：${ev.eliteEffect.desc}`:''}</div>`:'')
+      +`<div class="ev-choice-reward">報酬：${info.reward}</div>`
+      +`<div class="ev-choice-btns"><button class="ev-go-btn" ${altarShort?'disabled':''}>${evLabel}</button>${altarShort?`<div class="ev-choice-warn">所持Gが足りません（${GameData.ALTAR_COST}G必要・所持${GameState.gold}G）</div>`:''}`
+      +`<button class="ev-normal-btn">通常のコモンステージを攻略する<small>目標：${GlobalFunctions.formatScore(stage.targetScore)}点</small></button>`
+      +`<button class="ev-cancel-btn">やめる</button></div>`;
+    ov.appendChild(box);
+    ov.addEventListener('click',(e)=>{ if(e.target===ov) this.closeEventChoice(); });
+    box.querySelector('.ev-go-btn').addEventListener('click',()=>{ if(altarShort) return; this.closeEventChoice(); this.startEvent(stage,ev); });
+    box.querySelector('.ev-normal-btn').addEventListener('click',()=>{ this.closeEventChoice(); App.showGameMain(stage); });
+    box.querySelector('.ev-cancel-btn').addEventListener('click',()=>this.closeEventChoice());
+    document.body.appendChild(ov);
+  },
+  // イベント終了処理（コモンをクリア済みにしてイベントを消化）
+  _finishEvent(ev,result){
+    ev.done=true; ev.result=result;
+    if(!GameState.clearedStages.includes('common')) GameState.clearedStages.push('common');
+  },
+  startEvent(stage,ev){
+    const floor=GameState.currentFloor;
+    const info=GameData.eventCommonInfo(ev.type,floor);
+    if(ev.type==='throw'||ev.type==='highlow'){
+      const mod=ev.type==='throw'?(typeof ThrowGame!=='undefined'?ThrowGame:null):(typeof HighLowGame!=='undefined'?HighLowGame:null);
+      if(!mod||typeof mod.open!=='function'){ alert('このイベントは現在準備中です。通常のコモンステージを攻略してください。'); return; }
+      if(this._eventBusy) return;
+      this._eventBusy=true;
+      ev.committed=true; App.saveGame();
+      Promise.resolve().then(()=>mod.open({floor})).catch(e=>{ console.error(e); return {win:false,error:true}; }).then(res=>{
+        this._eventBusy=false;
+        const win=!!(res&&res.win);
+        this._finishEvent(ev,win?'win':'lose');
+        if(win){
+          GameState.gold+=info.gold;
+          GameState.specialGiftPending=(GameState.specialGiftPending||0)+1;
+          GameState.lastReward={type:'event',stageName:info.name,gold:info.gold,extra:'特別アップグレード1パック（ショップで選択）'};
+        }else GameState.lastReward=null;
+        App.saveGame();
+        this.pendingEventResult={win,name:info.name,gold:win?info.gold:0};
+        if(this.container&&document.body.contains(this.container)) this.renderAll();
+      });
+      return;
+    }
+    if(ev.type==='eliteboss'){
+      ev.committed=true; App.saveGame();
+      const elite={...stage, name:'強化ボス', tag:'ELITE BOSS', targetScore:this.eliteTarget(floor), skippable:false, bossEffectCount:1, eliteBoss:true, eliteBossEffect:ev.eliteEffect||null};
+      App.showGameMain(elite);
+      return;
+    }
+    if(ev.type==='altar'){
+      if(typeof MajinEvent==='undefined'||typeof MajinEvent.makeInfo!=='function') return;
+      if(!ev.altarPaid){
+        if(GameState.gold<GameData.ALTAR_COST) return;
+        GameState.gold-=GameData.ALTAR_COST;
+        ev.altarPaid=true; ev.committed=true;
+        ev.altarInfo=MajinEvent.makeInfo();
+        App.saveGame();
+        this.renderAll();
+      }
+      MajinEvent.open(floor,{ info:ev.altarInfo, onCleared:()=>{ this._finishEvent(ev,'done'); } });
+    }
+  },
+  renderEventResultPopup(){
+    const r=this.pendingEventResult;
+    const overlay=document.createElement('div'); overlay.className='pack-modal-overlay';
+    const box=document.createElement('div'); box.className='gold-reveal-popup ev-result-popup';
+    box.innerHTML=r.win
+      ? `<div class="gr-label">${r.name}：勝利！</div><div class="gr-total">+${r.gold}G</div><div class="gr-breakdown">追加報酬：特別アップグレード1パック（ショップで最初に選択）</div><button class="ev-result-btn" style="margin-top:16px;">ショップへ</button>`
+      : `<div class="gr-label">${r.name}：敗北</div><div class="gr-total ev-lose">報酬なし</div><div class="gr-breakdown">コモンは終了扱いになります</div><button class="ev-result-btn" style="margin-top:16px;">マップに戻る</button>`;
+    overlay.appendChild(box);
+    setTimeout(()=>{ box.querySelector('.ev-result-btn').addEventListener('click',()=>{ this.pendingEventResult=null; if(r.win) App.showShop(); else this.renderAll(); }); });
+    return overlay;
   },
 
   renderRewardPopup(){

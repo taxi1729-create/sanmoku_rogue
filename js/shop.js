@@ -45,6 +45,7 @@ const ShopScene = {
     return { slotType:'special', slotRef:{}, effectPool, chosenEffect:null, cardIndexes, selectedTargets:new Set(), packType:'special_upgrade', revelationGift:true };
   },
   grantFloor5Gift(){
+    this.grantSpecialGift();
     if(!GameState.floor5GiftPending || this.miniShop) return;
     GameState.floor5GiftPending=false;
     const pk=this.buildSpecialUpgradePack();
@@ -52,6 +53,20 @@ const ShopScene = {
     if(this.pickingPack){ this.packQueue=this.packQueue||[]; this.packQueue.unshift({pack:this.pickingPack}); }
     this.pickingPack=pk;
     this.message='啓示の褒美：特別アップグレード';
+    try{ App.saveGame(); }catch(e){}
+  },
+  // v1.10 イベントコモン報酬：無料の特別アップグレード（GameState.specialGiftPending 個）を他のパックより先に開く
+  grantSpecialGift(){
+    if(!(GameState.specialGiftPending>0) || this.miniShop) return;
+    const n=GameState.specialGiftPending; GameState.specialGiftPending=0;
+    const packs=[];
+    for(let i=0;i<n;i++){ const pk=this.buildSpecialUpgradePack(); if(pk){ pk.revelationGift=false; pk.eventGift=true; packs.push(pk); } }
+    if(packs.length===0){ this.message='特別セレクトの効果はすべて入手済みのため、イベント報酬の特別アップグレードは得られなかった'; try{ App.saveGame(); }catch(e){} return; }
+    this.packQueue=this.packQueue||[];
+    if(this.pickingPack) this.packQueue.unshift({pack:this.pickingPack});
+    for(let i=packs.length-1;i>=1;i--) this.packQueue.unshift({pack:packs[i]});
+    this.pickingPack=packs[0];
+    this.message='イベント報酬：特別アップグレード';
     try{ App.saveGame(); }catch(e){}
   },
 

@@ -26,6 +26,8 @@ const GameState = {
   // 一時撤退中の情報（null=撤退中でない）。ミニショップを出るまで保持し、リロード時はマップ表示時にミニショップへ復帰する
   //   { floor, stageKey, stageName, score, target, ratio, num, gold, livesLeft, offers }
   retreat:null,
+  // v1.10 イベントコモン（第3・8階層）：floorEvents[floor]={type,eliteEffect,committed,done,result,altarPaid,altarInfo}
+  floorEvents:{}, specialGiftPending:0, // specialGiftPending：ショップで先に開く無料の特別アップグレード数
 
   // #13 シカクパッシブ1の手札上限+1は廃止（パック選択枚数+1に変更）
   effectiveHandSize(){ return GameData.HAND_SIZE + this.handSizeBonus; },
@@ -142,6 +144,7 @@ const GameState = {
     this.majin={ decided:{}, done1:false, done2:false, usedMajin:[], cleared:{} };
     this.passiveSuspended=null;
     this.lives=this.MAX_LIVES; this.retreat=null; // 残機・一時撤退
+    this.floorEvents={}; this.specialGiftPending=0; // v1.10 イベントコモン
     this.bingoCountThisStage=0;
     this.totalBingoCount=0; this.sevenPendingMultBoost=false;
     GameData.BINGO_MULTIPLIER_BASE={...GameData.BINGO_MULTIPLIER_BASE_ORIGINAL};
@@ -189,6 +192,7 @@ const GameState = {
       gameMode:this.gameMode,
       initialPassiveGranted:this.initialPassiveGranted,
       lives:this.lives, retreat:this.retreat,
+      floorEvents:this.floorEvents, specialGiftPending:this.specialGiftPending||0,
       multBase:{...GameData.BINGO_MULTIPLIER_BASE},
       corrBase:GameData.CORRECTION_BASE_SCORE,
       savedFloorStage: (this.currentStage?this.currentStage.key:''),
@@ -227,6 +231,8 @@ const GameState = {
     // 残機（旧セーブは残機フィールドが無いので最大値2）・一時撤退中の情報
     this.lives=(typeof d.lives==='number'&&Number.isFinite(d.lives))?Math.max(0,d.lives):this.MAX_LIVES;
     this.retreat=(d.retreat&&typeof d.retreat==='object')?d.retreat:null;
+    this.floorEvents=(d.floorEvents&&typeof d.floorEvents==='object')?d.floorEvents:{};
+    this.specialGiftPending=Math.max(0,d.specialGiftPending|0);
     this.migrateCards();
     if(d.multBase) Object.assign(GameData.BINGO_MULTIPLIER_BASE,d.multBase);
     if(d.corrBase!=null) GameData.CORRECTION_BASE_SCORE=d.corrBase;

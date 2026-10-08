@@ -892,6 +892,8 @@ const MajinEvent = (function(){
   }
 
   function markCleared(){
+    // v1.10 秘密の祭壇（イベントコモン）から開いた場合：ハイレベル・魔神状態には触れず呼び出し元の処理で終了扱いにする
+    if(ui.opts&&typeof ui.opts.onCleared==='function'){ try{ ui.opts.onCleared(); }catch(e){ console.error(e); } try{ App.saveGame(); }catch(e){} return; }
     if(!G().clearedStages.includes('high')) G().clearedStages.push('high');
     state().cleared[ui.floor]=true;
     try{ App.saveGame(); }catch(e){ console.error(e); }
@@ -944,12 +946,20 @@ const MajinEvent = (function(){
     close();
   }
 
-  async function open(floor){
+  // v1.10 秘密の祭壇用：通常の発生判定・usedMajin を消費せずにランダムな魔神イベント情報を作る
+  function makeInfo(rng){
+    const used=(state().usedMajin||[]);
+    const id=pickMajinId(used, rng);
+    const events=pickEvents(id, rng);
+    return { id, events, params:makeParams(events, rng) };
+  }
+  // opts: { info（指定時は階層の魔神情報の代わりに使う）, onCleared（終了扱いにする処理） }
+  async function open(floor, opts){
     if(ui) return;
     floor=floor||G().currentFloor;
-    const info=getInfo(floor);
+    const info=(opts&&opts.info)||getInfo(floor);
     if(!info){ console.warn('MajinEvent: no majin on floor', floor); return; }
-    const done=new Promise(r=>{ buildOverlay(floor, info); ui.resolve=r; });
+    const done=new Promise(r=>{ buildOverlay(floor, info); ui.resolve=r; ui.opts=opts||null; });
     try{
       await intro();
       for(const line of ui.m.intro){ if(!ui) break; await say(line,{wait:true}); }
@@ -965,7 +975,7 @@ const MajinEvent = (function(){
 
   return { MAJINS, EVENTS, MAJIN_IDS, LUCK_RATE, OCCUR_RATE,
     ensureDecided, rollDecision, pickMajinId, pickEvents, isMajinFloor, getInfo,
-    buildStageCard, open, isOpen, checkEvent, debugForce, close,
+    buildStageCard, open, isOpen, makeInfo, checkEvent, debugForce, close,
     _figureSvg: figureSvg };
 })();
 if(typeof window!=='undefined') window.MajinEvent=MajinEvent;

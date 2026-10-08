@@ -768,6 +768,22 @@ const GameData = {
     return [{key:'common',name:'コモン',tag:'COMMON',targetScore:c,skippable:true,bossEffectCount:0},{key:'high',name:'ハイレベル',tag:'HIGH LEVEL',targetScore:c*2,skippable:true,bossEffectCount:0},{key:'boss',name:'ボス',tag:'BOSS',targetScore:c*bossMulti,skippable:false,bossEffectCount}];
   },
 
+  // v1.10 イベントコモン：第3・8階層のコモンが下記イベントのいずれかに変化（挑むか通常コモンを攻略するか選べる）
+  EVENT_COMMON_FLOORS: [3,8],
+  EVENT_COMMON_TYPES: ['throw','highlow','eliteboss','altar'],
+  ALTAR_COST: 25,
+  eventCommonInfo(type, floor){
+    const n=floor>=8?2:1;
+    const g=10*n;
+    switch(type){
+      case 'throw': return { type, name:'投射ミニゲーム', tag:'EVENT', desc:'狙いを定めて投げ込む腕試しのミニゲーム。', reward:`特別アップグレード1パック＋クリア報酬${g}G（10G×${n}）`, gold:g };
+      case 'highlow': return { type, name:'千里眼との勝負', tag:'EVENT', desc:'千里眼を持つ相手とハイロー対決。見透かされずに勝ち切れるか。', reward:`特別アップグレード1パック＋クリア報酬${g}G（10G×${n}）`, gold:g };
+      case 'eliteboss': return { type, name:'強化ボスステージ', tag:'ELITE BOSS', desc:'ボス効果つき。この階層のボス目標点数の1.5倍に挑む（階層のボスは別に残る）。', reward:'クリア報酬＋パッシブ報酬', gold:0 };
+      case 'altar': return { type, name:'秘密の祭壇', tag:'ALTAR', desc:`${GameData.ALTAR_COST}Gを捧げると、ランダムな魔神が現れ取引を持ちかけてくる。`, reward:'魔神イベント（取引内容はランダム）', gold:0 };
+    }
+    return null;
+  },
+
   STAGE_TYPES: [
     { key:'common', name:'コモン',    tag:'COMMON',     targetScore:250, skippable:true },
     { key:'high',   name:'ハイレベル',tag:'HIGH LEVEL', targetScore:450, skippable:true },

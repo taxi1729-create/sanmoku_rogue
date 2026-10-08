@@ -162,7 +162,7 @@ const GameMainScene = {
     }
     this.startRound();
     // #演出 ボスステージ開始時：ボス効果が盤面に付与される演出（初回描画後。タップで早送り）
-    if(this.stage.key==='boss'&&typeof StageFX!=='undefined') StageFX.bossIntro({list:StageFX.bossList(this),floor:GameState.currentFloor});
+    if((this.stage.key==='boss'||this.stage.eliteBoss)&&typeof StageFX!=='undefined') StageFX.bossIntro({list:StageFX.bossList(this),floor:GameState.currentFloor});
     TutorialOverlay.show('gameMain'); // #1 初回のみゲームメイン画面のチュートリアルを表示
   },
 
@@ -246,6 +246,12 @@ const GameMainScene = {
   },
 
   applyBossEffect(){
+    // v1.10 イベントコモン「強化ボスステージ」：ステージに保存済みのボス効果を使う（本来のボスの pendingBossEffect には触れない）
+    if(this.stage.eliteBoss){
+      const ee=this.stage.eliteBossEffect;
+      if(!ee) return;
+      return this._applyBossEffectList(Array.isArray(ee)?ee.map(x=>({...x})):[{...ee}]);
+    }
     if(this.stage.key!=='boss') return;
     // #6 階層10特有ボス効果：ターン6,11,16…は強制的にNPCの番になる（2つのランダムボス効果とは別枠）
     if(GameState.floor10SpecialBoss) this.addLog('ボス効果：「最終決戦」5ターンごと（6,11,16…ターン目）は強制的にNPCの番になる');
@@ -253,9 +259,12 @@ const GameMainScene = {
     const effect = GameState.pendingBossEffect || (GameData.BOSS_EFFECT_POOL.length > 0 ? GlobalFunctions.randChoice(GameData.BOSS_EFFECT_POOL) : null);
     if(!effect) return;
     // #9 複数ボス効果（第5階層以降）が配列で渡された場合も全て適用されるように修正
-    this.bossEffects = Array.isArray(effect) ? effect : [effect];
-    this.bossEffect = this.bossEffects[0]; // 単一効果チェック箇所との後方互換用
     GameState.pendingBossEffect = null; // 使用済みにリセット（次の周回用）
+    return this._applyBossEffectList(Array.isArray(effect) ? effect : [effect]);
+  },
+  _applyBossEffectList(list){
+    this.bossEffects = list;
+    this.bossEffect = this.bossEffects[0]; // 単一効果チェック箇所との後方互換用
     this.bossEffects.forEach(be=>{
       this.addLog(`ボス効果：「${be.name}」${be.desc}`);
       switch(be.id){
@@ -564,6 +573,8 @@ const GameMainScene = {
     this.stageBonusRounds=0;
     if(result==='win'){
       if(this.stage&&!GameState.clearedStages.includes(this.stage.key)) GameState.clearedStages.push(this.stage.key);
+      // v1.10 イベントコモン（強化ボス）クリア：イベントを終了済みにする（階層のボスはクリア扱いにしない）
+      if(this.stage&&this.stage.eliteBoss&&GameState.floorEvents&&GameState.floorEvents[GameState.currentFloor]){ const fe=GameState.floorEvents[GameState.currentFloor]; fe.done=true; fe.result='win'; }
       const multBeforeClear=GameData.snapshotMult(); // #2
       // #演出 クリア時に発動した効果（倍率・カードの変化）は報酬演出（StageFX z70）の上に順に見せる。トーストは報酬演出の裏に隠れるため使わない
       const clearFx=[]; this._clearFx=clearFx;
@@ -657,7 +668,7 @@ const GameMainScene = {
         GameState.lastReward={type:'clear',stageName:this.stage.name,gold:rd.total,breakdown:rd,/* #11 デバッグログは非表示（復活用に残す） debugLog:this.logs?this.logs.slice(-30):[], */extra:clearBonusMsg};
         this.addLog(`クリア報酬：G+${rd.total}（num=${rd.num}）${clearBonusMsg?'／'+clearBonusMsg:''}`);
         // #A ボスステージクリア時：記号パッシブを1つ選択
-        if(this.stage.key==='boss'){
+        if(this.stage.key==='boss'||this.stage.eliteBoss){
           this.pendingPassiveChoice=this.generatePassiveChoicePicks();
           this.passiveRewardsRemaining=GameState.passiveRewardCount(); // #1 魔力ステージD：この階層はパッシブ報酬3つ
           this.passiveChoiceContext='boss'; // #6 選択後にショップへ進む通常フローと区別するためのコンテキスト
@@ -3461,7 +3472,7 @@ const GameMainScene = {
     const debugHtml='';
     const box=document.createElement('div'); box.className='result-box';
     // #1 ボスクリア時：ショップへ移動の代わりに「パッシブ報酬を受け取る」をタップさせる
-    const hasPassiveChoice = win && this.stage.key==='boss' && this.pendingPassiveChoice && this.pendingPassiveChoice.length>0;
+    const hasPassiveChoice = win && (this.stage.key==='boss'||this.stage.eliteBoss) && this.pendingPassiveChoice && this.pendingPassiveChoice.length>0;
     // 敗北：残機があれば「一時撤退」（ミニショップへ）、残機0なら GAME OVER（タイトルへ）
     const retreat = !win ? this.retreatInfo : null;
     const gameOver = !win && !retreat;

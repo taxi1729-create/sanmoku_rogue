@@ -981,3 +981,31 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .cell-bubble.npc-cross-bubble{top:auto;bottom:-24px;z-index:6;background:#7a1f2b;border:1px solid #ff6b6b;color:#ffd6d6;}
 .cell-bubble.npc-cross-bubble::after{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:#7a1f2b;}
 .cell.hint-blink.npc-next-cell{animation:hintBlink 1s infinite;}
+
+/* v1.10 イベントコモン（第3・8階層） */
+.stage-card.event-common-card{border-color:#a78bfa;box-shadow:0 0 0 1px rgba(167,139,250,.35),0 0 18px rgba(167,139,250,.18);}
+.stage-card.event-common-card.ev-eliteboss{border-color:var(--cross);box-shadow:0 0 0 1px rgba(248,113,113,.35),0 0 18px rgba(248,113,113,.18);}
+.stage-card.event-common-card.ev-altar{border-color:#c084fc;}
+.ev-tag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;background:#a78bfa;color:#140f24;font-weight:900;letter-spacing:.08em;}
+.ev-eliteboss .ev-tag{background:var(--cross);}
+.ev-box{background:rgba(167,139,250,.10);border:1px dashed rgba(167,139,250,.5);border-radius:10px;padding:8px 10px;text-align:left;display:flex;flex-direction:column;gap:4px;}
+.ev-eliteboss .ev-box{background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.5);}
+.ev-title{font-weight:900;color:#ddd6fe;font-size:14px;}
+.ev-eliteboss .ev-title{color:#fecaca;}
+.ev-desc,.ev-line{font-size:12px;line-height:1.5;color:var(--text-dim);}
+.ev-reward{font-size:12px;color:var(--gold);font-weight:700;}
+.ev-status{font-size:11px;font-weight:900;color:var(--success);}
+.ev-choice-overlay{z-index:400;}
+.ev-choice-box{max-width:360px;width:calc(100vw - 32px);box-sizing:border-box;text-align:center;}
+.ev-choice-head{font-size:11px;letter-spacing:.12em;color:var(--text-dim);}
+.ev-choice-title{margin:6px 0 8px;color:#ddd6fe;}
+.ev-choice-desc{font-size:13px;line-height:1.6;margin-bottom:6px;text-align:left;}
+.ev-choice-reward{font-size:13px;color:var(--gold);font-weight:700;margin:8px 0 12px;}
+.ev-choice-btns{display:flex;flex-direction:column;gap:8px;}
+.ev-choice-btns button{width:100%;margin:0;}
+.ev-choice-btns button small{display:block;font-size:11px;opacity:.75;font-weight:400;}
+.ev-go-btn{background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff;font-weight:900;}
+.ev-go-btn:disabled{opacity:.4;}
+.ev-choice-warn{font-size:12px;color:var(--cross);}
+.ev-cancel-btn{opacity:.75;}
+.gr-total.ev-lose{color:var(--text-dim);}
