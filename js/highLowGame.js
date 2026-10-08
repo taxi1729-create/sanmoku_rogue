@@ -2,21 +2,22 @@
  * 公開API（グローバル const HighLowGame）:
  *   HighLowGame.open({floor}) -> Promise<{win:boolean}>  オーバーレイを閉じたときに resolve
  *   HighLowGame.isOpen()
- *   HighLowGame.npcDecide(npcVal, playerVal, round, rng) -> 'bet'|'check'   NPCのベット判断（純粋関数）
- *   HighLowGame.npcRespond(npcVal, playerVal, round, rng) -> 'call'|'fold'  プレイヤーのベットへの応答（純粋関数）
+ *   HighLowGame.npcDecide(npcVal, playerVal, round, rng) -> 'bet'|'check'   NPCのレイズ判断（純粋関数）
+ *   HighLowGame.npcRespond(npcVal, playerVal, round, rng) -> 'call'|'fold'  プレイヤーのレイズへの応答（純粋関数）
  *   HighLowGame.npcCallProb(npcVal, playerVal, round) -> 0..1               コール確率
  *   HighLowGame.roundPoints(npcBet, playerBet) -> 1|2|4                      ラウンド勝者の得点
  *   HighLowGame._debug  テスト用（rng 上書き / respondRng 上書き / npcPick 上書き / state 参照 / delayScale）
  * 報酬の付与は行わない（呼び出し側の責務）。表示のみ。
  * ルール:
  *   プレイヤーはデッキからランダムに8枚（コピー）を引き、値は baseScore。NPCの手札は [0,10,20,40,100]。
- *   各ラウンド：プレイヤーが表向きで1枚選ぶ → NPCはランダムに1枚選び（伏せ）、勝敗を透視してベット/チェック宣言
- *   （勝ち確定 80%ベット・負け確定 20%ベット・引き分け 50%、3・5回戦は千里眼不調で常に50%）
- *   → プレイヤーがベット/チェック。
- *     チェック：公開。高い方が勝ち、基本1点・NPCベットで×2。同値は0点。
- *     ベット：NPCがコール/フォールドを選ぶ（勝ち・引き分けが視えればコール、負けが視えればフォールド。
+ *   各ラウンド：プレイヤーが表向きで1枚選ぶ → NPCはランダムに1枚選び（伏せ）、勝敗を透視してレイズ/チェック宣言
+ *   （勝ち確定 80%レイズ・負け確定 20%レイズ・引き分け 50%、3・5回戦は千里眼不調で常に50%）
+ *   → NPCチェック時：プレイヤーがレイズ/チェック。NPCレイズ時：プレイヤーがレイズ/コール/フォールド
+ *     （フォールド→NPCが倍化なしの1点を獲得、コール→公開でNPCレイズ×2）。
+ *     チェック：公開。高い方が勝ち、基本1点・NPCレイズで×2。同値は0点。
+ *     レイズ：NPCがコール/フォールドを選ぶ（勝ち・引き分けが視えればコール、負けが視えればフォールド。
  *       3・5回戦は50%。NPCの札が0なら常にフォールド）。
- *       コール→公開、プレイヤーベットでさらに×2。フォールド→即終了、プレイヤーがベット倍化なしの得点を獲得。
+ *       コール→公開、プレイヤーレイズでさらに×2。フォールド→即終了、プレイヤーがレイズ倍化なしの得点を獲得。
  *   最大5回戦・先に3点で勝利。5回戦終了時に点数が多い方の勝ち、同点はプレイヤーの敗北。使ったカードは消費。
  */
 const HighLowGame = (function(){
@@ -42,7 +43,7 @@ const HighLowGame = (function(){
     const r = (rng || rnd)();
     return r < npcBetProb(npcVal, playerVal, round) ? 'bet' : 'check';
   }
-  // プレイヤーのベットに対するNPCのコール確率
+  // プレイヤーのレイズに対するNPCのコール確率
   function npcCallProb(npcVal, playerVal, round){
     if(npcVal === 0) return 0;                    // 0の札は必ずフォールド（不調回でも）
     if(FALTER_ROUNDS.includes(round)) return 0.5; // 千里眼不調：ランダム
@@ -213,7 +214,7 @@ const HighLowGame = (function(){
   function setDecl(who, kind){
     const el = $(who === 'n' ? '.hl-decl-npc' : '.hl-decl-player');
     el.className = 'hl-decl ' + (who === 'n' ? 'hl-decl-npc' : 'hl-decl-player') + (kind ? ' show ' + kind : '');
-    el.textContent = kind === 'bet' ? 'ベット ×2' : kind === 'check' ? 'チェック'
+    el.textContent = kind === 'bet' ? 'レイズ ×2' : kind === 'check' ? 'チェック'
       : kind === 'call' ? 'コール' : kind === 'fold' ? 'フォールド' : '';
   }
   function renderAll(){ renderRounds(); renderNpc(); renderScore(); renderHand(); }
@@ -234,12 +235,13 @@ const HighLowGame = (function(){
       <p class="hl-panel-lead">相手はあなたの手札を透視できる千里眼の持ち主。</p>
       <ul class="hl-rules">
         <li>デッキから<b>8枚</b>を引き、毎回1枚を出す（基礎点が数値）。相手の札は <b>0・10・20・40・100</b> の5枚。</li>
-        <li>相手はあなたの札を見てから<b>ベット／チェック</b>を宣言。続けてあなたも選べる。</li>
-        <li>あなたが<b>チェック</b>なら公開。数値が高い方が勝ち、<b>1点</b>（相手のベットで<b>×2</b>）。同値は0点。</li>
-        <li>あなたが<b>ベット</b>すると相手は<b>コール／フォールド</b>を選ぶ。勝ち（同値含む）が視えればコール、負けが視えればフォールド。<b>0の札</b>を出していたら必ずフォールド。</li>
-        <li>コール→公開、得点はさらに<b>×2</b>（最大4点）。フォールド→その場であなたの勝ち（ベットの×2はなし）。</li>
+        <li>相手はあなたの札を見てから<b>レイズ／チェック</b>を宣言。</li>
+        <li>相手がチェック→あなたは<b>チェック</b>（公開、高い方が<b>1点</b>）か<b>レイズ</b>。</li>
+        <li>相手がレイズ→あなたは<b>コール</b>（公開、<b>2点</b>）・<b>フォールド</b>（降りて相手に<b>1点</b>）・<b>レイズ</b>のいずれか。同値は0点。</li>
+        <li>あなたがレイズすると相手は<b>コール／フォールド</b>を選ぶ。勝ち（同値含む）が視えればコール、負けが視えればフォールド。<b>0の札</b>なら必ずフォールド。</li>
+        <li>コール→公開、得点はさらに<b>×2</b>（最大4点）。フォールド→その場であなたの勝ち（あなたのレイズの×2はなし）。</li>
         <li>最大<b>5回戦</b>・先に<b>3点</b>で勝利。5回戦終了時に同点なら<b>あなたの負け</b>。</li>
-        <li><span class="hl-falter-txt">3回戦・5回戦</span>は千里眼の調子が悪く、相手のベット／コールの判断はランダム。</li>
+        <li><span class="hl-falter-txt">3回戦・5回戦</span>は千里眼の調子が悪く、相手のレイズ／コールの判断はランダム。</li>
         <li>出した札は消費される（デッキには影響なし）。</li>
       </ul>
       <div class="hl-reward">勝利報酬：<b>${esc(st.rewardText)}</b></div>
@@ -303,28 +305,68 @@ const HighLowGame = (function(){
     root.classList.remove('gazing');
     const falter = FALTER_ROUNDS.includes(st.round);
     const line = decision === 'bet'
-      ? (falter ? 'む…視界が霞む…だが、ベットだ' : '…見えたぞ。ベットだ')
+      ? (falter ? 'む…視界が霞む…だが、レイズだ' : '…見えたぞ。レイズだ')
       : (falter ? 'む…視界が霞む…チェックにしておこう' : '…チェックだ');
     setSpeech(line, (falter ? 'falter ' : '') + (decision === 'bet' ? 'bet' : 'check'));
     setDecl('n', decision);
     st.phase = 'decide';
-    setMsg(`千里眼は<b class="${decision === 'bet' ? 'hl-t-bet' : ''}">${decision === 'bet' ? 'ベット' : 'チェック'}</b>。あなたは？`);
+    setMsg(`千里眼は<b class="${decision === 'bet' ? 'hl-t-bet' : ''}">${decision === 'bet' ? 'レイズ' : 'チェック'}</b>。あなたは？`);
     const pts0 = roundPoints(decision === 'bet', false), pts1 = roundPoints(decision === 'bet', true);
-    setActions(`
-      <button type="button" class="hl-btn hl-btn-check" data-act="check">チェック<small>勝者 ${pts0}点</small></button>
-      <button type="button" class="hl-btn hl-btn-bet" data-act="bet">ベット<small>コール ${pts1}点／降り ${pts0}点</small></button>`);
-    $('.hl-actions [data-act="check"]').addEventListener('click', () => onDecide(false));
-    $('.hl-actions [data-act="bet"]').addEventListener('click', () => onDecide(true));
+    const actions = $('.hl-actions');
+    if(decision === 'bet'){
+      actions.classList.add('three');
+      setActions(`
+        <button type="button" class="hl-btn hl-btn-fold" data-act="fold">フォールド<small>相手 ${roundPoints(false, false)}点</small></button>
+        <button type="button" class="hl-btn hl-btn-call" data-act="call">コール<small>勝者 ${pts0}点</small></button>
+        <button type="button" class="hl-btn hl-btn-bet" data-act="bet">レイズ<small>コール ${pts1}点／降り ${pts0}点</small></button>`);
+    } else {
+      actions.classList.remove('three');
+      setActions(`
+        <button type="button" class="hl-btn hl-btn-check" data-act="check">チェック<small>勝者 ${pts0}点</small></button>
+        <button type="button" class="hl-btn hl-btn-bet" data-act="bet">レイズ<small>コール ${pts1}点／降り ${pts0}点</small></button>`);
+    }
+    actions.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => onDecide(b.dataset.act)));
   }
 
-  async function onDecide(bet){
+  // act: 'check' | 'bet'(レイズ) | 'call'(相手のレイズを受ける) | 'fold'(相手のレイズに降りる)
+  async function onDecide(act){
     if(!st || st.phase !== 'decide') return;
-    st.phase = 'reveal';
+    if(act === true) act = 'bet'; else if(act === false) act = 'check';
+    if(!['check', 'bet', 'call', 'fold'].includes(act)) return;
     const c = st.cur;
-    c.player = bet ? 'bet' : 'check';
+    if((act === 'call' || act === 'fold') && c.npc !== 'bet') return;
+    if(act === 'check' && c.npc === 'bet') act = 'call';
+    st.phase = 'reveal';
+    const bet = act === 'bet';
+    c.player = act;
     setDecl('p', c.player);
     setActions('');
+    $('.hl-actions').classList.remove('three');
     const falter = FALTER_ROUNDS.includes(st.round);
+    if(act === 'fold'){
+      // プレイヤーが降りる：千里眼の勝ち（レイズの×2なし）
+      c.response = null;
+      setMsg('あなたはフォールドした…');
+      const pc = $('.hl-slot-player .hl-play-in');
+      if(pc) pc.classList.add('folded');
+      await wait(450);
+      if(!root) return;
+      const fl = $('.hl-slot-npc .hl-flip');
+      if(fl) fl.classList.add('flipped');
+      await wait(650);
+      if(!root) return;
+      const pts = roundPoints(false, false);
+      st.history.push({ round:st.round, pv:c.pv, nv:c.nv, npc:c.npc, player:'fold', response:null, folded:true, playerFolded:true, winner:'n', pts });
+      $('.hl-arena').classList.add('res-l');
+      st.score.n += pts;
+      setMsg(`<span class="hl-t-lose">あなたがフォールド（千里眼の札は${c.nv}）　千里眼 +${pts}点</span>`);
+      setSpeech(c.nv > c.pv ? '賢明だな。視えていた通りだ。' : c.nv < c.pv ? 'ふふ…降りたか。' : '……降りるか。', 'smug');
+      renderScore('n');
+      renderRounds();
+      await wait(1200);
+      if(!root) return;
+      return afterRound();
+    }
     if(bet){
       // NPCの応答：コール or フォールド
       c.response = npcRespond(c.nv, c.pv, st.round);

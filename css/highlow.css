@@ -146,6 +146,12 @@
 .hl-btn-main{ background:linear-gradient(180deg,#9333ea,#6b21a8); box-shadow:0 0 14px rgba(168,85,247,.5); }
 .hl-btn-bet{ background:linear-gradient(180deg,#ec4899,#be185d); box-shadow:0 0 14px rgba(244,114,182,.45); }
 .hl-btn-check{ background:#1e293b; border:1px solid #38bdf8; color:#bae6fd; }
+.hl-btn-call{ background:linear-gradient(180deg,#eab308,#a16207); color:#fff; box-shadow:0 0 12px rgba(250,204,21,.4); }
+.hl-btn-fold{ background:#334155; border:1px solid #64748b; color:#cbd5e1; }
+.hl-actions.three{ gap:6px; }
+.hl-actions.three .hl-btn{ flex:1 1 0; min-width:0; padding:10px 6px; font-size:14px; }
+.hl-actions.three .hl-btn small{ font-size:9px; white-space:nowrap; }
+.hl-play-in.folded{ animation:hlFold .45s cubic-bezier(.5,0,.7,.4) forwards; transform-origin:50% 100%; }
 
 /* --- 手札 --- */
 .hl-hand{ margin-top:auto; display:grid; grid-template-columns:repeat(4, 1fr); gap:8px 6px; justify-items:center; padding-top:4px; }
