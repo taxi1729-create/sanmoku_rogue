@@ -768,19 +768,22 @@ const GameData = {
     return [{key:'common',name:'コモン',tag:'COMMON',targetScore:c,skippable:true,bossEffectCount:0},{key:'high',name:'ハイレベル',tag:'HIGH LEVEL',targetScore:c*2,skippable:true,bossEffectCount:0},{key:'boss',name:'ボス',tag:'BOSS',targetScore:c*bossMulti,skippable:false,bossEffectCount}];
   },
 
-  // v1.10 イベントコモン：第3・8階層のコモンが下記イベントのいずれかに変化（挑むか通常コモンを攻略するか選べる）
+  // v1.10 イベントコモン → v1.13 裏世界：第3・8階層のコモンから「裏世界」に入れる（3つのイベントから1つを選ぶ）
   EVENT_COMMON_FLOORS: [3,8],
-  EVENT_COMMON_TYPES: ['throw','highlow','eliteboss','altar'],
+  EVENT_COMMON_TYPES: ['throw','highlow','eliteboss','altar','pachinko','derby'], // 裏世界イベントのプール（階層ごとに3つ抽選）
+  URASEKAI_LINEUP_SIZE: 3,
   ALTAR_COST: 25, // （旧）G消費。v1.11から残機を捧げる
   ALTAR_LIFE_COST: 1,
   eventCommonInfo(type, floor){
     const n=floor>=8?2:1;
     const g=10*n;
     switch(type){
-      case 'throw': return { type, name:'投射ミニゲーム', tag:'EVENT', desc:'狙いを定めて投げ込む腕試しのミニゲーム。', reward:`特別アップグレード1パック＋クリア報酬${g}G（10G×${n}）`, gold:g };
-      case 'highlow': return { type, name:'千里眼との勝負', tag:'EVENT', desc:'千里眼を持つ相手とハイロー対決。見透かされずに勝ち切れるか。', reward:`特別アップグレード1パック＋クリア報酬${g}G（10G×${n}）`, gold:g };
-      case 'eliteboss': return { type, name:'強化ボスステージ', tag:'ELITE BOSS', desc:'ボス効果つき。この階層のボス目標点数の1.5倍に挑む（階層のボスは別に残る）。', reward:'クリア報酬＋パッシブ報酬', gold:0 };
-      case 'altar': return { type, name:'秘密の祭壇', tag:'ALTAR', desc:`残機${GameData.ALTAR_LIFE_COST}を捧げると、ランダムな魔神が現れ取引を持ちかけてくる。`, reward:'魔神イベント（取引内容はランダム）', gold:0 };
+      case 'throw': return { type, name:'投射チャレンジ', tag:'MINIGAME', icon:'throw', desc:'角度を決めてカードを投げ、10m・30m・50mを目指す。', reward:'10m 特別アップグレード／30m +5G／50m +10G、ピッタリで+5G（最大 特別アップグレード+25G）', gold:0 };
+      case 'highlow': return { type, name:'千里眼とのハイロー対決', tag:'MINIGAME', icon:'highlow', desc:'千里眼を持つ相手とハイロー対決。見透かされずに勝ち切れるか。', reward:`特別アップグレード＋${g}G（10G×${n}）`, gold:g };
+      case 'eliteboss': return { type, name:'強化ボスステージ', tag:'ELITE BOSS', icon:'eliteboss', desc:'ボス効果つき。この階層のボス目標点数の1.5倍に挑む（階層のボスは別に残る）。', reward:'クリア報酬＋パッシブ報酬', gold:0 };
+      case 'altar': return { type, name:'秘密の祭壇', tag:'ALTAR', icon:'altar', desc:`残機${GameData.ALTAR_LIFE_COST}を捧げると、ランダムな魔神が現れ取引を持ちかけてくる。`, reward:`残機${GameData.ALTAR_LIFE_COST}を捧げ魔神イベント`, gold:0 };
+      case 'pachinko': return { type, name:'パチンコ', tag:'MINIGAME', icon:'pachinko', desc:'2球。カードでギミックを操作して入賞口を狙う。', reward:'1G／10G／特別アップグレード', gold:0 };
+      case 'derby': return { type, name:'シンボルダービー', tag:'MINIGAME', icon:'derby', desc:'20Gを元手にシンボルの順位に賭ける。', reward:'払戻最大100G、120G超で特別アップグレード追加', gold:0 };
     }
     return null;
   },

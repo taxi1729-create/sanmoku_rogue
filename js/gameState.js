@@ -26,7 +26,7 @@ const GameState = {
   // 一時撤退中の情報（null=撤退中でない）。ミニショップを出るまで保持し、リロード時はマップ表示時にミニショップへ復帰する
   //   { floor, stageKey, stageName, score, target, ratio, num, gold, livesLeft, offers }
   retreat:null,
-  // v1.10 イベントコモン（第3・8階層）：floorEvents[floor]={type,eliteEffect,committed,done,result,altarPaid,altarInfo}
+  // v1.13 裏世界（第3・8階層）：floorEvents[floor]={lineup:[type×3],eliteEffect,committed,active,done,result,altarPaid,altarInfo}（旧セーブの type は lineup に移行）
   floorEvents:{}, specialGiftPending:0, // specialGiftPending：ショップで先に開く無料の特別アップグレード数
 
   // #13 シカクパッシブ1の手札上限+1は廃止（パック選択枚数+1に変更）
@@ -232,7 +232,7 @@ const GameState = {
     this.lives=(typeof d.lives==='number'&&Number.isFinite(d.lives))?Math.max(0,d.lives):this.MAX_LIVES;
     this.retreat=(d.retreat&&typeof d.retreat==='object')?d.retreat:null;
     this.floorEvents=(d.floorEvents&&typeof d.floorEvents==='object')?d.floorEvents:{};
-    this.specialGiftPending=Math.max(0,d.specialGiftPending|0);
+    this.specialGiftPending=(d.specialGiftPending===true)?1:Math.max(0,d.specialGiftPending|0); // 旧形式 true → 1
     this.migrateCards();
     if(d.multBase) Object.assign(GameData.BINGO_MULTIPLIER_BASE,d.multBase);
     if(d.corrBase!=null) GameData.CORRECTION_BASE_SCORE=d.corrBase;

@@ -57,8 +57,9 @@ const ShopScene = {
   },
   // v1.10 イベントコモン報酬：無料の特別アップグレード（GameState.specialGiftPending 個）を他のパックより先に開く
   grantSpecialGift(){
+    if(GameState.specialGiftPending===true) GameState.specialGiftPending=1; // 旧形式（真偽値）の互換
     if(!(GameState.specialGiftPending>0) || this.miniShop) return;
-    const n=GameState.specialGiftPending; GameState.specialGiftPending=0;
+    const n=Math.max(0,GameState.specialGiftPending|0); GameState.specialGiftPending=0; // 裏世界の報酬で複数個になり得る：順に開く
     const packs=[];
     for(let i=0;i<n;i++){ const pk=this.buildSpecialUpgradePack(); if(pk){ pk.revelationGift=false; pk.eventGift=true; packs.push(pk); } }
     if(packs.length===0){ this.message='特別セレクトの効果はすべて入手済みのため、イベント報酬の特別アップグレードは得られなかった'; try{ App.saveGame(); }catch(e){} return; }

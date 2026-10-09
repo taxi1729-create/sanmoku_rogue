@@ -101,3 +101,49 @@
   .tg-panel,.tg-flag.popnow .tg-flag-pop,.tg-readout.pop,.tg-spark,.tg-hand-label.warn{animation:none;}
   .tg-slot{transition:none;}
 }
+
+/* --- 段階報酬・ピッタリ --- */
+.tg-rtable{width:100%;max-width:300px;border-collapse:collapse;font-size:12.5px;background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.35);border-radius:10px;overflow:hidden;}
+.tg-rtable th,.tg-rtable td{padding:5px 8px;border-bottom:1px solid rgba(251,191,36,.15);text-align:left;vertical-align:top;}
+.tg-rtable th{white-space:nowrap;color:var(--text-dim,#8b90a5);font-weight:700;width:5.5em;}
+.tg-rtable td{color:var(--gold,#fbbf24);font-weight:700;}
+.tg-rtable td b{color:#fde68a;}
+.tg-rt-pitta th{color:#f472b6;}
+.tg-rt-max td{color:#fff;}
+.tg-rt-max th,.tg-rt-max td{border-bottom:none;background:rgba(251,191,36,.12);}
+.tg-rwd{width:100%;display:flex;align-items:center;gap:6px;font-size:12px;padding:5px 10px;border-radius:10px;background:var(--panel,#1c2030);border:1px solid #2b3150;color:var(--text-dim,#8b90a5);}
+.tg-rwd b{color:var(--text-dim,#8b90a5);font-weight:700;}
+.tg-rwd.got{border-color:rgba(251,191,36,.45);}
+.tg-rwd.got b{color:var(--gold,#fbbf24);font-size:13px;}
+.tg-rwd-p{margin-left:auto;font-size:11px;font-weight:900;color:#f472b6;}
+.tg-chip.pitta{background:linear-gradient(90deg,#4ade80,#f472b6);}
+.tg-pitta-fx{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;opacity:0;}
+.tg-pitta-fx.show{animation:tgPitta 1.3s ease-out forwards;}
+.tg-pitta-big{font-size:40px;font-weight:900;letter-spacing:.06em;color:#fff;-webkit-text-stroke:1.5px #f472b6;text-shadow:0 0 14px rgba(244,114,182,.9),0 3px 0 #9d174d;}
+.tg-pitta-sub{font-size:20px;font-weight:900;color:var(--gold,#fbbf24);text-shadow:0 2px 6px rgba(0,0,0,.9);}
+@keyframes tgPitta{0%{opacity:0;transform:scale(2.2);}15%{opacity:1;transform:scale(.92);}25%{transform:scale(1.05);}35%{transform:scale(1);}80%{opacity:1;}100%{opacity:0;transform:translateY(-10px);}}
+.tg-rlist{list-style:none;margin:0;padding:0;width:100%;max-width:300px;font-size:13px;}
+.tg-rlist li{display:flex;justify-content:space-between;gap:8px;padding:5px 4px;border-bottom:1px solid #2b3150;}
+.tg-rlist li.ok{color:var(--success,#4ade80);}
+.tg-rlist li.ng{color:var(--text-dim,#8b90a5);}
+.tg-rlist em{font-style:normal;color:#f472b6;font-weight:900;font-size:11px;}
+.tg-rnote{margin:-6px 0 0;font-size:12px;}
+@media (prefers-reduced-motion: reduce){
+  .tg-pitta-fx.show{animation:none;opacity:1;}
+}
+.tg-head .tg-title.sm{white-space:nowrap;font-size:15px;letter-spacing:.04em;}
+.tg-chip{white-space:nowrap;padding:3px 6px;}
+.tg-chip.pitta{color:#fff;}
+
+/* --- 予測軌道 --- */
+.tg-pred-arc{fill:none;stroke:rgba(226,232,240,.7);stroke-width:1.6;stroke-dasharray:4 4;stroke-linecap:round;}
+.tg-pred-dot{fill:none;stroke:rgba(226,232,240,.85);stroke-width:1.6;}
+.tg-pred-t{font-size:10px;font-weight:900;fill:#e2e8f0;paint-order:stroke;stroke:rgba(0,0,0,.75);stroke-width:2.5px;}
+.tg-pred.reach .tg-pred-arc{stroke:rgba(74,222,128,.9);}
+.tg-pred.reach .tg-pred-dot{stroke:var(--success,#4ade80);fill:rgba(74,222,128,.25);}
+.tg-pred.reach .tg-pred-t{fill:var(--success,#4ade80);}
+.tg-pred.pitta .tg-pred-arc{stroke:var(--gold,#fbbf24);stroke-width:2.4;stroke-dasharray:6 3;filter:drop-shadow(0 0 3px rgba(251,191,36,.9));animation:tgPredFlow .6s linear infinite;}
+.tg-pred.pitta .tg-pred-dot{stroke:var(--gold,#fbbf24);fill:rgba(251,191,36,.45);filter:drop-shadow(0 0 4px rgba(251,191,36,1));}
+.tg-pred.pitta .tg-pred-t{fill:var(--gold,#fbbf24);font-size:11px;}
+@keyframes tgPredFlow{to{stroke-dashoffset:-9;}}
+@media (prefers-reduced-motion: reduce){.tg-pred.pitta .tg-pred-arc{animation:none;}}

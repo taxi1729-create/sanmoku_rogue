@@ -2,58 +2,69 @@
  * 公開API（グローバル const HighLowGame）:
  *   HighLowGame.open({floor}) -> Promise<{win:boolean}>  オーバーレイを閉じたときに resolve
  *   HighLowGame.isOpen()
- *   HighLowGame.npcDecide(npcVal, playerVal, round, rng) -> 'bet'|'check'   NPCのレイズ判断（純粋関数）
- *   HighLowGame.npcRespond(npcVal, playerVal, round, rng) -> 'call'|'fold'  プレイヤーのレイズへの応答（純粋関数）
- *   HighLowGame.npcCallProb(npcVal, playerVal, round) -> 0..1               コール確率
+ *   HighLowGame.npcDecide(npcVal, playerVal, falter, rng) -> 'bet'|'check'   NPCのレイズ判断
+ *   HighLowGame.npcRespond(npcVal, playerVal, falter, rng) -> 'call'|'fold'  プレイヤーのレイズへの応答
+ *   HighLowGame.npcCallProb(npcVal, playerVal, falter) -> 0..1               コール確率
+ *     falter: boolean（千里眼不調）。数値を渡した場合はラウンド番号とみなし、進行中の勝負の不調ラウンドか判定。
+ *   HighLowGame.effectiveValue(card, gambleDelta) -> number                   このミニゲームでの札の値
  *   HighLowGame.roundPoints(npcBet, playerBet) -> 1|2|4                      ラウンド勝者の得点
- *   HighLowGame._debug  テスト用（rng 上書き / respondRng 上書き / npcPick 上書き / state 参照 / delayScale）
+ *   HighLowGame._debug  テスト用（rng / respondRng / gambleRng 上書き / npcPick 上書き / state 参照 / delayScale）
  * 報酬の付与は行わない（呼び出し側の責務）。表示のみ。
  * ルール:
- *   プレイヤーはデッキからランダムに8枚（コピー）を引き、値は baseScore。NPCの手札は [0,10,20,40,100]。
+ *   プレイヤーはデッキからランダムに8枚（コピー）を引く。NPCの手札は [0,10,20,40,100]。
+ *   札の値（この勝負のみ・デッキのカードは変更しない）：基礎点に強化倍率（横拡張・縦拡張×2／拡大×4）を先に掛け、
+ *     その後ギャンブルの加算値（本編と同じ抽選：-50〜+50、レリック「ギャンブル依存症」なら±50）を足す。
  *   各ラウンド：プレイヤーが表向きで1枚選ぶ → NPCはランダムに1枚選び（伏せ）、勝敗を透視してレイズ/チェック宣言
- *   （勝ち確定 80%レイズ・負け確定 20%レイズ・引き分け 50%、3・5回戦は千里眼不調で常に50%）
+ *   （勝ち確定 80%レイズ・負け確定 20%レイズ・引き分け 50%、千里眼不調の回は常に50%）
+ *   千里眼不調：ジャミング「混乱」「スタン」「ブレイク」「ビンゴ阻害」付きの札を出すと、次の回戦で千里眼が不調になる。
  *   → NPCチェック時：プレイヤーがレイズ/チェック。NPCレイズ時：プレイヤーがレイズ/コール/フォールド
  *     （フォールド→NPCが倍化なしの1点を獲得、コール→公開でNPCレイズ×2）。
  *     チェック：公開。高い方が勝ち、基本1点・NPCレイズで×2。同値は0点。
  *     レイズ：NPCがコール/フォールドを選ぶ（勝ち・引き分けが視えればコール、負けが視えればフォールド。
- *       3・5回戦は50%。NPCの札が0なら常にフォールド）。
+ *       不調の回は50%。NPCの札が0なら常にフォールド）。
  *       コール→公開、プレイヤーレイズでさらに×2。フォールド→即終了、プレイヤーがレイズ倍化なしの得点を獲得。
- *   最大5回戦・先に3点で勝利。5回戦終了時に点数が多い方の勝ち、同点はプレイヤーの敗北。使ったカードは消費。
+ *   最大5回戦。プレイヤーが3点取った時点で勝利。5回戦終了時にプレイヤーが3点未満なら敗北（千里眼の点数は勝敗に無関係）。使ったカードは消費。
  */
 const HighLowGame = (function(){
   'use strict';
 
   const NPC_CARDS = [0, 10, 20, 40, 100];
   const MAX_ROUNDS = 5, WIN_POINTS = 3, HAND_SIZE = 8;
-  const FALTER_ROUNDS = [3, 5];
+  const FALTER_JAMMINGS = ['混乱', 'スタン', 'ブレイク', 'ビンゴ阻害'];   // 出した次の回戦で千里眼が不調になる
+  const ENHANCE_MULT = { '横拡張':2, '縦拡張':2, '拡大':4 };   // この勝負のみ基礎点に掛ける倍率
 
-  const _debug = { rng:null, respondRng:null, npcPick:null, delayScale:1, state:null };
+  const _debug = { rng:null, respondRng:null, gambleRng:null, npcPick:null, delayScale:1, state:null };
   const rnd = () => (_debug.rng ? _debug.rng() : Math.random());
 
   let st = null, root = null, resolveFn = null;
 
   // ---------- 純粋ロジック ----------
-  function npcBetProb(npcVal, playerVal, round){
-    if(FALTER_ROUNDS.includes(round)) return 0.5;
+  // falter: boolean。数値ならラウンド番号として進行中の勝負の不調ラウンドか判定
+  function isFalter(f){
+    if(typeof f === 'number') return !!(st && st.falterRounds && st.falterRounds.includes(f));
+    return !!f;
+  }
+  function npcBetProb(npcVal, playerVal, falter){
+    if(isFalter(falter)) return 0.5;
     if(npcVal > playerVal) return 0.8;
     if(npcVal < playerVal) return 0.2;
     return 0.5;
   }
-  function npcDecide(npcVal, playerVal, round, rng){
+  function npcDecide(npcVal, playerVal, falter, rng){
     const r = (rng || rnd)();
-    return r < npcBetProb(npcVal, playerVal, round) ? 'bet' : 'check';
+    return r < npcBetProb(npcVal, playerVal, falter) ? 'bet' : 'check';
   }
   // プレイヤーのレイズに対するNPCのコール確率
-  function npcCallProb(npcVal, playerVal, round){
+  function npcCallProb(npcVal, playerVal, falter){
     if(npcVal === 0) return 0;                    // 0の札は必ずフォールド（不調回でも）
-    if(FALTER_ROUNDS.includes(round)) return 0.5; // 千里眼不調：ランダム
+    if(isFalter(falter)) return 0.5;              // 千里眼不調：ランダム
     if(npcVal > playerVal) return 1;              // 勝ちが視えている → コール
     if(npcVal < playerVal) return 0;              // 負けが視えている → フォールド
     return 1;                                     // 引き分け → コール（失うものはない）
   }
-  function npcRespond(npcVal, playerVal, round, rng){
+  function npcRespond(npcVal, playerVal, falter, rng){
     const r = (rng || _debug.respondRng || rnd)();
-    return r < npcCallProb(npcVal, playerVal, round) ? 'call' : 'fold';
+    return r < npcCallProb(npcVal, playerVal, falter) ? 'call' : 'fold';
   }
   function roundPoints(npcBet, playerBet){
     return 1 * (npcBet ? 2 : 1) * (playerBet ? 2 : 1);
@@ -63,7 +74,49 @@ const HighLowGame = (function(){
   const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const reduced = () => { try{ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } };
   const wait = ms => new Promise(r => setTimeout(r, reduced() ? Math.min(ms, 120) * _debug.delayScale : ms * _debug.delayScale));
-  const valOf = c => Number(c && c.baseScore) || 0;
+  // 手札エントリ h の値（effectiveValue で算出済み）
+  const valOf = h => Number(h && h.val) || 0;
+  const causesFalter = card => !!(card && FALTER_JAMMINGS.includes(card.jamming));
+
+  // 本編のギャンブル基礎点（手札に来た時の加算分を除いた値）
+  function rawBase(card){
+    let b = Number(card && card.baseScore) || 0;
+    if(card && card.enhance === 'ギャンブル' && card._gambleDelta) b -= card._gambleDelta;
+    return b;
+  }
+  // 本編（GameMainScene の手札追加処理）と同じ抽選：-50〜+50 の整数。ギャンブル依存症なら ±50
+  function rollGamble(){
+    const r = () => (_debug.gambleRng ? _debug.gambleRng() : Math.random());
+    let addicted = false;
+    try{
+      addicted = typeof GameState !== 'undefined' && GameState.hasRelic && GameState.hasRelic('gambling_addict')
+        && (typeof GameMainScene === 'undefined' || !GameMainScene.relicActive || GameMainScene.relicActive());
+    }catch(e){ addicted = false; }
+    return addicted ? (r() < 0.5 ? 50 : -50) : Math.round(r() * 100 - 50);
+  }
+  // 計算順：①基礎点 ×強化倍率（横拡張・縦拡張×2／拡大×4） → ②ギャンブル加算値を足す
+  function effectiveValue(card, gambleDelta){
+    const mult = ENHANCE_MULT[card && card.enhance] || 1;
+    return rawBase(card) * mult + (card && card.enhance === 'ギャンブル' ? (Number(gambleDelta) || 0) : 0);
+  }
+  function makeEntry(uid, card){
+    // card はコピー。表示用にギャンブル加算前の基礎点へ戻しておく（デッキ本体は変更しない）
+    if(card.enhance === 'ギャンブル'){ card.baseScore = rawBase(card); card._gambleDelta = 0; }
+    const base = rawBase(card), mult = ENHANCE_MULT[card.enhance] || 1;
+    const gamble = card.enhance === 'ギャンブル' ? rollGamble() : 0;
+    return { uid, card, base, mult, gamble, val:effectiveValue(card, gamble), falter:causesFalter(card) };
+  }
+  // 札の値ラベル（変化がなければ値のみ）
+  function valLabel(h){
+    return (h.mult !== 1 || h.gamble) ? `基礎${h.base}→${h.val}` : String(h.val);
+  }
+  function tagsHtml(h){
+    const t = [];
+    if(h.mult !== 1) t.push(`<span class="hl-tag mult">基礎×${h.mult}</span>`);
+    if(h.card.enhance === 'ギャンブル') t.push(`<span class="hl-tag gamble">ギャンブル${h.gamble >= 0 ? '+' : ''}${h.gamble}</span>`);
+    if(h.falter) t.push(`<span class="hl-tag falter">次の番 不調</span>`);
+    return t.length ? `<span class="hl-tags">${t.join('')}</span>` : '';
+  }
 
   function cloneCard(c){
     try{ return JSON.parse(JSON.stringify(c)); }catch(e){ return Object.assign({}, c); }
@@ -72,9 +125,9 @@ const HighLowGame = (function(){
     const deck = (typeof GameState !== 'undefined' && Array.isArray(GameState.currentDeck)) ? GameState.currentDeck : [];
     const idx = deck.map((_, i) => i);
     for(let i = idx.length - 1; i > 0; i--){ const j = Math.floor(rnd() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
-    const hand = idx.slice(0, HAND_SIZE).map((i, k) => ({ uid:'p' + k, card:cloneCard(deck[i]) }));
+    const hand = idx.slice(0, HAND_SIZE).map((i, k) => makeEntry('p' + k, cloneCard(deck[i])));
     // デッキが極端に少ない場合の保険
-    while(hand.length < MAX_ROUNDS){ hand.push({ uid:'p' + hand.length, card:{ symbol:'Circle', baseScore:10 } }); }
+    while(hand.length < MAX_ROUNDS){ hand.push(makeEntry('p' + hand.length, { symbol:'Circle', baseScore:10 })); }
     return hand;
   }
 
@@ -86,7 +139,7 @@ const HighLowGame = (function(){
         return G.cardTagsHtml(card) + G.cardSymbolHtml(card) + G.cardScoreHtml(card, gold);
       }catch(e){ /* フォールバックへ */ }
     }
-    return `<div class="hl-fallback-val">${valOf(card)}</div>`;
+    return `<div class="hl-fallback-val">${rawBase(card)}</div>`;
   }
   function cardHtml(card){
     const tr = card.trait ? ' trait-' + String(card.trait).replace(/[()]/g, '') : '';
@@ -153,7 +206,7 @@ const HighLowGame = (function(){
         </div>
         <div class="hl-score">
           <div class="hl-score-side hl-score-player"><span class="hl-score-lbl">あなた</span><span class="hl-score-num" data-k="p">0</span></div>
-          <div class="hl-score-mid">先に<b>3点</b>で勝利</div>
+          <div class="hl-score-mid"><b>3点</b>取れば勝利</div>
           <div class="hl-score-side hl-score-npc"><span class="hl-score-num" data-k="n">0</span><span class="hl-score-lbl">千里眼</span></div>
         </div>
         <div class="hl-msg"></div>
@@ -168,7 +221,7 @@ const HighLowGame = (function(){
   function renderRounds(){
     const el = $('.hl-rounds');
     el.innerHTML = Array.from({length:MAX_ROUNDS}, (_, i) => {
-      const r = i + 1, f = FALTER_ROUNDS.includes(r);
+      const r = i + 1, f = st.falterRounds.includes(r);
       const cls = ['hl-pip'];
       if(f) cls.push('falter');
       if(r === st.round) cls.push('cur');
@@ -181,7 +234,8 @@ const HighLowGame = (function(){
   function renderNpc(){
     $('.hl-npc-backs').innerHTML = st.npcHand.map(() => `<div class="hl-back mini"></div>`).join('');
     $('.hl-npc-list').innerHTML = '<span class="hl-npc-list-lbl">残り札</span>' + NPC_CARDS.map(v =>
-      `<span class="hl-chip${st.npcHand.includes(v) ? '' : ' used'}">${v}</span>`).join('');
+      // v1.17 出した札は公開（めくり）されるまで残り札として表示し、どれを出したか分からないようにする
+      `<span class="hl-chip${(st.npcHand.includes(v) || (st.cur && st.cur.nv === v && !st.cur.revealed)) ? '' : ' used'}">${v}</span>`).join('');
   }
   function renderScore(bump){
     const p = $('.hl-score-num[data-k="p"]'), n = $('.hl-score-num[data-k="n"]');
@@ -197,8 +251,8 @@ const HighLowGame = (function(){
       w.className = 'hl-hcard' + (h.used ? ' used' : '');
       w.dataset.uid = h.uid;
       w.disabled = h.used || st.phase !== 'pick';
-      w.setAttribute('aria-label', `カード 値${valOf(h.card)}`);
-      w.innerHTML = `<div class="hl-cscale">${cardHtml(h.card)}</div><span class="hl-hval">${valOf(h.card)}</span>`;
+      w.setAttribute('aria-label', `カード 値${valOf(h)}${h.falter ? '（次の番 千里眼不調）' : ''}`);
+      w.innerHTML = `<div class="hl-cscale">${cardHtml(h.card)}</div>${tagsHtml(h)}<span class="hl-hval${h.val !== h.base ? ' mod' : ''}">${valLabel(h)}</span>`;
       w.addEventListener('click', () => onPick(h.uid));
       el.appendChild(w);
     });
@@ -240,8 +294,9 @@ const HighLowGame = (function(){
         <li>相手がレイズ→あなたは<b>コール</b>（公開、<b>2点</b>）・<b>フォールド</b>（降りて相手に<b>1点</b>）・<b>レイズ</b>のいずれか。同値は0点。</li>
         <li>あなたがレイズすると相手は<b>コール／フォールド</b>を選ぶ。勝ち（同値含む）が視えればコール、負けが視えればフォールド。<b>0の札</b>なら必ずフォールド。</li>
         <li>コール→公開、得点はさらに<b>×2</b>（最大4点）。フォールド→その場であなたの勝ち（あなたのレイズの×2はなし）。</li>
-        <li>最大<b>5回戦</b>・先に<b>3点</b>で勝利。5回戦終了時に同点なら<b>あなたの負け</b>。</li>
-        <li><span class="hl-falter-txt">3回戦・5回戦</span>は千里眼の調子が悪く、相手のレイズ／コールの判断はランダム。</li>
+        <li>最大<b>5回戦</b>。あなたが<b>3点</b>取った時点で勝利。5回戦を終えてあなたが3点未満なら<b>あなたの負け</b>（千里眼の点数は勝敗に関係しない）。</li>
+        <li>ジャミング<b>「混乱」「スタン」「ブレイク」「ビンゴ阻害」</b>付きの札を出すと、<span class="hl-falter-txt">次の回戦は千里眼が不調</span>になり、相手のレイズ／コールの判断はランダム。</li>
+        <li>強化<b>「横拡張」「縦拡張」</b>の札は基礎点<b>×2</b>、<b>「拡大」</b>は<b>×4</b>（この勝負のみ）。<b>「ギャンブル」</b>は引いた時の加算値を基礎点に足す（倍率→加算の順）。</li>
         <li>出した札は消費される（デッキには影響なし）。</li>
       </ul>
       <div class="hl-reward">勝利報酬：<b>${esc(st.rewardText)}</b></div>
@@ -250,12 +305,12 @@ const HighLowGame = (function(){
   }
 
   function showResult(){
-    const win = st.score.p > st.score.n && st.score.p > 0 ? true : false;
+    const win = st.score.p >= WIN_POINTS; // v1.15 勝利条件はプレイヤーが3点以上のみ
     st.win = win;
     const p = showPanel(`
       <div class="hl-result ${win ? 'win' : 'lose'}">${win ? '勝利' : '敗北'}</div>
       <div class="hl-result-score">あなた <b>${st.score.p}</b> − <b>${st.score.n}</b> 千里眼</div>
-      <p class="hl-panel-lead">${win ? '「……視えていたはずなのに。見事だ」' : (st.score.p === st.score.n ? '「引き分けか。ならば我の勝ちとしよう」' : '「未来は、最初から決まっていた」')}</p>
+      <p class="hl-panel-lead">${win ? '「……視えていたはずなのに。見事だ」' : (false ? '' : '「未来は、最初から決まっていた」')}</p>
       ${win ? `<div class="hl-reward">獲得：<b>${esc(st.rewardText)}</b></div>` : `<div class="hl-reward dim">報酬なし</div>`}
       <button type="button" class="hl-btn hl-btn-main" data-act="close">戻る</button>`);
     p.querySelector('[data-act="close"]').addEventListener('click', close);
@@ -268,12 +323,13 @@ const HighLowGame = (function(){
     $('.hl-slot-npc .hl-slot-card').innerHTML = '';
     $('.hl-slot-player .hl-slot-card').innerHTML = '';
     setDecl('n', null); setDecl('p', null);
-    root.classList.toggle('falter', FALTER_ROUNDS.includes(st.round));
+    const falter = st.falterRounds.includes(st.round);
+    root.classList.toggle('falter', falter);
     $('.hl-arena').classList.remove('res-w', 'res-l', 'res-d');
     renderAll();
-    setMsg(`<b>第${st.round}回戦</b>${FALTER_ROUNDS.includes(st.round) ? '<span class="hl-falter-txt">（千里眼不調）</span>' : ''} ― 出す札を選んでください`);
+    setMsg(`<b>第${st.round}回戦</b>${falter ? '<span class="hl-falter-txt">（千里眼不調）</span>' : ''} ― 出す札を選んでください`);
     setActions('');
-    if(FALTER_ROUNDS.includes(st.round)) setSpeech('む…視界が霞む…', 'falter');
+    if(falter) setSpeech('む…視界が霞む…', 'falter');
     else setSpeech(st.round === 1 ? '……お前の札は、すべて視えている。' : 'さあ、次の札を見せてみろ。', null);
   }
 
@@ -283,27 +339,35 @@ const HighLowGame = (function(){
     if(!h) return;
     st.phase = 'npc';
     h.used = true;
-    const pv = valOf(h.card);
+    const pv = valOf(h);
+    const falter = st.falterRounds.includes(st.round);
+    // ジャミング「混乱」「スタン」「ブレイク」「ビンゴ阻害」付きの札 → 次の回戦で千里眼不調
+    const triggered = h.falter && st.round < MAX_ROUNDS && !st.falterRounds.includes(st.round + 1);
+    if(triggered) st.falterRounds.push(st.round + 1);
     // NPC：残り札からランダム
     let ni = _debug.npcPick ? _debug.npcPick(st.npcHand.slice(), pv, st.round) : Math.floor(rnd() * st.npcHand.length);
     if(typeof ni !== 'number' || ni < 0 || ni >= st.npcHand.length) ni = 0;
     const nv = st.npcHand.splice(ni, 1)[0];
-    const decision = npcDecide(nv, pv, st.round);
-    st.cur = { pv, nv, npc:decision, player:null, card:h.card };
-    renderHand(); renderNpc();
-    $('.hl-slot-player .hl-slot-card').innerHTML = `<div class="hl-play-in"><div class="hl-cscale">${cardHtml(h.card)}</div><span class="hl-hval">${pv}</span></div>`;
+    const decision = npcDecide(nv, pv, falter);
+    st.cur = { pv, nv, npc:decision, player:null, card:h.card, falter };
+    renderHand(); renderNpc(); renderRounds();
+    $('.hl-slot-player .hl-slot-card').innerHTML = `<div class="hl-play-in"><div class="hl-cscale">${cardHtml(h.card)}</div><span class="hl-hval${h.val !== h.base ? ' mod' : ''}">${valLabel(h)}</span></div>`;
     $('.hl-slot-npc .hl-slot-card').innerHTML = `
       <div class="hl-flip"><div class="hl-flip-inner">
         <div class="hl-flip-face hl-flip-back"><div class="hl-back"></div></div>
         <div class="hl-flip-face hl-flip-front"><div class="hl-npc-card">${nv}</div></div>
       </div></div>`;
-    setMsg('千里眼が札を選んでいる…');
-    setSpeech('……ふむ。', FALTER_ROUNDS.includes(st.round) ? 'falter' : null);
+    if(triggered){
+      setMsg(`千里眼が札を選んでいる…　<span class="hl-falter-txt">第${st.round + 1}回戦は千里眼不調！</span>`);
+      setSpeech('ぐっ…札の力で視界が乱れる…', 'falter');
+    } else {
+      setMsg('千里眼が札を選んでいる…');
+      setSpeech('……ふむ。', falter ? 'falter' : null);
+    }
     root.classList.add('gazing');
     await wait(900);
     if(!root) return;
     root.classList.remove('gazing');
-    const falter = FALTER_ROUNDS.includes(st.round);
     const line = decision === 'bet'
       ? (falter ? 'む…視界が霞む…だが、レイズだ' : '…見えたぞ。レイズだ')
       : (falter ? 'む…視界が霞む…チェックにしておこう' : '…チェックだ');
@@ -342,7 +406,7 @@ const HighLowGame = (function(){
     setDecl('p', c.player);
     setActions('');
     $('.hl-actions').classList.remove('three');
-    const falter = FALTER_ROUNDS.includes(st.round);
+    const falter = !!c.falter;
     if(act === 'fold'){
       // プレイヤーが降りる：千里眼の勝ち（レイズの×2なし）
       c.response = null;
@@ -352,7 +416,7 @@ const HighLowGame = (function(){
       await wait(450);
       if(!root) return;
       const fl = $('.hl-slot-npc .hl-flip');
-      if(fl) fl.classList.add('flipped');
+      if(fl) fl.classList.add('flipped'); if(st && st.cur){ st.cur.revealed = true; renderNpc(); }
       await wait(650);
       if(!root) return;
       const pts = roundPoints(false, false);
@@ -369,7 +433,7 @@ const HighLowGame = (function(){
     }
     if(bet){
       // NPCの応答：コール or フォールド
-      c.response = npcRespond(c.nv, c.pv, st.round);
+      c.response = npcRespond(c.nv, c.pv, falter);
       setMsg('千里眼が応答を考えている…');
       root.classList.add('gazing');
       await wait(700);
@@ -386,7 +450,7 @@ const HighLowGame = (function(){
         await wait(350);
         if(!root) return;
         const fl = $('.hl-slot-npc .hl-flip');
-        if(fl) fl.classList.add('flipped');
+        if(fl) fl.classList.add('flipped'); if(st && st.cur){ st.cur.revealed = true; renderNpc(); }
         await wait(550);
         if(!root) return;
         if(fl) fl.classList.add('folded');
@@ -410,7 +474,7 @@ const HighLowGame = (function(){
     await wait(250);
     if(!root) return;
     const fl = $('.hl-slot-npc .hl-flip');
-    if(fl) fl.classList.add('flipped');
+    if(fl) fl.classList.add('flipped'); if(st && st.cur){ st.cur.revealed = true; renderNpc(); }
     await wait(650);
     if(!root) return;
     const pts = roundPoints(c.npc === 'bet', bet);
@@ -429,7 +493,8 @@ const HighLowGame = (function(){
   }
 
   function afterRound(){
-    if(st.score.p >= WIN_POINTS || st.score.n >= WIN_POINTS || st.round >= MAX_ROUNDS){
+    // v1.15 プレイヤーが3点取れば勝利。千里眼が3点以上取っても終了せず、5回戦終了時にプレイヤーが3点未満なら敗北
+    if(st.score.p >= WIN_POINTS || st.round >= MAX_ROUNDS){
       st.phase = 'end';
       showResult();
     } else {
@@ -460,6 +525,7 @@ const HighLowGame = (function(){
       floor, n, rewardText:`特別アップグレード1パック＋${10 * n}G`,
       hand:drawPlayerHand(), npcHand:NPC_CARDS.slice(),
       round:1, score:{ p:0, n:0 }, history:[], phase:'intro', cur:null, win:false,
+      falterRounds:[],   // 千里眼不調の回戦（ジャミング札を出すと次の回戦が追加される）
     };
     _debug.state = st;
     build();
@@ -472,7 +538,7 @@ const HighLowGame = (function(){
 
   return {
     open, isOpen:() => !!root,
-    npcDecide, npcBetProb, npcRespond, npcCallProb, roundPoints,
-    NPC_CARDS, _debug,
+    npcDecide, npcBetProb, npcRespond, npcCallProb, roundPoints, effectiveValue,
+    NPC_CARDS, FALTER_JAMMINGS, ENHANCE_MULT, _debug,
   };
 })();

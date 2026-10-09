@@ -87,11 +87,11 @@ const MapSelectScene = {
         return;
       }
       const card=document.createElement('div');
-      // v1.10 イベントコモン：コモンのカードにイベント内容を表示し、挑戦時に「イベント／通常コモン」を選ばせる
+      // v1.13 裏世界：第3・8階層のコモンは「コモンを攻略／裏世界に入る／スキップ」の3択
       const ev=(stage.key==='common')?this.floorEventFor(GameState.currentFloor):null;
-      const evInfo=ev?GameData.eventCommonInfo(ev.type,GameState.currentFloor):null;
+      const evInfo=!!(ev&&Array.isArray(ev.lineup));
       // #4 「クリア済み・再挑戦」表記を廃止
-      card.className='stage-card'+(locked?' locked':'')+(evInfo?' event-common-card ev-'+ev.type:'');
+      card.className='stage-card'+(locked?' locked':'')+(evInfo?' event-common-card ura-common-card':'');
       let bossInfoHtml='';
       let bossRerollBtnHtml='';
       if(stage.key==='boss'&&GameState.pendingBossEffect){
@@ -112,20 +112,24 @@ const MapSelectScene = {
       }
       const evCommitted=!!(ev&&ev.committed&&!ev.done&&!isCleared);
       if(evCommitted) skipBonusHtml='';
-      const evHtml=evInfo?this.eventCardHtml(ev,evInfo,stage,isCleared):'';
+      const evHtml=evInfo?this.eventCardHtml(ev,stage,isCleared):'';
+      const uraOpen=!!(evInfo&&!ev.done&&!isCleared);
       const actionsHtml=isCleared
         ? `<div class="stage-actions"><div class="stage-done-tag">クリア済み</div></div>`
-        : `<div class="stage-actions"><button class="challenge-btn" ${locked?'disabled':''}>${evCommitted?'イベントを再開する':'挑戦する'}</button>${(stage.skippable&&!evCommitted)?`<button class="skip-btn" ${locked?'disabled':''}>スキップ</button>`:''}</div>`;
-      card.innerHTML=`<div class="stage-tag">${stage.tag}${evInfo?`<span class="ev-tag">EVENT</span>`:''}</div><div class="stage-name">${stage.name}</div><div class="stage-goal">目標：${GlobalFunctions.formatScore(stage.targetScore)}点</div>${evHtml}${bossInfoHtml}${bossRerollBtnHtml}${skipBonusHtml}${actionsHtml}`;
+        : uraOpen
+          ? `<div class="stage-actions ura-actions">${evCommitted?'':`<button class="challenge-btn" ${locked?'disabled':''}>コモンを攻略</button>`}<button class="ura-enter-btn" ${locked?'disabled':''}>${evCommitted?'裏世界に戻る（イベント再開）':'裏世界に入る'}</button>${(stage.skippable&&!evCommitted)?`<button class="skip-btn" ${locked?'disabled':''}>スキップ</button>`:''}</div>`
+          : `<div class="stage-actions"><button class="challenge-btn" ${locked?'disabled':''}>挑戦する</button>${(stage.skippable&&!evCommitted)?`<button class="skip-btn" ${locked?'disabled':''}>スキップ</button>`:''}</div>`;
+      card.innerHTML=`<div class="stage-tag">${stage.tag}${evInfo?`<span class="ev-tag ura-tag">裏世界</span>`:''}</div><div class="stage-name">${stage.name}</div><div class="stage-goal">目標：${GlobalFunctions.formatScore(stage.targetScore)}点</div>${evHtml}${bossInfoHtml}${bossRerollBtnHtml}${skipBonusHtml}${actionsHtml}`;
       path.appendChild(card);
       const challengeBtn=card.querySelector('.challenge-btn');
       if(challengeBtn) challengeBtn.addEventListener('click',()=>{
         if(locked) return;
-        if(ev&&!ev.done&&!isCleared){
-          if(evCommitted) this.startEvent(stage,ev); else this.openEventChoice(stage,ev);
-          return;
-        }
         App.showGameMain(stage);
+      });
+      const uraBtn=card.querySelector('.ura-enter-btn');
+      if(uraBtn) uraBtn.addEventListener('click',()=>{
+        if(locked||isCleared||!ev||ev.done) return;
+        if(typeof UraSekai!=='undefined') UraSekai.open(stage,ev);
       });
       // #3 ホシパッシブ1：ボス効果リロール
       const bossRerollBtn=card.querySelector('.boss-reroll-btn');
@@ -198,7 +202,6 @@ const MapSelectScene = {
     this.container.appendChild(el);
     const pip=GameMainScene.renderPassiveInfoPanel(()=>this.renderAll()); if(pip) this.container.appendChild(pip); // #16
     if(this.pendingReward) this.container.appendChild(this.renderRewardPopup());
-    if(this.pendingEventResult) this.container.appendChild(this.renderEventResultPopup());
     window.scrollTo(0,scrollY);
   },
 
@@ -221,120 +224,139 @@ const MapSelectScene = {
     return area;
   },
 
-  // ===================== v1.10 イベントコモン（第3・8階層） =====================
+  // ===================== v1.10 イベントコモン → v1.13 裏世界（第3・8階層） =====================
+  // floorEvents[floor]={lineup:[type×3], eliteEffect, committed, active, done, result, altarPaid, altarInfo}
   floorEventFor(floor){ return (GameState.floorEvents&&GameState.floorEvents[floor])||null; },
-  // 階層侵入時に一度だけ抽選して保存（リロードしても同じイベント・同じボス効果）
+  _rollLineup(include){
+    const pool=GameData.EVENT_COMMON_TYPES.filter(t=>t!==include);
+    const size=GameData.URASEKAI_LINEUP_SIZE||3;
+    const picks=GlobalFunctions.shuffle(pool).slice(0, include?size-1:size);
+    if(include) picks.splice(Math.floor(Math.random()*(picks.length+1)),0,include);
+    return picks;
+  },
+  // 階層侵入時に一度だけ抽選して保存（リロード・入り直しでも同じラインナップ・同じボス効果）
   ensureFloorEvent(floor){
     if(!GameData.EVENT_COMMON_FLOORS.includes(floor)) return null;
     if(!GameState.floorEvents||typeof GameState.floorEvents!=='object') GameState.floorEvents={};
-    if(GameState.floorEvents[floor]) return GameState.floorEvents[floor];
-    if(GameState.clearedStages.includes('common')) return null; // 旧セーブ等で既にコモンが終わっている
-    const type=GlobalFunctions.randChoice(GameData.EVENT_COMMON_TYPES);
-    const ev={type, committed:false, done:false, result:null};
-    if(type==='eliteboss'&&GameData.BOSS_EFFECT_POOL.length>0){
-      ev.eliteEffect=GameData.bossEffectForFloor(GlobalFunctions.randChoice(GameData.BOSS_EFFECT_POOL),floor);
+    let ev=GameState.floorEvents[floor];
+    if(ev){
+      // 旧セーブ（v1.10〜v1.12：type のみ）→ そのイベントを含むラインナップを作る
+      if(!Array.isArray(ev.lineup)){
+        ev.lineup=this._rollLineup(GameData.EVENT_COMMON_TYPES.includes(ev.type)?ev.type:null);
+        if(ev.committed&&!ev.active&&ev.type) ev.active=ev.type;
+        this._ensureEliteEffect(ev,floor);
+        try{ App.saveGame(); }catch(e){}
+      }
+      return ev;
     }
+    if(GameState.clearedStages.includes('common')) return null; // 旧セーブ等で既にコモンが終わっている
+    ev={lineup:this._rollLineup(null), committed:false, active:null, done:false, result:null};
+    this._ensureEliteEffect(ev,floor);
     GameState.floorEvents[floor]=ev;
     try{ App.saveGame(); }catch(e){}
     return ev;
+  },
+  _ensureEliteEffect(ev,floor){
+    if(ev.lineup.includes('eliteboss')&&!ev.eliteEffect&&GameData.BOSS_EFFECT_POOL.length>0){
+      ev.eliteEffect=GameData.bossEffectForFloor(GlobalFunctions.randChoice(GameData.BOSS_EFFECT_POOL),floor);
+    }
   },
   eliteTarget(floor){
     const boss=GameData.buildFloorStages(floor).find(s=>s.key==='boss');
     return Math.round((boss?boss.targetScore:0)*1.5);
   },
-  eventCardHtml(ev,info,stage,isCleared){
-    const floor=GameState.currentFloor;
-    let extra='';
-    if(ev.type==='eliteboss'){
-      const b=ev.eliteEffect;
-      extra=`<div class="ev-line">目標：<b>${GlobalFunctions.formatScore(this.eliteTarget(floor))}点</b>（ボスの1.5倍）</div>`+(b?`<div class="ev-line">ボス効果：<b>${b.name}</b>：${b.desc}</div>`:'');
-    }
+  eventCardHtml(ev,stage,isCleared){
     let status='';
-    if(ev.done) status=`<div class="ev-status">${ev.result==='win'?'イベント成功':ev.result==='lose'?'イベント失敗':'イベント終了'}</div>`;
-    else if(isCleared) status=`<div class="ev-status">通常コモンとして攻略済み</div>`;
-    else if(ev.committed) status=`<div class="ev-status">イベント挑戦中</div>`;
-    return `<div class="ev-box"><div class="ev-title">${info.name}</div><div class="ev-desc">${info.desc}</div>${extra}<div class="ev-reward">報酬：${info.reward}</div>${status}</div>`;
+    if(ev.done) status=`<div class="ev-status">裏世界のイベントを終えた${ev.result==='win'?'（成功）':ev.result==='lose'?'（失敗）':''}</div>`;
+    else if(isCleared) status=`<div class="ev-status ura-closed">通常コモンとして攻略済み（裏世界は閉じた）</div>`;
+    else if(ev.committed) status=`<div class="ev-status ura-active">裏世界でイベント進行中</div>`;
+    const open=!ev.done&&!isCleared;
+    return `<div class="ev-box ura-box"><div class="ev-title ura-map-title">裏世界への入口</div>`
+      +(open?`<div class="ev-desc">コモンの裏側に歪んだ世界が口を開けている。中には3つのイベントが待つ（出入りしてもラインナップは変わらない）。終えたらショップへ。</div>`
+             +`<div class="ura-lineup-chips">${ev.lineup.map(t=>{ const i=GameData.eventCommonInfo(t,GameState.currentFloor); return `<span class="ura-chip${ev.active===t?' active':''}">${i?i.name:t}</span>`; }).join('')}</div>`:'')
+      +status+`</div>`;
   },
-  closeEventChoice(){ const o=document.getElementById('ev-choice-overlay'); if(o) o.remove(); },
-  openEventChoice(stage,ev){
-    this.closeEventChoice();
-    const info=GameData.eventCommonInfo(ev.type,GameState.currentFloor);
-    const ov=document.createElement('div'); ov.id='ev-choice-overlay'; ov.className='pack-modal-overlay ev-choice-overlay';
-    const box=document.createElement('div'); box.className='pack-modal ev-choice-box';
-    const altarShort=ev.type==='altar'&&!ev.altarPaid&&(GameState.lives||0)<GameData.ALTAR_LIFE_COST; // v1.11 捧げるのは残機1
-    const evLabel=ev.type==='altar'?`イベントに挑む（残機${GameData.ALTAR_LIFE_COST}を捧げる）`:'イベントに挑む';
-    box.innerHTML=`<div class="ev-choice-head">第${GameState.currentFloor}階層・イベントコモン</div><h3 class="ev-choice-title">${info.name}</h3>`
-      +`<div class="ev-choice-desc">${info.desc}</div>`
-      +(ev.type==='eliteboss'?`<div class="ev-choice-desc">目標：<b>${GlobalFunctions.formatScore(this.eliteTarget(GameState.currentFloor))}点</b>${ev.eliteEffect?`／ボス効果：<b>${ev.eliteEffect.name}</b>：${ev.eliteEffect.desc}`:''}</div>`:'')
-      +`<div class="ev-choice-reward">報酬：${info.reward}</div>`
-      +`<div class="ev-choice-btns"><button class="ev-go-btn" ${altarShort?'disabled':''}>${evLabel}</button>${altarShort?`<div class="ev-choice-warn">残機が足りません（残機${GameData.ALTAR_LIFE_COST}必要・残り${GameState.lives||0}）</div>`:''}`
-      +`<button class="ev-normal-btn">通常のコモンステージを攻略する<small>目標：${GlobalFunctions.formatScore(stage.targetScore)}点</small></button>`
-      +`<button class="ev-cancel-btn">やめる</button></div>`;
-    ov.appendChild(box);
-    ov.addEventListener('click',(e)=>{ if(e.target===ov) this.closeEventChoice(); });
-    box.querySelector('.ev-go-btn').addEventListener('click',()=>{ if(altarShort) return; this.closeEventChoice(); this.startEvent(stage,ev); });
-    box.querySelector('.ev-normal-btn').addEventListener('click',()=>{ this.closeEventChoice(); App.showGameMain(stage); });
-    box.querySelector('.ev-cancel-btn').addEventListener('click',()=>this.closeEventChoice());
-    document.body.appendChild(ov);
-  },
-  // イベント終了処理（コモンをクリア済みにしてイベントを消化）
+  // イベント終了処理（裏世界を消化し、コモンをクリア済みにする）
   _finishEvent(ev,result){
-    ev.done=true; ev.result=result;
+    ev.done=true; ev.result=result; ev.committed=false;
     if(!GameState.clearedStages.includes('common')) GameState.clearedStages.push('common');
   },
-  startEvent(stage,ev){
+  // ミニゲームの結果 {win} または {reward:{gold,special},summary} を報酬に変換
+  normalizeMinigameResult(type,res,floor){
+    res=res||{};
+    let gold=0, special=0;
+    if(res.reward&&typeof res.reward==='object'){
+      gold=Math.max(0,Math.round(Number(res.reward.gold)||0));
+      special=Math.max(0,Math.floor(Number(res.reward.special)||0));
+    }else if(res.win){
+      const info=GameData.eventCommonInfo(type,floor);
+      gold=(info&&info.gold)||10*(floor>=8?2:1); special=1;
+    }
+    const win=(typeof res.win==='boolean')?res.win:(gold>0||special>0);
+    return { win, gold, special, summary:(typeof res.summary==='string'?res.summary:'') };
+  },
+  minigameModule(type){
+    switch(type){
+      case 'throw': return typeof ThrowGame!=='undefined'?ThrowGame:null;
+      case 'highlow': return typeof HighLowGame!=='undefined'?HighLowGame:null;
+      case 'pachinko': return typeof PachinkoGame!=='undefined'?PachinkoGame:null;
+      case 'derby': return typeof DerbyGame!=='undefined'?DerbyGame:null;
+    }
+    return null;
+  },
+  // 裏世界のイベントを開始する（UraSekai から呼ばれる）。終了したら必ずショップへ
+  startEvent(stage,ev,type){
     const floor=GameState.currentFloor;
-    const info=GameData.eventCommonInfo(ev.type,floor);
-    if(ev.type==='throw'||ev.type==='highlow'){
-      const mod=ev.type==='throw'?(typeof ThrowGame!=='undefined'?ThrowGame:null):(typeof HighLowGame!=='undefined'?HighLowGame:null);
-      if(!mod||typeof mod.open!=='function'){ alert('このイベントは現在準備中です。通常のコモンステージを攻略してください。'); return; }
-      if(this._eventBusy) return;
+    type=type||ev.active;
+    if(!type||!ev.lineup.includes(type)) return false;
+    const info=GameData.eventCommonInfo(type,floor);
+    if(['throw','highlow','pachinko','derby'].includes(type)){
+      const mod=this.minigameModule(type);
+      if(!mod||typeof mod.open!=='function') return false;
+      if(this._eventBusy) return true;
       this._eventBusy=true;
-      ev.committed=true; App.saveGame();
+      ev.committed=true; ev.active=type; App.saveGame();
+      if(typeof UraSekai!=='undefined') UraSekai.close();
       Promise.resolve().then(()=>mod.open({floor})).catch(e=>{ console.error(e); return {win:false,error:true}; }).then(res=>{
         this._eventBusy=false;
-        const win=!!(res&&res.win);
-        this._finishEvent(ev,win?'win':'lose');
-        if(win){
-          GameState.gold+=info.gold;
-          GameState.specialGiftPending=(GameState.specialGiftPending||0)+1;
-          GameState.lastReward={type:'event',stageName:info.name,gold:info.gold,extra:'特別アップグレード1パック（ショップで選択）'};
-        }else GameState.lastReward=null;
+        const r=this.normalizeMinigameResult(type,res,floor);
+        this._finishEvent(ev,r.win?'win':'lose');
+        GameState.gold+=r.gold;
+        if(r.special>0) GameState.specialGiftPending=(Number(GameState.specialGiftPending)||0)+r.special;
+        const extra=r.special>0?`特別アップグレード${r.special}パック（ショップで選択）`:'';
+        GameState.lastReward=(r.gold>0||r.special>0)?{type:'event',stageName:info.name,gold:r.gold,extra}:null;
         App.saveGame();
-        this.pendingEventResult={win,name:info.name,gold:win?info.gold:0};
-        if(this.container&&document.body.contains(this.container)) this.renderAll();
+        const go=()=>App.showShop();
+        if(typeof UraSekai!=='undefined') UraSekai.showReward({name:info.name, win:r.win, gold:r.gold, special:r.special, summary:r.summary, onNext:go});
+        else go();
       });
-      return;
+      return true;
     }
-    if(ev.type==='eliteboss'){
-      ev.committed=true; App.saveGame();
+    if(type==='eliteboss'){
+      ev.committed=true; ev.active=type; App.saveGame();
+      if(typeof UraSekai!=='undefined') UraSekai.close();
       const elite={...stage, name:'強化ボス', tag:'ELITE BOSS', targetScore:this.eliteTarget(floor), skippable:false, bossEffectCount:1, eliteBoss:true, eliteBossEffect:ev.eliteEffect||null};
       App.showGameMain(elite);
-      return;
+      return true;
     }
-    if(ev.type==='altar'){
-      if(typeof MajinEvent==='undefined'||typeof MajinEvent.makeInfo!=='function') return;
+    if(type==='altar'){
+      if(typeof MajinEvent==='undefined'||typeof MajinEvent.makeInfo!=='function') return false;
       if(!ev.altarPaid){
-        if((GameState.lives||0)<GameData.ALTAR_LIFE_COST) return;
+        if((GameState.lives||0)<GameData.ALTAR_LIFE_COST) return false;
         GameState.lives-=GameData.ALTAR_LIFE_COST; // v1.11 残機1を捧げる
-        ev.altarPaid=true; ev.committed=true;
+        ev.altarPaid=true; ev.committed=true; ev.active=type;
         ev.altarInfo=MajinEvent.makeInfo();
         App.saveGame();
-        this.renderAll();
       }
-      MajinEvent.open(floor,{ info:ev.altarInfo, onCleared:()=>{ this._finishEvent(ev,'done'); } });
+      if(typeof UraSekai!=='undefined') UraSekai.close();
+      this.renderAll();
+      Promise.resolve(MajinEvent.open(floor,{ info:ev.altarInfo, onCleared:()=>{ this._finishEvent(ev,'done'); } })).catch(e=>console.error(e)).then(()=>{
+        if(ev.done){ try{ App.saveGame(); }catch(e){} App.showShop(); }
+        else if(this.container&&document.body.contains(this.container)) this.renderAll();
+      });
+      return true;
     }
-  },
-  renderEventResultPopup(){
-    const r=this.pendingEventResult;
-    const overlay=document.createElement('div'); overlay.className='pack-modal-overlay';
-    const box=document.createElement('div'); box.className='gold-reveal-popup ev-result-popup';
-    box.innerHTML=r.win
-      ? `<div class="gr-label">${r.name}：勝利！</div><div class="gr-total">+${r.gold}G</div><div class="gr-breakdown">追加報酬：特別アップグレード1パック（ショップで最初に選択）</div><button class="ev-result-btn" style="margin-top:16px;">ショップへ</button>`
-      : `<div class="gr-label">${r.name}：敗北</div><div class="gr-total ev-lose">報酬なし</div><div class="gr-breakdown">コモンは終了扱いになります</div><button class="ev-result-btn" style="margin-top:16px;">マップに戻る</button>`;
-    overlay.appendChild(box);
-    setTimeout(()=>{ box.querySelector('.ev-result-btn').addEventListener('click',()=>{ this.pendingEventResult=null; if(r.win) App.showShop(); else this.renderAll(); }); });
-    return overlay;
+    return false;
   },
 
   renderRewardPopup(){

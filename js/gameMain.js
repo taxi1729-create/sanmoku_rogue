@@ -574,7 +574,7 @@ const GameMainScene = {
     if(result==='win'){
       if(this.stage&&!GameState.clearedStages.includes(this.stage.key)) GameState.clearedStages.push(this.stage.key);
       // v1.10 イベントコモン（強化ボス）クリア：イベントを終了済みにする（階層のボスはクリア扱いにしない）
-      if(this.stage&&this.stage.eliteBoss&&GameState.floorEvents&&GameState.floorEvents[GameState.currentFloor]){ const fe=GameState.floorEvents[GameState.currentFloor]; fe.done=true; fe.result='win'; }
+      if(this.stage&&this.stage.eliteBoss&&GameState.floorEvents&&GameState.floorEvents[GameState.currentFloor]){ const fe=GameState.floorEvents[GameState.currentFloor]; fe.done=true; fe.result='win'; fe.committed=false; }
       const multBeforeClear=GameData.snapshotMult(); // #2
       // #演出 クリア時に発動した効果（倍率・カードの変化）は報酬演出（StageFX z70）の上に順に見せる。トーストは報酬演出の裏に隠れるため使わない
       const clearFx=[]; this._clearFx=clearFx;
@@ -689,6 +689,11 @@ const GameMainScene = {
       App.saveGame();
     } else if(result==='lose'){
       this.retreatInfo=null;
+      // v1.13 裏世界（強化ボス）失敗：裏世界は消化済み・コモンは終了扱い（通常の敗北と同じく一時撤退／ゲームオーバーへ）
+      if(this.stage&&this.stage.eliteBoss&&GameState.floorEvents&&GameState.floorEvents[GameState.currentFloor]){
+        const fe=GameState.floorEvents[GameState.currentFloor]; fe.done=true; fe.result='lose'; fe.committed=false;
+        if(!GameState.clearedStages.includes('common')) GameState.clearedStages.push('common');
+      }
       if((GameState.lives||0)>0){
         // 残機あり：残機を1つ消費して「一時撤退」。セーブは破棄せず、撤退Gを得てミニショップ→マップで同じステージに再挑戦できる
         const livesBefore=GameState.lives;
@@ -1890,20 +1895,24 @@ const GameMainScene = {
     return {board,ef,echo:due};
   },
 
-  // 次にNPCが置くマス（プレイヤーの番のみ。スタン・混乱予定・ラウンド結果表示中は予告なし）
+  // 次にNPCが置くマス（プレイヤーの番のみ。スタン予定・ラウンド結果表示中は予告なし。混乱予定時は混乱先を予告）
   //   予告マス（_npcIntent）は手番中は原則固定し、NPCはそのマスに置く。ただし手番中にジャミング（リンク/誘導/封印/引き直し等）が
   //   追加されて予告マスが置けなくなった場合や、予告マスが埋まった場合は、その時点の効果（サンカク・エコー含む）で再計算する
   predictNpcCell(){
     if(this.currentSide!=='player'||this.resultState) return null;
     const {board,ef}=this.npcOutlook();
-    if(ef.stunNextNpc||ef.confuseNextNpc) return null;
+    if(ef.stunNextNpc) return null;
     const d=this.decideAICell(board,ef);
     if(d.stun||d.ci===null) return null;
+    // 混乱予定時も、混乱による配置先（乱択はシード固定）を事前に確定して予告する。
+    //   通常予告→混乱予告（またはその逆）に切り替わった場合は予告マスを再計算する
+    const conf=!!ef.confuseNextNpc;
     const it=this._npcIntent;
-    if(it&&d.allowed.includes(it.ci)) return it.ci;
-    this._npcIntent={ci:d.ci};
+    if(it&&!!it.conf===conf&&d.allowed.includes(it.ci)) return it.ci;
+    this._npcIntent={ci:d.ci,conf};
     return d.ci;
   },
+  npcNextIsConfused(){ return !!(this._npcIntent&&this._npcIntent.conf&&this.npcNextCell!==null&&this._npcIntent.ci===this.npcNextCell); },
 
   chooseAICell(){
     const d=this.decideAICell();
@@ -1914,7 +1923,9 @@ const GameMainScene = {
     this._echoApplied=null;
     if(d.stun){ ef.stunNextNpc=true; return null; }
     // 直前のプレイヤー手番で予告したマスが（ジャミングの制限を満たしたうえで）まだ空いていれば、予告どおりそこに置く
-    if(it&&!d.consumed.includes('confuseNextNpc')&&d.allowed.includes(it.ci)) return it.ci;
+    //   混乱時は混乱として予告したマス（事前確定済み）のみ採用し、通常予告は採用しない
+    const conf=d.consumed.includes('confuseNextNpc');
+    if(it&&!!it.conf===conf&&d.allowed.includes(it.ci)) return it.ci;
     return d.ci;
   },
 
@@ -2849,6 +2860,7 @@ const GameMainScene = {
       }
       if(i===this.npcNextCell&&!cd&&!isBlocked){
         cellEl.classList.add('npc-next-cell');
+        if(this.npcNextIsConfused()){ const tg=document.createElement('div');tg.className='npc-confuse-tag';tg.textContent='混乱';cellEl.appendChild(tg); }
         if(npcHint!==null){
           const nb=document.createElement('div');nb.className='cell-bubble npc-cross-bubble';nb.textContent=`バツ予測${GlobalFunctions.formatSigned(npcHint)}`;if(npcHint<0) nb.classList.add('negative');cellEl.appendChild(nb);
         }
