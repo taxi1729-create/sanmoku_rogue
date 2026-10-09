@@ -2,6 +2,7 @@
 //   1. 神の啓示（Revelation.openEnding）：聖なる声が旅を振り返るエピローグ（語りはスキップ可）
 //   2. 白い光から明けるエンドロール（旅の記録・スタッフ・Thank you for playing）→ タイトルへ（スキップ可）
 //   チュートリアル非表示設定に関係なく常に再生する。セーブは呼び出し側（App.saveGame()）で従来どおり保持
+const _seEnd=(n,o)=>{ try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} };
 const EndingScene = {
   _timers:[],
   render(container){
@@ -48,6 +49,7 @@ const EndingScene = {
       </div>
       ${reduced?'':'<div class="end-whiteout"></div>'}`;
     container.appendChild(el);
+    _seEnd('win'); this._timers.push(setTimeout(()=>{ _seEnd('fanfare'); _seEnd('holy',{volume:0.6}); },600));
     if(!reduced){
       const m=el.querySelector('.end-motes');
       for(let i=0;i<22;i++){
@@ -57,9 +59,10 @@ const EndingScene = {
         s.style.setProperty('--dx',((Math.random()*2-1)*40).toFixed(0)+'px'); m.appendChild(s);
       }
     }
-    const finish=()=>{ this._clear(); el.classList.add('done'); };
-    const toTitle=()=>{ this._clear(); App.showTitle(); };
+    const finish=()=>{ const first=!el.classList.contains('done'); this._clear(); el.classList.add('done'); if(first){ _seEnd('reveal'); _seEnd('holy',{volume:0.5}); } };
+    const toTitle=()=>{ _seEnd('close',{suppressTap:true}); this._clear(); App.showTitle(); };
     el.querySelector('#btn-skip-credits').addEventListener('click',()=>{
+      _seEnd('skip',{suppressTap:true});
       el.querySelector('#ending-credits-scroll')?.classList.remove('scrolling');
       finish();
     });

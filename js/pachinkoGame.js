@@ -19,6 +19,9 @@
  */
 const PachinkoGame = (function(){
   'use strict';
+  const _se=(n,o)=>{ try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} };
+  let _sePegT = 0;
+  const _sePeg = (y, seal) => { const now = (typeof performance!=='undefined'?performance.now():Date.now()); if(now - _sePegT < 55) return; _sePegT = now; _se('peg', { rate: 0.8 + Math.random() * 0.5 + (seal ? -0.25 : 0), volume: 0.45 }); };
 
   const HAND_SIZE = 8, SLOT_N = 5, BALLS = 2;
   const ZONES = [
@@ -247,7 +250,7 @@ const PachinkoGame = (function(){
       </div>`;
     sh.querySelectorAll('.pc-hcard').forEach(b => b.addEventListener('click', () => onHandTap(b.dataset.uid)));
     sh.querySelector('[data-act="auto"]').addEventListener('click', autoFill);
-    sh.querySelector('[data-act="start"]').addEventListener('click', () => { if(st.slots.every(Boolean)) startPlay(); });
+    sh.querySelector('[data-act="start"]').addEventListener('click', () => { if(st.slots.every(Boolean)){ _se('confirm', {suppressTap:true}); startPlay(); } else _se('error', {suppressTap:true}); });
   }
 
   function setMsg(html){ const m = $('.pc-msg'); if(m) m.innerHTML = html || ''; }
@@ -273,13 +276,14 @@ const PachinkoGame = (function(){
     if(!st || st.phase !== 'setup') return;
     const at = st.slots.indexOf(uid);
     if(st.sel && st.sel.type === 'slot'){
-      placeInSlot(uid, st.sel.i); st.sel = null;
+      placeInSlot(uid, st.sel.i); st.sel = null; _se('place', {suppressTap:true});
     } else if(at >= 0){
       st.slots[at] = null; st.sel = null;            // 配置済みの札をタップ → 外す
+      _se('deselect', {suppressTap:true});
     } else {
       const empty = st.slots.indexOf(null);
-      if(empty >= 0){ st.slots[empty] = uid; st.sel = null; }
-      else { st.sel = (st.sel && st.sel.uid === uid) ? null : { type:'hand', uid }; }
+      if(empty >= 0){ st.slots[empty] = uid; st.sel = null; _se('place', {suppressTap:true}); }
+      else { st.sel = (st.sel && st.sel.uid === uid) ? null : { type:'hand', uid }; _se(st.sel ? 'select' : 'deselect', {suppressTap:true}); }
     }
     renderSlots(); renderSheet();
     setupMsg();
@@ -289,12 +293,13 @@ const PachinkoGame = (function(){
     if(st.phase === 'fall'){ useCard(i); return; }
     if(st.phase !== 'setup') return;
     const s = st.sel;
-    if(s && s.type === 'hand'){ placeInSlot(s.uid, i); st.sel = null; }
+    if(s && s.type === 'hand'){ placeInSlot(s.uid, i); st.sel = null; _se('place'); }
     else if(s && s.type === 'slot'){
-      if(s.i === i){ st.slots[i] = null; }
-      else { const t = st.slots[i]; st.slots[i] = st.slots[s.i]; st.slots[s.i] = t; }
+      if(s.i === i){ st.slots[i] = null; _se('deselect'); }
+      else { const t = st.slots[i]; st.slots[i] = st.slots[s.i]; st.slots[s.i] = t; _se('place'); }
       st.sel = null;
-    } else if(st.slots[i]){ st.sel = { type:'slot', i }; }
+    } else if(st.slots[i]){ st.sel = { type:'slot', i }; _se('select'); }
+    else _se('tap', { volume:0.5 });
     renderSlots(); renderSheet();
     setupMsg();
   }
@@ -308,6 +313,7 @@ const PachinkoGame = (function(){
     const rest = shuffle(st.hand.filter(h => !st.slots.includes(h.uid)).map(h => h.uid));
     for(let i = 0; i < SLOT_N; i++) if(!st.slots[i]) st.slots[i] = rest.shift() || null;
     st.sel = null;
+    _se('shuffle', {suppressTap:true});
     renderSlots(); renderSheet(); setupMsg();
   }
 
@@ -329,6 +335,7 @@ const PachinkoGame = (function(){
     </div>`;
     wrap.classList.add('show');
     wrap.querySelector('[data-act="go"]').addEventListener('click', () => {
+      _se('confirm', {suppressTap:true});
       wrap.classList.remove('show'); wrap.innerHTML = '';
       st.phase = 'setup'; renderAll(); setupMsg();
     });
@@ -353,13 +360,14 @@ const PachinkoGame = (function(){
     const x = W / 2 + (rnd() - 0.5) * W * 0.34;
     st.ball = { x, y:-BALL_R, vx:(rnd() - 0.5) * 1.2, vy:1.2, trail:[], still:0, lx:x, ly:0 };
     st.phase = 'fall';
+    _se('ball');
     renderSlots(); renderTop();
     setMsg('カードをタップで球がジャンプ！');
   }
 
   function useCard(i){
     const uid = st.slots[i];
-    if(!uid || st.used[i] || !st.ball) return;
+    if(!uid || st.used[i] || !st.ball){ if(st.ball) _se('error', { volume:0.5 }); return; }
     const h = st.hand.find(x => x.uid === uid); if(!h) return;
     st.used[i] = true;
     const b = st.ball;
@@ -368,6 +376,7 @@ const PachinkoGame = (function(){
     b.vy = jumpVelocity(h.base);
     b.still = 0;
     burst(b.x, b.y, '#ffe9a8', 10);
+    _se('jump', { rate: clamp(0.8 + h.base / 120, 0.8, 1.6) });
     const jam = h.card.jamming;
     let note = `ジャンプ！（基礎点${h.base}）`;
     if(jam === 'サンダー'){
@@ -375,7 +384,7 @@ const PachinkoGame = (function(){
       // 列の範囲（境界線上の棒も含む）にある障害物を全て破壊
       st.pegs.forEach(p => { if(p.alive && p.x >= COLW * i - 0.5 && p.x <= COLW * (i + 1) + 0.5){ p.alive = false; p.fade = 1; n++; burst(p.x, p.y, '#bfe3ff', reduced() ? 2 : 6); } });
       st.fx.push({ type:'bolt', col:i, t:0, life:34, seed:Math.floor(rnd() * 1e6) });
-      flash('thunder');
+      flash('thunder'); _se('thunder');
       note = `サンダー！ ${i + 1}列目の障害物を${n}本破壊`;
       st.stats.thunder++;
     } else if(jam === '誘導'){
@@ -383,12 +392,13 @@ const PachinkoGame = (function(){
       b.vx = clamp(dx / 22, -6, 6);
       if(Math.abs(dx) < 4) b.vx = 0;
       st.fx.push({ type:'guide', col:i, x:b.x, y:b.y, t:0, life:40 });
-      note = `誘導！ 球を${i + 1}列目へ`;
+      note = `誘導！ 球を${i + 1}列目へ`; _se('jam');
       st.stats.guide++;
     } else if(jam === '封印'){
       const p = placeSealPeg(i, b.y);
       if(p){ st.fx.push({ type:'ring', x:p.x, y:p.y, t:0, life:30 }); note = `封印！ ${i + 1}列目に障害物を配置`; }
       else note = '封印！ …置ける場所がなかった';
+      _se('jam', { pitch:-3 });
       st.stats.seal++;
     } else if(jam === '引き直し'){
       reshuffleZones();
@@ -424,7 +434,7 @@ const PachinkoGame = (function(){
     let tries = 0;
     do { shuffle(st.zones); tries++; } while(st.zones.map(z => z.id).join(',') === before && tries < 10);
     renderZones(true);
-    flash('redraw');
+    flash('redraw'); _se('shuffle');
   }
 
   // ---------- 物理 ----------
@@ -457,7 +467,7 @@ const PachinkoGame = (function(){
           b.vx += -ny * j; b.vy += nx * j;
           // 真上に乗った場合は左右へ
           if(Math.abs(nx) < 0.12) b.vx += (rnd() < 0.5 ? -1 : 1) * 0.7;
-          if(-vn > 1.2){ p.hit = 1; if(!reduced() && rnd() < 0.5) burst(p.x, p.y, '#e8eefc', 2); }
+          if(-vn > 1.2){ _sePeg(p.y, p.seal); p.hit = 1; if(!reduced() && rnd() < 0.5) burst(p.x, p.y, '#e8eefc', 2); }
         }
       }
       // 報酬ゾーンの仕切り
@@ -500,6 +510,8 @@ const PachinkoGame = (function(){
     const zel = $(`.pc-zone[data-pos="${pos}"]`);
     if(zel){ zel.classList.remove('hit'); void zel.offsetWidth; zel.classList.add('hit', z.key === 'none' ? 'miss' : 'win'); }
     burst(b.x, st.H - 6, z.key === 'none' ? '#94a3b8' : '#ffd36b', 16);
+    if(z.key === 'none' || (!z.gold && !z.special)) _se('error');
+    else { _se('zone'); setTimeout(() => { if(z.gold) _se('coin'); if(z.special) _se('upgrade'); }, 220); }
     renderSlots(); renderTop();
     banner(z.key === 'none' ? '何もなし…' : z.label + '！', z.key === 'none' ? 'miss' : 'win');
     setMsg(`${st.ballIdx + 1}球目：<b class="${z.key === 'none' ? 'pc-t-miss' : 'pc-t-win'}">${esc(z.label)}</b>`);
@@ -510,7 +522,7 @@ const PachinkoGame = (function(){
     if(st.ballIdx < BALLS){
       setActions(`<button type="button" class="pc-btn pc-btn-main" data-act="next">${st.ballIdx + 1}球目へ</button>`);
       setMsg(`${st.ballIdx}球目：<b class="${z.key === 'none' ? 'pc-t-miss' : 'pc-t-win'}">${esc(z.label)}</b>　カードは再び使えるようになります`);
-      $('.pc-actions [data-act="next"]').addEventListener('click', () => { setActions(''); launchBall(); });
+      $('.pc-actions [data-act="next"]').addEventListener('click', () => { _se('confirm', {suppressTap:true}); setActions(''); launchBall(); });
       renderTop();
     } else {
       st.phase = 'end';
@@ -542,7 +554,8 @@ const PachinkoGame = (function(){
       <button type="button" class="pc-btn pc-btn-main" data-act="close">戻る</button>
     </div>`;
     wrap.classList.add('show');
-    wrap.querySelector('[data-act="close"]').addEventListener('click', close);
+    if(win){ _se('win'); if(s > 0) setTimeout(() => _se('fanfare'), 380); } else _se('lose');
+    wrap.querySelector('[data-act="close"]').addEventListener('click', () => { _se(win ? 'coin' : 'close', {suppressTap:true}); close(); });
   }
 
   // ---------- 描画 ----------
@@ -693,6 +706,7 @@ const PachinkoGame = (function(){
       log:[], stats:{ thunder:0, guide:0, seal:0, redraw:0 }, H:480, scale:1, acc:0, lastTs:null,
     };
     _debug.state = st;
+    _se('open');
     if(!pegSprite) makeSprites();
     build();
     sizeBoard();

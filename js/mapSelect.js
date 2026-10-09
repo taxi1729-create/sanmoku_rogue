@@ -1,3 +1,4 @@
+const _seMap=(n,o)=>{ try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} };
 const MapSelectScene = {
   container:null, pendingReward:null, activeRelicId:null, // #11 マップ画面でのレリック選択・並び替え
   render(container){
@@ -52,7 +53,7 @@ const MapSelectScene = {
     //header.appendChild(debugGoldBtn);
     // #2 マップ選択画面でデッキを確認できるようにする
     const deckBtn=document.createElement('button'); deckBtn.className='debug-gold-btn'; deckBtn.textContent=`デッキ確認(${GameState.currentDeck.length})`;
-    deckBtn.addEventListener('click',()=>GameMainScene.showDeckModal('deck'));
+    deckBtn.addEventListener('click',()=>{ _seMap('open',{suppressTap:true}); GameMainScene.showDeckModal('deck'); });
     header.appendChild(deckBtn);
     el.appendChild(header);
     // #11 マップ画面でも所持レリックを確認・並び替えできるようにする
@@ -69,6 +70,7 @@ const MapSelectScene = {
         : `<div class="stage-tag">SHOP</div><div class="stage-name">最終決戦前の商店</div><div class="stage-goal">最終決戦の前に、ここで支度を整えよう（入店時に10G獲得）</div><div class="stage-actions"><button class="challenge-btn final-shop-btn">商店へ向かう</button></div>`;
       const fb=shopCard.querySelector('.final-shop-btn');
       if(fb) fb.addEventListener('click',()=>{
+        _seMap('confirm',{suppressTap:true}); setTimeout(()=>_seMap('coin'),120);
         GameState.finalShopDone=true;
         GameState.gold+=10;
         App.saveGame();
@@ -123,12 +125,14 @@ const MapSelectScene = {
       path.appendChild(card);
       const challengeBtn=card.querySelector('.challenge-btn');
       if(challengeBtn) challengeBtn.addEventListener('click',()=>{
-        if(locked) return;
+        if(locked){ _seMap('error',{suppressTap:true}); return; }
+        _seMap('confirm',{suppressTap:true});
+        if(stage.key==='boss') setTimeout(()=>_seMap('boss'),90);
         App.showGameMain(stage);
       });
       const uraBtn=card.querySelector('.ura-enter-btn');
       if(uraBtn) uraBtn.addEventListener('click',()=>{
-        if(locked||isCleared||!ev||ev.done) return;
+        if(locked||isCleared||!ev||ev.done){ _seMap('error',{suppressTap:true}); return; }
         if(typeof UraSekai!=='undefined') UraSekai.open(stage,ev);
       });
       // #3 ホシパッシブ1：ボス効果リロール
@@ -139,6 +143,7 @@ const MapSelectScene = {
           ? GameData.bossEffectForFloor(GlobalFunctions.randChoice(GameData.BOSS_EFFECT_POOL),GameState.currentFloor)
           : GlobalFunctions.shuffle(GameData.BOSS_EFFECT_POOL).slice(0,bossCount).map(e=>GameData.bossEffectForFloor(e,GameState.currentFloor));
         GameState.bossRerollUsed=true;
+        _seMap('reroll',{suppressTap:true}); setTimeout(()=>_seMap('boss',{volume:0.6}),120);
         this.renderAll();
       });
       const skipBtn=card.querySelector('.skip-btn');
@@ -152,6 +157,7 @@ const MapSelectScene = {
         const sr=GameState.calcSkipReward();
         const total=sr.total;
         GameState.gold+=total;
+        _seMap('skip',{suppressTap:true}); setTimeout(()=>_seMap('coin'),160);
         const bonus=skipBonus||this.getSkipBonus(stage);
         const bonusMsg=this.applySkipBonusEffect(bonus);
         GameState.lastReward={type:'skip',stageName:stage.name,gold:total,breakdown:sr,extra:bonusMsg};
@@ -180,6 +186,7 @@ const MapSelectScene = {
       setTimeout(()=>{
         const b=el.querySelector('#btn-next-floor');
         if(b) b.addEventListener('click',()=>{
+          _seMap('levelUp',{suppressTap:true});
           GameState.currentFloor=nextFloor;
           GameState.clearedStages=[];
           GameState.pendingBossEffect=null;
@@ -194,6 +201,7 @@ const MapSelectScene = {
         // #2 階層10クリア時：エンディング（ゲームクリア画面＋スタッフロール）へ
         const eb=el.querySelector('#btn-show-ending');
         if(eb) eb.addEventListener('click',()=>{
+          _seMap('fanfare',{suppressTap:true});
           App.saveGame();
           App.showEnding();
         });
@@ -335,6 +343,7 @@ const MapSelectScene = {
     if(type==='eliteboss'){
       ev.committed=true; ev.active=type; App.saveGame();
       if(typeof UraSekai!=='undefined') UraSekai.close();
+      _seMap('boss');
       const elite={...stage, name:'強化ボス', tag:'ELITE BOSS', targetScore:this.eliteTarget(floor), skippable:false, bossEffectCount:1, eliteBoss:true, eliteBossEffect:ev.eliteEffect||null};
       App.showGameMain(elite);
       return true;
@@ -344,6 +353,7 @@ const MapSelectScene = {
       if(!ev.altarPaid){
         if((GameState.lives||0)<GameData.ALTAR_LIFE_COST) return false;
         GameState.lives-=GameData.ALTAR_LIFE_COST; // v1.11 残機1を捧げる
+        _seMap('jam');
         ev.altarPaid=true; ev.committed=true; ev.active=type;
         ev.altarInfo=MajinEvent.makeInfo();
         App.saveGame();
@@ -365,7 +375,8 @@ const MapSelectScene = {
     const box=document.createElement('div'); box.className='gold-reveal-popup';
     box.innerHTML=`<div class="gr-label">${r.stageName}をスキップ</div><div class="gr-total">+${r.gold}G</div><div class="gr-breakdown">基本G${r.breakdown.base} × num${r.breakdown.num}${r.breakdown.num>1?'（階層6以上+1）':''} ＋ レリック効果${r.breakdown.relicBonus} ＋ レリック強化効果${r.breakdown.relicEnhanceBonus}${r.extra?`<br>追加報酬：${r.extra}`:''}</div><button id="btn-goto-shop" style="margin-top:16px;">ショップへ</button>`;
     overlay.appendChild(box);
-    setTimeout(()=>{ box.querySelector('#btn-goto-shop').addEventListener('click',()=>{ this.pendingReward=null; App.showShop(); }); });
+    if(this._seRewardShown!==r){ this._seRewardShown=r; _seMap('reveal'); setTimeout(()=>_seMap('coin'),200); }
+    setTimeout(()=>{ box.querySelector('#btn-goto-shop').addEventListener('click',()=>{ _seMap('confirm',{suppressTap:true}); this.pendingReward=null; App.showShop(); }); });
     return overlay;
   },
 

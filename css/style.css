@@ -997,3 +997,10 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 .ev-reward{font-size:12px;color:var(--gold);font-weight:700;}
 .ev-status{font-size:11px;font-weight:900;color:var(--success);}
 .gr-total.ev-lose{color:var(--text-dim);}
+
+/* サウンド ON/OFF（js/sfx.js）：ゲーム画面の上部ボタン列 */
+.controls-row .sfx-toggle-btn{display:inline-flex;align-items:center;justify-content:center;padding:6px 8px;}
+.sfx-toggle-btn .sfx-ico{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.sfx-toggle-btn .sfx-ico path:first-child{fill:currentColor;fill-opacity:.25;}
+.sfx-toggle-btn.muted{opacity:.6;}
+.sfx-toggle-btn.muted .sfx-ico{color:#f87171;}

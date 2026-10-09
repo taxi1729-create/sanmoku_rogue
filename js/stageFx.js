@@ -17,6 +17,7 @@ const StageFX = (function(){
   const esc = v => String(v==null?'':v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const icon = (k,o) => (typeof GameIcons!=='undefined' && GameIcons.has && GameIcons.has(k)) ? GameIcons.svg(k,o) : '';
   const rnd = (a,b) => a+Math.random()*(b-a);
+  const sfx = (n,o) => { try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} }; // 効果音（js/sfx.js）
   function el(tag, cls, html){ const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; }
   function anim(node, frames, opts){
     // 3つ以上のキーフレームでは、イージングを全体ではなく各区間に掛ける（全体に掛けると中間キーフレームの時刻がずれるため）
@@ -167,6 +168,7 @@ const StageFX = (function(){
       lbl.style.top=(above ? c.top-6-idx*20 : c.bottom+4+idx*20)+'px';
       lbl.classList.add(above?'up':'down');
       g.appendChild(lbl);
+      if(kind==='enh') sfx('upgrade',{volume:0.75,minGap:0}); else if(kind==='trait') sfx('reveal',{minGap:0}); // jam はGameMainScene.queueJammingEffect側で鳴らす
       anim(lbl,[{opacity:0,transform:`translate(-50%,${above?'-100%':'0'}) translateY(${above?6:-6}px) scale(.8)`},{opacity:1,transform:`translate(-50%,${above?'-100%':'0'}) scale(1)`,offset:.18},{opacity:1,transform:`translate(-50%,${above?'-100%':'0'}) scale(1)`,offset:.8},{opacity:0,transform:`translate(-50%,${above?'-100%':'0'}) translateY(${above?-6:6}px)`}],{duration:sub.D+120,easing:'ease-out',fill:'both'});
       try{
         if(ctx.R) drawReduced(sub);
@@ -677,9 +679,11 @@ const StageFX = (function(){
     return (async()=>{
       try{
         ov.classList.add('st-on');
+        sfx('boss');
         anim(ov.querySelector('.stfx-boss-vig'),[{opacity:0},{opacity:1,offset:.25},{opacity:.55,offset:.5},{opacity:1,offset:.75},{opacity:.7}],{duration:R?200:900,fill:'forwards'});
         await w(420);
         const band=ov.querySelector('.stfx-boss-band');
+        if(!ui.skip) sfx('swipe',{pitch:-5});
         anim(band,[{transform:'translateX(-110%) skewX(-12deg)',opacity:1},{transform:'translateX(0) skewX(-12deg)',offset:.35},{transform:'translateX(0) skewX(-12deg)',offset:.75},{transform:'translateX(110%) skewX(-12deg)',opacity:1}],{duration:R?300:1500,easing:'cubic-bezier(.7,0,.3,1)',fill:'both'});
         await w(1150);
         // 効果1つ：じっくり見せる / 複数：1つずつ、前の効果の差分演出を片付けてから次を叩きつける（重ならない）
@@ -721,8 +725,10 @@ const StageFX = (function(){
     const ph=plate.offsetHeight||110;
     const c=plateSpot(br, plan.target, ph);
     plate.style.left=c.x+'px'; plate.style.top=c.y+'px'; plate.style.visibility='';
+    if(!ui.skip) sfx('open',{pitch:-7});
     await anim(plate,[{opacity:0,transform:'translate(-50%,-50%) scale(2.6) rotate(-4deg)'},{opacity:1,transform:'translate(-50%,-50%) scale(.94) rotate(0)',offset:.8},{opacity:1,transform:'translate(-50%,-50%) scale(1)'}],{duration:R?120:340,easing:'cubic-bezier(.7,0,.9,.6)',fill:'forwards'}).finished.catch(()=>{});
     // 叩きつけの衝撃（オーバーレイ側を揺らす。盤面そのものは動かさない）。強化版は揺れ・衝撃波が強い
+    if(!ui.skip){ sfx('land',{pitch:-5,volume:1.3}); sfx(pw?'thunder':'jam',{volume:pw?0.8:0.7}); }
     if(!R){
       const k=pw?1.6:1;
       anim(ui.ov,[{transform:'translate(0,0)'},{transform:`translate(${-6*k}px,${4*k}px)`},{transform:`translate(${5*k}px,${-3*k}px)`},{transform:`translate(${-3*k}px,${2*k}px)`},{transform:'translate(0,0)'}],{duration:pw?380:280});
@@ -741,6 +747,7 @@ const StageFX = (function(){
     const t=badge?ctr(badge):{x:c.x,y:br.top};
     await anim(plate,[{opacity:1,transform:'translate(-50%,-50%) scale(1)'},{opacity:0,transform:`translate(calc(-50% + ${t.x-c.x}px),calc(-50% + ${t.y-c.y}px)) scale(.12)`}],{duration:R?100:420,easing:'cubic-bezier(.6,0,.8,.4)',fill:'forwards'}).finished.catch(()=>{});
     plate.remove();
+    if(!ui.skip) sfx('close',{pitch:-3});
     ui.lit=true;
     const bdg=document.querySelector('.stfx-boss-badge');
     if(bdg){ bdg.classList.remove('pending'); anim(bdg,[{transform:'scale(1.35)',filter:'brightness(2)'},{transform:'scale(1)',filter:'brightness(1)'}],{duration:380,easing:'ease-out'}); }
@@ -867,6 +874,7 @@ const StageFX = (function(){
     if(!node) return;
     if(!R) await anim(node,[{transform:'translateX(0) scale(1)'},{transform:'translateX(-4px) scale(1.15)'},{transform:'translateX(4px) scale(1.15)'},{transform:'translateX(-3px) scale(1.1)'},{transform:'translateX(0) scale(1.2)',filter:'brightness(2.2)'}],{duration:ui.skip?1:460,easing:'ease-in-out'}).finished.catch(()=>{});
     node.classList.remove('breaking'); node.classList.add('broken');
+    if(!ui.skip) sfx('glitch',{volume:0.8});
     node.innerHTML=icon('life_heart_broken');
     if(!R && !ui.skip){
       const r=node.getBoundingClientRect(); const c=ctr(r);
@@ -992,6 +1000,7 @@ const StageFX = (function(){
       try{
         anim(ov,[{backgroundColor:'rgba(6,7,12,0)'},{backgroundColor:'rgba(6,7,12,.84)'}],{duration:R?100:(opts.win?350:900),fill:'forwards'});
         anim(box,[{opacity:0,transform:'translateY(16px) scale(.96)'},{opacity:1,transform:'none'}],{duration:R?100:(opts.win?320:700),fill:'both',easing:'ease-out'});
+        sfx(opts.win?'win':'lose',{fast:false,pitch:go?-3:0});
         if(rt){ await retreatSeq(ui, box, rt, R, w); finish(); return; }
         if(!opts.win){ await w(500); finish(); return; }
         // STAGE CLEAR の登場
@@ -1013,12 +1022,14 @@ const StageFX = (function(){
         for(const row of rows){
           if(ui.skip) break;
           anim(row,[{opacity:0,transform:'translateX(-14px)'},{opacity:1,transform:'none'}],{duration:220,fill:'both',easing:'ease-out'});
+          sfx('scoreTick',{pitch:4});
           await w(230);
           // G獲得：レリック（強化）アイコンから金貨が飛び出し、この行の値に加算される
           if(row.dataset.g && !ui.skip) await goldBurst(ui, row, R, w);
         }
         // 合計
         const tot=box.querySelector('.stfx-res-total');
+        if(!ui.skip) sfx('scoreChip',{pitch:5});
         anim(tot,[{opacity:0,transform:'scale(2)'},{opacity:1,transform:'scale(.95)',offset:.7},{opacity:1,transform:'scale(1)'}],{duration:380,fill:'both',easing:'cubic-bezier(.6,0,.6,1.4)'});
         await w(450);
         // レリック効果ぶんの G を獲得G（合計）へ流し込む：小計 → 合計
@@ -1050,6 +1061,7 @@ const StageFX = (function(){
           anim(ex,[{opacity:0,transform:'scale(.9)'},{opacity:1,transform:'scale(1)'}],{duration:260,fill:'both'});
           for(const x of ex.querySelectorAll('.stfx-res-extra')){
             if(ui.skip) break;
+            sfx('reveal');
             anim(x,[{opacity:0,transform:'translateX(30px)',filter:'brightness(2.4)'},{opacity:1,transform:'none',filter:'brightness(1)'}],{duration:380,fill:'both',easing:'cubic-bezier(.3,1.4,.5,1)'});
             await w(420);
           }
@@ -1076,6 +1088,7 @@ const StageFX = (function(){
       for(const row of box.querySelectorAll('.stfx-rt-panel .stfx-res-line')){
         if(ui.skip) break;
         anim(row,[{opacity:0,transform:'translateX(-14px)'},{opacity:1,transform:'none'}],{duration:220,fill:'both',easing:'ease-out'});
+        sfx('scoreTick',{pitch:4});
         await w(240);
       }
       const tot=box.querySelector('.stfx-rt-panel .stfx-res-total'); const tv=box.querySelector('.stfx-rt-panel .stfx-res-total-v');
@@ -1112,6 +1125,7 @@ const StageFX = (function(){
       const an=anim(c,[{opacity:0,transform:'translate(-50%,-50%) scale(.6)'},{opacity:1,transform:`translate(calc(-50% + ${dx*.3}px),calc(-50% + ${dy*.5-50}px)) scale(1.1)`,offset:.4},{opacity:1,transform:`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px)) scale(.7)`}],{duration:620,delay:i*55,easing:'cubic-bezier(.4,0,.6,1)',fill:'both'});
       an.finished.catch(()=>{}).then(()=>c.remove());
     }
+    if(!ui.skip) for(let i=0;i<Math.min(6,n);i++) sfx('coin',{delay:0.3+i*0.07,minGap:0,pitch:i});
     const wal=toNode.closest('.stfx-res-wallet');
     setTimeout(()=>{ if(wal&&!ui.skip) wal.classList.add('pulse'); }, R?0:420);
     await (R?Promise.resolve():new Promise(r=>setTimeout(r,R?0:380)));
@@ -1129,6 +1143,7 @@ const StageFX = (function(){
     const card=rfxCard(f,false); ui.rl.appendChild(card);
     const chip=ui.box.querySelector(`.stfx-res-rchip[data-i="${i}"]`);
     card.addEventListener('click',(e)=>{ e.stopPropagation(); if(ui.wake) ui.wake(); });
+    sfx('relic'); sfx(f.kind==='card'?'cardFlip':'upgrade',{delay:0.12});
     // 登場：アイコンが弾け、カードが展開
     if(!R){
       const ico=card.querySelector('.stfx-rfx-ico');
@@ -1150,9 +1165,10 @@ const StageFX = (function(){
     closeRelicViewer(ui);
     ui.rl.classList.add('viewing');
     const card=rfxCard(f,true); ui.rl.appendChild(card);
+    sfx('open');
     // カード変化は再生し直して変化後を見せる
     anim(card,[{opacity:0,transform:'translate(-50%,-50%) scale(.85)'},{opacity:1,transform:'translate(-50%,-50%) scale(1)'}],{duration:reduced()?60:220,fill:'both',easing:'ease-out'});
-    ui.rl.onclick=(e)=>{ e.stopPropagation(); closeRelicViewer(ui); };
+    ui.rl.onclick=(e)=>{ e.stopPropagation(); sfx('close'); closeRelicViewer(ui); };
   }
   function closeRelicViewer(ui){
     if(!ui||!ui.rl) return;
@@ -1162,6 +1178,7 @@ const StageFX = (function(){
   // 金貨を a 要素から b 要素へ飛ばす（報酬演出の上のレイヤー）
   function flyCoins(ui, from, to, n, R, small){
     if(!from||!to||R) return;
+    if(!ui.skip) for(let i=0;i<Math.min(4,n);i++) sfx('coin',{delay:0.25+i*0.06,minGap:0,pitch:i+(small?3:0),volume:small?0.7:1});
     const fc=ctr(from.getBoundingClientRect()), tc=ctr(to.getBoundingClientRect());
     for(let i=0;i<n;i++){
       const c=el('div','stfx-coin fly'+(small?' small':''),'G'); const sx=fc.x+rnd(-8,8);
@@ -1177,6 +1194,7 @@ const StageFX = (function(){
     const small=row.dataset.g==='ren';
     const icons=row.querySelector('.stfx-res-gicons'); const val=row.querySelector('b');
     row.classList.add('lit');
+    sfx('relic');
     if(icons) anim(icons,[{transform:'scale(1)',filter:'brightness(1)'},{transform:'scale(1.7) translateY(-3px)',filter:'brightness(2.2)',offset:.35},{transform:'scale(1)',filter:'brightness(1)'}],{duration:R?60:620,easing:'ease-out'});
     const rr=row.getBoundingClientRect();
     const tag=el('div','stfx-rfx-tag'+(small?' small':''),`<span class="stfx-rfx-tag-ico">${row.querySelector('.stfx-res-gico')?row.querySelector('.stfx-res-gico').innerHTML:''}</span>レリック${small?'強化':''}効果が発動：${esc(row.dataset.gname)} <b>+${amt}G</b>`);
@@ -1250,6 +1268,7 @@ const StageFX = (function(){
     (async()=>{
       const D=R?0:1;
       const pil=ov.querySelector('.stfx-pv-pillar.main');
+      sfx('holy',{fast:false});
       // 2回目以降（魔力ステージD）は、選択時に薄めた背景・光の柱・後光を短く灯し直す
       const k=repeat?.45:1;
       ['.stfx-pv-bg','.stfx-pv-pillar','.stfx-pv-halo','.stfx-pv-motes'].forEach(sel=>ov.querySelectorAll(sel).forEach(n=>n.getAnimations().forEach(a=>{ if(!(a.effect&&a.effect.getTiming&&a.effect.getTiming().iterations===Infinity)) a.cancel(); })));
@@ -1264,6 +1283,7 @@ const StageFX = (function(){
       cards.forEach((cd,i)=>{
         anim(cd,[{opacity:0,transform:'translateY(-70vh) scale(.7)',filter:'blur(6px) brightness(3)'},{opacity:1,transform:'translateY(6px) scale(1.02)',filter:'blur(0) brightness(1.8)',offset:.8},{opacity:1,transform:'none',filter:'blur(0) brightness(1)'}],{duration:R?80:760,delay:base+i*D*200,fill:'both',easing:'cubic-bezier(.2,.7,.3,1)'});
         const fl=el('div','stfx-pv-landflash'); cd.appendChild(fl);
+        sfx('cardFlip',{delay:(base+i*D*200+(R?0:600))/1000,minGap:0,pitch:i*2});
         anim(fl,[{opacity:0},{opacity:.9,offset:.1},{opacity:0}],{duration:R?60:600,delay:base+i*D*200+(R?0:600),fill:'both'});
       });
       anim(skipBtn,[{opacity:0},{opacity:1}],{duration:R?60:300,delay:base+cards.length*D*200+(R?0:500),fill:'both'});
@@ -1278,6 +1298,7 @@ const StageFX = (function(){
     const cards=Array.from(content.querySelectorAll('.stfx-pv-card'));
     const it=ui.opts.items[idx]; const cd=cards[idx];
     ov.classList.add('st-choosing'); cd.classList.add('chosen');
+    sfx('passive',{fast:false});
     cards.forEach((c,i)=>{ if(i!==idx) anim(c,[{opacity:1,transform:'none'},{opacity:0,transform:'translateY(-40px) scale(.9)',filter:'blur(3px)'}],{duration:R?60:420,fill:'forwards',easing:'ease-in'}); });
     anim(content.querySelector('.stfx-pv-skip'),[{opacity:1},{opacity:0}],{duration:200,fill:'forwards'});
     anim(content.querySelector('.stfx-pv-head'),[{opacity:1},{opacity:.0}],{duration:R?60:500,fill:'forwards'});
@@ -1308,6 +1329,7 @@ const StageFX = (function(){
       // 着弾：パッシブバーのレベルを先行表示して光らせる
       const land=document.querySelector(`.status-top-row .passive-icon.sym-${it.sym}`);
       if(land){ land.classList.add('active','stfx-pv-land'); const t=land.querySelector('.passive-tier'); if(t) t.textContent='Lv'+it.tier; }
+      sfx('levelUp',{fast:false});
       const burst=el('div','stfx-pv-burst'); burst.style.left=tc.x+'px'; burst.style.top=tc.y+'px'; ov.appendChild(burst);
       anim(burst,[{opacity:1,transform:'translate(-50%,-50%) scale(.2)'},{opacity:0,transform:'translate(-50%,-50%) scale(2.2)'}],{duration:R?60:600,fill:'forwards',easing:'ease-out'});
       const tag=el('div','stfx-pv-gain',`${esc(it.name)} 習得`); tag.style.left=Math.max(70,Math.min(innerWidth-70,tc.x))+'px'; tag.style.top=(tc.y+26)+'px'; ov.appendChild(tag);

@@ -35,6 +35,7 @@ const ToastSwipe = {
     }
   },
   dismiss(el, dir){
+    try{ if(typeof SFX!=='undefined') SFX.play('swipe'); }catch(e){} // 効果音（js/sfx.js）
     const box=el.querySelector('.card-reveal-popup');
     if(box){ box.style.transition='transform .18s ease-out, opacity .18s'; box.style.transform=`translateX(${dir*220}px)`; box.style.opacity='0'; }
     const isMult=el.classList.contains('mult-change-toast'), isGame=el.classList.contains('game-change-toast');

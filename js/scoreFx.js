@@ -13,6 +13,7 @@ const ScoreFXProto = {
   speed(){ return (this.opts&&this.opts.getSpeed)?(this.opts.getSpeed()||1):1; },
   dur(ms){ return Math.max(16, Math.round(ms/this.speed())); },
   wait(ms){ return new Promise(res=>setTimeout(res,this.dur(ms))); },
+  sfx(name,o){ try{ if(typeof SFX!=='undefined') SFX.play(name,o); }catch(e){} }, // 効果音（js/sfx.js）
   target(){ return (this.opts&&this.opts.targetScore)||1; },
 
   ensure(){
@@ -79,7 +80,8 @@ const ScoreFXProto = {
   // ---------- 開閉 ----------
   // opts: { title, symLabel, symClass, cells:[盤面idx], targetScore, getSpeed, onToggleFF }
   open(opts){
-    this.ensure(); this.opts=opts; this._anchorCells=opts.cells||[];
+    this.ensure(); this.opts=opts; this._anchorCells=opts.cells||[]; this._sfxN=0;
+    this.sfx('open',{volume:0.6});
     const E=this.el;
     E.sym.innerHTML=opts.symLabel||''; /* 記号はインラインSVG（GameData.SYMBOL_LABEL。ゲーム内定数のみ） */ E.sym.className='sfx-sym '+(opts.symClass||'');
     E.title.textContent=opts.title||'';
@@ -355,6 +357,8 @@ const ScoreFXProto = {
     ],{duration:fly,easing:'cubic-bezier(.5,0,.75,1)',fill:'forwards'});
     await new Promise(res=>setTimeout(res,fly));
     c.remove();
+    if(k==='a'){ const n=this._sfxN=(this._sfxN||0)+1; this.sfx('scoreChip',{pitch:Math.min(12,n-1),minGap:0}); }
+    else this.sfx(cls&&cls.indexOf('c-add')>=0?'scoreChip':'mult',{pitch:strength>=2?2:0,minGap:0});
     this.bump(k,strength);
     if(!this.reduced&&strength>=1) this.sparks(box,3+strength*2,true);
     await this.tweenTo(k,to,ms*0.45);
@@ -407,6 +411,7 @@ const ScoreFXProto = {
     const wasScore=E.a.classList.contains('kind-score');
     this.setBox('a',{label:label||'得点',kind});
     if(!wasScore) this.el.a._v=this.el.a._v||0;
+    this.sfx(op==='×'?'mult':'scoreChip',{pitch:op==='×'?Math.min(7,(strength-1)*3):7,volume:strength>=3?1.2:1});
     if(strength>0){
       this.flash(op==='×'?'rgba(255,90,60,.55)':'rgba(120,220,255,.45)');
       this.shake(strength);
@@ -435,6 +440,8 @@ const ScoreFXProto = {
     E.a._v=value; this.writeNum('a',value);
     this.anim(E.aNum,[{transform:'scale(2.6)',opacity:0,filter:'blur(4px)'},{transform:'scale(.9)',opacity:1,filter:'blur(0)',offset:.6},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:this.dur(360),easing:'cubic-bezier(.2,.9,.3,1.2)'});
     await new Promise(r=>setTimeout(r,this.dur(200)));
+    this.sfx(neg?'jam':'land',{volume:1.2});
+    if(!neg&&(this._heat||0)>=3) this.sfx('rare',{volume:0.7});
     this.flash(neg?'rgba(255,80,80,.5)':'rgba(255,230,140,.7)');
     this.shake(neg?1:Math.min(3,1+Math.floor((this._heat||0)/2)));
     if(!neg) this.sparks(E.a,14,true);
@@ -447,6 +454,7 @@ const ScoreFXProto = {
     c.textContent=E.aNum.textContent; c.style.fontSize=getComputedStyle(E.aNum).fontSize;
     c.style.left=s.left+'px'; c.style.top=s.top+'px';
     this.fx.appendChild(c);
+    this.sfx('swipe',{volume:0.7});
     const dx=(t.left+Math.min(t.width,160)/2)-(s.left+s.width/2), dy=(t.top+t.height/2)-(s.top+s.height/2);
     const d=this.dur(360);
     this.anim(E.aNum,[{opacity:1},{opacity:.25}],{duration:d,fill:'forwards'});
@@ -454,10 +462,12 @@ const ScoreFXProto = {
     await new Promise(r=>setTimeout(r,d));
     c.remove();
     if(E.aNum.getAnimations) E.aNum.getAnimations().forEach(x=>x.cancel());
+    this.sfx('coin');
     this.sparks(targetEl,10,true);
   },
   celebrate(scoreEl){
     this.bubble.classList.add('celebrate');
+    this.sfx('levelUp');
     const bn=this.el.banner; bn.classList.add('show');
     this.anim(this.el.aNum,[{opacity:1},{opacity:.12}],{duration:this.dur(200),fill:'forwards'});
     this.anim(bn,[{transform:'translate(-50%,-50%) scale(3) rotate(-8deg)',opacity:0},{transform:'translate(-50%,-50%) scale(.9) rotate(-4deg)',opacity:1,offset:.6},{transform:'translate(-50%,-50%) scale(1) rotate(-4deg)',opacity:1}],{duration:this.dur(420),easing:'cubic-bezier(.2,.9,.3,1.3)'});
@@ -503,6 +513,8 @@ const ScoreFX = {
          <div class="sfx-fin-sub">${neg?'合計加算点数…':'合計加算点数'}</div>
        </div>`;
     document.body.appendChild(ov);
+    const sfx=(n,o)=>{ try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} }; // 効果音（js/sfx.js）
+    sfx(neg?'jam':'finale',{fast:false});
     const q=s=>ov.querySelector(s);
     const core=q('.sfx-fin-core'), num=q('.sfx-fin-num'), cnt=q('.sfx-fin-count'), rays=q('.sfx-fin-rays'), flash=q('.sfx-fin-flash'), dim=q('.sfx-fin-dim');
     const A=(el,kf,o)=>{ try{ return el&&el.animate?el.animate(kf,o):null; }catch(e){ return null; } };
@@ -563,13 +575,14 @@ const ScoreFX = {
         if(done) return;
         const t=Math.max(0,Math.min(1,(now-t0)/cd)); const e=1-Math.pow(1-t,3);
         num.textContent=fmt(t>=1?total:Math.round(total*e));
-        if(now-lastBurst>70&&t>0&&t<1){ lastBurst=now; spark(2+tier,false); }
+        if(now-lastBurst>70&&t>0&&t<1){ lastBurst=now; spark(2+tier,false); sfx('scoreTick',{pitch:Math.round(e*12),fast:false}); }
         if(t<1) rafId=requestAnimationFrame(step);
         else{
           // 確定：叩きつけ＋爆発
           A(num,[{transform:'scale(1.45)'},{transform:'scale(.95)'},{transform:'scale(1)'}],{duration:dur(300),easing:'cubic-bezier(.34,1.56,.64,1)'});
           A(flash,[{opacity:reduced?.2:(neg?.35:.7)},{opacity:0}],{duration:dur(300),easing:'ease-out',fill:'forwards'});
           core.classList.add('landed');
+          sfx(neg?'placeNpc':'land',{volume:1.3,fast:false}); if(!neg&&tier>=2) sfx('legend',{volume:0.8,fast:false});
           spark(22,true); confetti(18+tier*10);
           later(finish,dur(460));
         }

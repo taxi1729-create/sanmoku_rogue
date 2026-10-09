@@ -15,6 +15,7 @@
  */
 const StartEvent = (function(){
   'use strict';
+  const _se=(n,o)=>{ try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} };
 
   const G = () => GameState;
   const reduced = () => { try{ return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }catch(e){ return false; } };
@@ -182,7 +183,7 @@ const StartEvent = (function(){
     q('.sev-stage').addEventListener('click', onTap);
     q('.sev-bg').addEventListener('click', onTap);
     ui.panel.addEventListener('click', e=>{ if(e.target.closest('.sev-tip,.sev-pager,.sev-taphint')) onTap(e); });
-    ui.skipBtn.addEventListener('click', e=>{ e.stopPropagation(); skipStory(); });
+    ui.skipBtn.addEventListener('click', e=>{ e.stopPropagation(); _se('skip',{suppressTap:true}); skipStory(); });
     spawnMotes(reduced()?0:26);
     document.body.appendChild(ov);
     document.documentElement.classList.add('sev-lock');
@@ -227,6 +228,8 @@ const StartEvent = (function(){
   }
   function refreshStats(g0, d0){
     if(!ui) return;
+    if(g0!=null&&g0!==G().gold) _se('coin');
+    if(d0!=null&&d0!==G().currentDeck.length) _se('draw');
     animateNum(ui.goldV, g0!=null?g0:+ui.goldV.textContent, G().gold);
     animateNum(ui.deckV, d0!=null?d0:+ui.deckV.textContent, G().currentDeck.length);
   }
@@ -255,12 +258,12 @@ const StartEvent = (function(){
       const complete=()=>{
         if(done) return; done=true; if(iv) clearInterval(iv);
         box.textContent=text;
-        if(opts.wait){ more.hidden=false; ui.tap=()=>{ ui.tap=null; more.hidden=true; finish(); }; }
+        if(opts.wait){ more.hidden=false; ui.tap=()=>{ ui.tap=null; more.hidden=true; _se('tap',{volume:0.5}); finish(); }; }
         else { ui.tap=null; finish(); }
       };
       if(reduced()){ complete(); return; }
-      box.textContent=''; ui.tap=complete;
-      iv=setInterval(()=>{ i++; box.textContent=chars.slice(0,i).join(''); if(i>=chars.length) complete(); }, 34);
+      box.textContent=''; ui.tap=complete; _se('holy',{volume:0.3});
+      iv=setInterval(()=>{ i++; box.textContent=chars.slice(0,i).join(''); if(i%6===1&&chars[i-1]&&chars[i-1].trim()) _se('page',{volume:0.25}); if(i>=chars.length) complete(); }, 34);
       ui.timers.push(iv);
     });
   }
@@ -276,8 +279,9 @@ const StartEvent = (function(){
       ui.tap=()=>{ o.classList.add('sev-noanim'); finish(); ui.timers.push(setTimeout(()=>ui&&ui.ov.classList.remove('sev-noanim'),60)); };
       const at=(ms,fn)=>ui.timers.push(setTimeout(()=>{ if(!finished&&ui) fn(); }, ms));
       requestAnimationFrame(()=>o.classList.add('st-dawn'));
+      _se('holy',{volume:0.6});
       at(500,()=>{ o.classList.add('st-pillar'); });
-      at(1100,()=>{ o.classList.add('st-sigil'); pulse('rx-flash',600); spawnRise(14); });
+      at(1100,()=>{ _se('reveal'); o.classList.add('st-sigil'); pulse('rx-flash',600); spawnRise(14); });
       at(2100,()=>{ o.classList.add('st-talk'); finish(); });
     });
   }
@@ -317,7 +321,7 @@ const StartEvent = (function(){
         item.dataset.bl=id; item.style.setProperty('--k',k);
         item.addEventListener('click',()=>{
           if(ui.busy) return;
-          chosen=id;
+          chosen=id; _se('select',{suppressTap:true});
           list.querySelectorAll('.sev-opt').forEach(x=>x.classList.toggle('chosen', x===item));
           confirm.disabled=false;
           confirm.textContent=`授かる：${b.name}`;
@@ -325,7 +329,7 @@ const StartEvent = (function(){
         list.appendChild(item);
       });
       p.appendChild(list);
-      confirm.addEventListener('click',()=>{ if(!chosen||ui.busy) return; ui.busy=true; res(chosen); });
+      confirm.addEventListener('click',()=>{ if(!chosen||ui.busy) return; ui.busy=true; _se('confirm',{suppressTap:true}); res(chosen); });
       p.appendChild(confirm);
     });
   }
@@ -345,8 +349,8 @@ const StartEvent = (function(){
         const w=el('div','sev-pick-card', cardHtml(c)+(opts.badge?`<span class="sev-badge">${opts.badge(c)}</span>`:''));
         w.dataset.i=i;
         w.addEventListener('click',()=>{
-          if(sel.has(i)) sel.delete(i);
-          else{ if(max===1) sel.clear(); if(sel.size<max) sel.add(i); }
+          if(sel.has(i)){ sel.delete(i); _se('deselect',{suppressTap:true}); }
+          else{ if(max===1) sel.clear(); if(sel.size<max){ sel.add(i); _se('select',{suppressTap:true}); } else _se('error',{suppressTap:true}); }
           grid.querySelectorAll('.sev-pick-card').forEach(x=>x.classList.toggle('picked', sel.has(+x.dataset.i)));
           const d=cardDescHtml(c); detail.hidden=!d||!sel.has(i); detail.innerHTML=d;
           upd();
@@ -366,7 +370,7 @@ const StartEvent = (function(){
       }
       p.appendChild(grid);
       p.appendChild(detail);
-      confirm.addEventListener('click',()=>{ if(confirm.disabled) return; res([...sel].sort((a,b)=>a-b)); });
+      confirm.addEventListener('click',()=>{ if(confirm.disabled) return; _se('confirm',{suppressTap:true}); res([...sel].sort((a,b)=>a-b)); });
       p.appendChild(confirm); upd();
     });
   }
@@ -384,14 +388,14 @@ const StartEvent = (function(){
         const row=el('div','sev-opt'+(it.rare?' sev-opt-rare':''), `<div class="sev-opt-body"><div class="sev-opt-title">${it.label}</div>${it.desc?`<div class="sev-opt-desc">${it.desc}</div>`:''}</div>`);
         row.dataset.key=it.key; row.style.setProperty('--k',k);
         row.addEventListener('click',()=>{
-          chosen=it.key;
+          chosen=it.key; _se('select',{suppressTap:true});
           list.querySelectorAll('.sev-opt').forEach(x=>x.classList.toggle('chosen', x===row));
           confirm.disabled=false; confirm.textContent='決定';
         });
         list.appendChild(row);
       });
       p.appendChild(list);
-      confirm.addEventListener('click',()=>{ if(chosen==null) return; res(chosen); });
+      confirm.addEventListener('click',()=>{ if(chosen==null) return; _se('confirm',{suppressTap:true}); res(chosen); });
       p.appendChild(confirm);
     });
   }
@@ -401,8 +405,9 @@ const StartEvent = (function(){
       clearPanel();
       ui.panel.appendChild(panelTitle(title));
       ui.panel.appendChild(el('div','sev-result',html));
+      _se('reveal');
       const b=el('button','sev-confirm sev-depart',`${ico('btn_map',{cls:'gi-gap'})}祭壇を目指して出発する`);
-      b.addEventListener('click',()=>res());
+      b.addEventListener('click',()=>{ _se('confirm',{suppressTap:true}); res(); });
       ui.panel.appendChild(b);
     });
   }
@@ -418,6 +423,7 @@ const StartEvent = (function(){
     clearPanel();
     ui.panel.appendChild(el('div','sev-granting',`<span class="sev-granting-ico">${ico(b.icon)}</span><div class="sev-panel-title">寵愛：${b.name}</div>`));
     pulse('rx-bless',1600); pulse('rx-flash',700); spawnRise(22);
+    _se('fanfare'); _se('holy',{volume:0.7});
     await say('光よ、この者に宿れ――');
     await wait(900);
   }
@@ -597,7 +603,7 @@ const StartEvent = (function(){
     return new Promise(res=>{
       if(!ui) return res();
       if(reduced()) return res();
-      ui.ov.classList.add('st-leave'); spawnRise(16);
+      ui.ov.classList.add('st-leave'); spawnRise(16); _se('holy',{volume:0.4});
       ui.timers.push(setTimeout(res, 1100));
     });
   }

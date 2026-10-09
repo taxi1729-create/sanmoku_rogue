@@ -12,6 +12,7 @@
  */
 const Revelation = (function(){
   'use strict';
+  const _se=(n,o)=>{ try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} };
   const G = () => GameState;
   const reduced = () => { try{ return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }catch(e){ return false; } };
   const ico = (k,o) => (typeof GameIcons!=='undefined' && GameIcons.has(k)) ? GameIcons.svg(k,o) : '';
@@ -148,7 +149,7 @@ const Revelation = (function(){
     q('.sev-stage').addEventListener('click', onTap);
     q('.sev-bg').addEventListener('click', onTap);
     ui.panel.addEventListener('click', e=>{ if(e.target.closest('.sev-tip,.sev-pager,.sev-taphint')) onTap(e); });
-    ui.skipBtn.addEventListener('click', e=>{ e.stopPropagation(); skip(); });
+    ui.skipBtn.addEventListener('click', e=>{ e.stopPropagation(); _se('skip',{suppressTap:true}); skip(); });
     spawnMotes(reduced()?0:26);
     document.body.appendChild(ov);
     document.documentElement.classList.add('sev-lock');
@@ -203,12 +204,12 @@ const Revelation = (function(){
       const complete=()=>{
         if(done) return; done=true; if(iv) clearInterval(iv);
         box.textContent=text;
-        if(opts.wait){ more.hidden=false; ui.tap=()=>{ ui.tap=null; more.hidden=true; finish(); }; }
+        if(opts.wait){ more.hidden=false; ui.tap=()=>{ ui.tap=null; more.hidden=true; _se('tap',{volume:0.5}); finish(); }; }
         else { ui.tap=null; finish(); }
       };
       if(reduced()){ complete(); return; }
-      box.textContent=''; ui.tap=complete;
-      iv=setInterval(()=>{ i++; box.textContent=chars.slice(0,i).join(''); if(i>=chars.length) complete(); }, 34);
+      box.textContent=''; ui.tap=complete; _se('holy',{volume:0.3});
+      iv=setInterval(()=>{ i++; box.textContent=chars.slice(0,i).join(''); if(i%6===1&&chars[i-1]&&chars[i-1].trim()) _se('page',{volume:0.25}); if(i>=chars.length) complete(); }, 34);
       ui.timers.push(iv);
     });
   }
@@ -222,8 +223,9 @@ const Revelation = (function(){
       ui.tap=()=>{ o.classList.add('sev-noanim'); finish(); ui.timers.push(setTimeout(()=>ui&&ui.ov.classList.remove('sev-noanim'),60)); };
       const at=(ms,fn)=>ui.timers.push(setTimeout(()=>{ if(!finished&&ui) fn(); }, ms));
       requestAnimationFrame(()=>o.classList.add('st-dawn'));
+      _se('holy',{volume:0.6});
       at(500,()=>{ o.classList.add('st-pillar'); });
-      at(1100,()=>{ o.classList.add('st-sigil'); pulse('rx-flash',600); spawnRise(14); });
+      at(1100,()=>{ _se('reveal'); o.classList.add('st-sigil'); pulse('rx-flash',600); spawnRise(14); });
       at(2100,()=>{ o.classList.add('st-talk'); finish(); });
     });
   }
@@ -267,7 +269,7 @@ const Revelation = (function(){
       cards.forEach((c,i)=>{
         const w=el('div','sev-pick-card', cardHtml(c)); w.dataset.i=i;
         w.addEventListener('click',()=>{
-          sel=i;
+          sel=i; _se('select',{suppressTap:true});
           grid.querySelectorAll('.sev-pick-card').forEach(x=>x.classList.toggle('picked', +x.dataset.i===sel));
           const d=cardDescHtml(c); detail.hidden=!d; detail.innerHTML=d;
           confirm.disabled=false;
@@ -275,7 +277,7 @@ const Revelation = (function(){
         grid.appendChild(w);
       });
       p.appendChild(grid); p.appendChild(detail);
-      confirm.addEventListener('click',()=>{ if(sel<0) return; res(sel); });
+      confirm.addEventListener('click',()=>{ if(sel<0) return; _se('confirm',{suppressTap:true}); res(sel); });
       p.appendChild(confirm);
     });
   }
@@ -285,7 +287,7 @@ const Revelation = (function(){
       if(title) ui.panel.appendChild(panelTitle(title));
       if(html) ui.panel.appendChild(el('div','sev-result',html));
       const b=el('button','sev-confirm sev-depart'+(cls?' '+cls:''),label);
-      b.addEventListener('click',()=>res());
+      b.addEventListener('click',()=>{ _se('confirm',{suppressTap:true}); res(); });
       ui.panel.appendChild(b);
     });
   }
@@ -297,7 +299,7 @@ const Revelation = (function(){
   function outroAnim(ms){
     return new Promise(res=>{
       if(!ui||reduced()) return res();
-      ui.ov.classList.add('st-leave'); spawnRise(16);
+      ui.ov.classList.add('st-leave'); spawnRise(16); _se('holy',{volume:0.4});
       ui.timers.push(setTimeout(res, ms||1100));
     });
   }
@@ -310,6 +312,7 @@ const Revelation = (function(){
   // v1.08 褒美はドリームカードパックから特別アップグレードに変更。啓示の後、ショップで爆発アップグレードより先に開く
   async function grantSpecial(){
     G().floor5GiftPending=true;
+    _se('fanfare'); _se('holy',{volume:0.7}); setTimeout(()=>_se('upgrade'),500);
     pulse('rx-bless',1600); pulse('rx-flash',700); spawnRise(22);
     return `<div class="sev-grant"><span class="sev-grant-ico">${ico('pack_special')}</span><div><b>特別アップグレード</b>を授かった<div class="sev-grant-desc">啓示の後、クリア報酬（爆発アップグレード）より先に開かれる</div></div></div>`;
   }
@@ -331,6 +334,7 @@ const Revelation = (function(){
       await resP;
       if(!ui) return done;
       ui.ov.classList.add('rev-dusk'); // 深層の示唆：光が翳る
+      _se('heartbeat');
       await story(FLOOR5_OMEN);
       if(!ui) return done;
       const hasExplosive=!!(typeof ShopScene!=='undefined' && (ShopScene.pickingPack||ShopScene.pendingRelicPacks||(ShopScene.packQueue&&ShopScene.packQueue.length)));
@@ -353,9 +357,11 @@ const Revelation = (function(){
     const done=new Promise(r=>{ buildOverlay('ending','終章・祭壇の灯'); ui.resolve=r; ui.full=true; });
     try{
       await intro();
+      _se('fanfare'); _se('holy',{volume:0.7});
       pulse('rx-bless',1600); spawnRise(24);
       await story(ENDING_LINES);
       if(!ui) return done;
+      _se('reveal');
       const endP=button('旅の記録', statsHtml(true)+symsHtml(), 'エンドロールへ', 'rev-to-credits');
       say('……あなたの旅に、永遠の祝福を。');
       await endP;

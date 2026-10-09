@@ -1,4 +1,5 @@
 // ショップ：#26/#27/#28/#29に対応した全面実装
+const _seShop=(n,o)=>{ try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} };
 const ShopScene = {
   container: null,
   offers: null,
@@ -705,7 +706,7 @@ const ShopScene = {
 
     const actions = document.createElement('div'); actions.className='shop-actions';
     // #19 パック内訳ボタン（品揃え更新の左）
-    const breakdownBtn = document.createElement('button'); breakdownBtn.innerHTML=GIcon('btn_pack_breakdown',{cls:'gi-gap'})+'パック内訳'; breakdownBtn.addEventListener('click',()=>{ this.packBreakdownOpen=true; this.packBreakdownSelected=null; this.renderAll(); }); actions.appendChild(breakdownBtn);
+    const breakdownBtn = document.createElement('button'); breakdownBtn.innerHTML=GIcon('btn_pack_breakdown',{cls:'gi-gap'})+'パック内訳'; breakdownBtn.addEventListener('click',()=>{ _seShop('open',{suppressTap:true}); this.packBreakdownOpen=true; this.packBreakdownSelected=null; this.renderAll(); }); actions.appendChild(breakdownBtn);
     if(!this.fixedFinalShop){
       // #6 最終ショップ（階層10）は品揃え更新不可
       // #4 サンカクパッシブ1を取得するまでロック
@@ -827,8 +828,8 @@ const ShopScene = {
       const eff = puSlot._single;
       puEl.innerHTML=`<div class="slot-title">${GIcon('shop_pickup_upgrade')}ピックアップ<br>${eff.name}</div><div class="slot-desc">${eff.desc}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入（${price}G）</button>`;
       puEl.querySelector('.buy-btn').addEventListener('click', () => {
-        if(GameState.gold < price) return;
-        GameState.gold -= price; puSlot.used = true;
+        if(GameState.gold < price){ _seShop('error',{suppressTap:true}); return; }
+        GameState.gold -= price; puSlot.used = true; _seShop('buy',{suppressTap:true}); _seShop('coin');
         if(eff.targetMax === 0 && !eff.showCards){
           this.applyEffect(eff.id, []);
           this.renderAll();
@@ -905,8 +906,8 @@ const ShopScene = {
         el.className+=' pickup-slot';
         el.innerHTML=`<div class="slot-title">${GIcon('shop_pickup_upgrade')}ピックアップ<br>${eff.name}</div><div class="slot-desc">${eff.desc}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入（${price}G）</button>`;
         el.querySelector('.buy-btn').addEventListener('click', () => {
-          if(GameState.gold<price) return;
-          GameState.gold-=price; slot.used=true;
+          if(GameState.gold<price){ _seShop('error',{suppressTap:true}); return; }
+          GameState.gold-=price; slot.used=true; _seShop('buy',{suppressTap:true}); _seShop('coin');
           if(eff.targetMax===0&&!eff.showCards){ this.applyEffect(eff.id,[]); this.renderAll(); }
           else{
             const ci=GlobalFunctions.shuffle(GameState.currentDeck.map((_,i)=>i)).slice(0,Math.min(GameState.packCardCount(false),GameState.currentDeck.length)); // #11
@@ -968,8 +969,9 @@ const ShopScene = {
         wrap.addEventListener('click', () => this.pickCardPackCard(card));
       }else{
         wrap.addEventListener('click', () => {
-          if(p.selected.has(idx)) p.selected.delete(idx);
-          else if(p.selected.size < pickCount) p.selected.add(idx);
+          if(p.selected.has(idx)){ p.selected.delete(idx); _seShop('deselect',{suppressTap:true}); }
+          else if(p.selected.size < pickCount){ p.selected.add(idx); _seShop('select',{suppressTap:true}); }
+          else _seShop('error',{suppressTap:true});
           this.renderAll();
         });
       }
@@ -1000,7 +1002,7 @@ const ShopScene = {
   // #19 パック内訳一覧・詳細モーダル
   renderPackBreakdownModal(){
     const overlay=document.createElement('div'); overlay.className='pack-modal-overlay';
-    overlay.addEventListener('click',(e)=>{ if(e.target===overlay){ this.packBreakdownOpen=false; this.packBreakdownSelected=null; this.renderAll(); } });
+    overlay.addEventListener('click',(e)=>{ if(e.target===overlay){ _seShop('close',{suppressTap:true}); this.packBreakdownOpen=false; this.packBreakdownSelected=null; this.renderAll(); } });
     // #枠固定 モーダルの大きさは固定。パック一覧と詳細表示エリアを分離し、詳細は固定高さのエリア内でスクロールする。
     // パックのタップでは renderAll せずにその場で詳細だけ差し替える（一覧のスクロール位置も動かない）
     const modal=document.createElement('div'); modal.className='pack-modal pack-breakdown-modal';
@@ -1026,7 +1028,7 @@ const ShopScene = {
     modal.appendChild(list);
     modal.appendChild(detail);
     const closeBtn=document.createElement('button'); closeBtn.textContent='閉じる'; closeBtn.style.marginTop='12px';
-    closeBtn.addEventListener('click',()=>{ this.packBreakdownOpen=false; this.packBreakdownSelected=null; this.renderAll(); });
+    closeBtn.addEventListener('click',()=>{ _seShop('close',{suppressTap:true}); this.packBreakdownOpen=false; this.packBreakdownSelected=null; this.renderAll(); });
     modal.appendChild(closeBtn);
     overlay.appendChild(modal);
     return overlay;
@@ -1276,3 +1278,37 @@ const ShopScene = {
     box.appendChild(grid); overlay.appendChild(box); return overlay;
   },
 };
+
+// ===== SE（効果音）フック：購入・売却・品替え・パック選択・アップグレード等 =====
+(function(){
+  const S=ShopScene; let depth=0;
+  const wrap=(name,fn)=>{ const orig=S[name]; if(typeof orig!=='function') return; S[name]=function(...a){ return fn.call(this,orig,a); }; };
+  const gradeSe=(relic)=>{ let g='normal'; try{ g=GameMainScene.relicGradeOf(relic); }catch(e){} _seShop(g==='legend'?'legend':(g==='super'||g==='rare')?'rare':'relic'); };
+  const isErrMsg=(m)=>typeof m==='string'&&(m.includes('足りません')||m.includes('上限')||m.includes('最大'));
+  // 購入系：最外周の呼び出しで所持G・レリック数の変化から音を決める（handleRandomSlot→buyX の二重発音を防止）
+  ['buyPickupCard','buyPickupRelic','buyRelic','buyCardPack','buyUpgrade','buyExplosiveUpgrade','buySpecialPackExhausted','handleRandomSlot',
+   'buyFocusPack','buyDreamCard','buyEnhancePack','buyJammingPack','buyRelicPack','pickRelicPackCard'].forEach(name=>wrap(name,function(orig,a){
+    const g=GameState.gold, rl=GameState.relics.length, msg=this.message, pk=[this.pickingPack,this.pickingCardPack,this.pickingRelicPack,this.message].join('|');
+    depth++; let r; try{ r=orig.apply(this,a); } finally{ depth--; }
+    if(depth===0){
+      const bought=GameState.gold<g, gotRelic=GameState.relics.length>rl;
+      if(bought){ _seShop('buy',{suppressTap:true}); setTimeout(()=>_seShop('coin'),70); }
+      if(gotRelic){ const rel=GameState.relics[GameState.relics.length-1]; setTimeout(()=>gradeSe(rel), bought?160:0); if(!bought) _seShop('confirm',{suppressTap:true}); }
+      if(!bought&&!gotRelic&&this.message!==msg&&isErrMsg(this.message)) _seShop('error',{suppressTap:true});
+      else if(!bought&&!gotRelic&&name!=='pickRelicPackCard'&&GameState.gold===g&&[this.pickingPack,this.pickingCardPack,this.pickingRelicPack,this.message].join('|')===pk) _seShop('error',{suppressTap:true});
+    }
+    return r;
+  }));
+  wrap('shopSellRelic',function(orig,a){ const rl=GameState.relics.length; const r=orig.apply(this,a); if(GameState.relics.length<rl){ _seShop('sell',{suppressTap:true}); setTimeout(()=>_seShop('coin'),80); } return r; });
+  wrap('rerollOffers',function(orig,a){ const g=GameState.gold; const r=orig.apply(this,a); if(GameState.gold<g){ _seShop('shuffle',{suppressTap:true}); setTimeout(()=>_seShop('coin'),90); } else _seShop('error',{suppressTap:true}); return r; });
+  wrap('leaveShop',function(orig,a){ _seShop('close',{suppressTap:true}); return orig.apply(this,a); });
+  wrap('chooseEffect',function(orig,a){ if(this.pickingPack) _seShop('select',{suppressTap:true}); return orig.apply(this,a); });
+  wrap('toggleTarget',function(orig,a){ const p=this.pickingPack, n=p&&p.selectedTargets?p.selectedTargets.size:0; const r=orig.apply(this,a); const m=p&&p.selectedTargets?p.selectedTargets.size:0; if(p&&p.chosenEffect){ _seShop(m>n?'select':m<n?'deselect':'error',{suppressTap:true}); } return r; });
+  wrap('confirmPack',function(orig,a){ const p=this.pickingPack, eff=p&&p.chosenEffect; const ok=!!(eff&&p.selectedTargets.size>=eff.targetMin); const r=orig.apply(this,a); if(ok) _seShop('upgrade',{suppressTap:true}); return r; });
+  wrap('pickCardPackCard',function(orig,a){ _seShop('confirm',{suppressTap:true}); setTimeout(()=>_seShop('draw'),90); return orig.apply(this,a); });
+  wrap('confirmCardPackMulti',function(orig,a){ const p=this.pickingCardPack; const r=orig.apply(this,a); if(p&&!this.pickingCardPack){ _seShop('confirm',{suppressTap:true}); setTimeout(()=>_seShop('draw'),90); } return r; });
+  ['skipCardPack','skipPack','skipRelicPack'].forEach(n=>wrap(n,function(orig,a){ _seShop('skip',{suppressTap:true}); return orig.apply(this,a); }));
+  wrap('showRevealPopup',function(orig,a){ const effectId=a[2]; setTimeout(()=>{ if(effectId==='cash_in') _seShop('coin'); _seShop('reveal'); },180); return orig.apply(this,a); });
+  // PackFX が無い（即開封）場合のみここで開封音。PackFX 側でも演出音が鳴る
+  wrap('startPackFx',function(orig,a){ if(typeof PackFX==='undefined') _seShop('packOpen'); return orig.apply(this,a); });
+})();

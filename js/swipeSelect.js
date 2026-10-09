@@ -24,6 +24,7 @@ const SwipeSelect = (function(){
       if(g.mode===sel) return;
       if(g.mode&&o.canSelect&&!o.canSelect()) return;
       o.set(key,g.mode); g.changed=true;
+      try{ if(typeof SFX!=='undefined') SFX.play(g.mode?'select':'deselect',{minGap:25,pitch:Math.min(12,g.visited.size-1)}); }catch(e){} // 効果音（js/sfx.js）
       if(o.paint) o.paint(el,g.mode);
     };
     container.addEventListener('touchstart',(e)=>{

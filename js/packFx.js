@@ -44,6 +44,7 @@ const PackFX = (function(){
   }
   function normType(t){ return Object.prototype.hasOwnProperty.call(EMOJI, t) ? t : 'card_pack'; }
   function rnd(a,b){ return a + Math.random()*(b-a); }
+  function sfx(n,o){ try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} } // 効果音（js/sfx.js）
   function rint(a,b){ return Math.floor(rnd(a,b+1)); }
 
   // パック外形：上下がギザギザ（圧着シール）の多角形
@@ -263,15 +264,19 @@ const PackFX = (function(){
       // ===== タイムライン =====
       // 表示
       requestAnimationFrame(() => { if(cur === c) ov.classList.add('pfx-in'); });
+      sfx(dream ? 'holy' : 'open', {volume: dream ? 0.7 : 1});
       if(!reduced){
-        at(T.shake1, () => { ov.dataset.st = '1'; });
-        at(T.shake2, () => { ov.dataset.st = '2'; });
-        at(T.shake3, () => { ov.dataset.st = '3'; });
+        at(T.shake1, () => { ov.dataset.st = '1'; sfx('cardFlip', {pitch:-10}); });
+        at(T.shake2, () => { ov.dataset.st = '2'; sfx('cardFlip', {pitch:-7}); });
+        at(T.shake3, () => { ov.dataset.st = '3'; sfx('cardFlip', {pitch:-4}); });
       }
 
       at(T.tear, () => {
         ov.dataset.st = 'tear';
         ov.classList.add('pfx-torn');
+        sfx('packOpen');
+        if(explosive) sfx('thunder', {volume:0.5});
+        if(rareAny) sfx('rare', {delay:0.12});
         bodyEl.style.webkitClipPath = polys.body;
         bodyEl.style.clipPath = polys.body;
         if(reduced) return;
@@ -321,7 +326,8 @@ const PackFX = (function(){
           setVars(w, { fx: (ox - (r.left + r.width/2)).toFixed(0)+'px', fy: (oy - (r.top + r.height/2)).toFixed(0)+'px',
             delay: (i*stagger/1000).toFixed(3)+'s', fly: (T.fly/1000).toFixed(3)+'s' });
           w.classList.add('pfx-go');
-          if(w.classList.contains('pfx-item-rare')) at(i*stagger + T.fly*0.8, () => w.classList.add('pfx-landed'));
+          if(i < 8) at(i*stagger + T.fly*0.6, () => sfx('cardFlip', {minGap:0, pitch:i}));
+          if(w.classList.contains('pfx-item-rare')) at(i*stagger + T.fly*0.8, () => { w.classList.add('pfx-landed'); sfx(dream ? 'legend' : 'rare', {volume:0.8}); });
         });
       });
 

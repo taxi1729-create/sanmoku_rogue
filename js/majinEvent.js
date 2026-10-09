@@ -16,6 +16,7 @@
  */
 const MajinEvent = (function(){
   'use strict';
+  const _se=(n,o)=>{ try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} };
 
   // ===================== 魔神定義 =====================
   const MAJINS = {
@@ -390,6 +391,7 @@ const MajinEvent = (function(){
     const eligible=deck().filter(c=>cnt[c.symbol]>=2);
     const lost=GlobalFunctions.randChoice(eligible);
     removeFromDeck(lost);
+    _se('jam');
     await api.interlude(lostHtml([lost],'魔神に喰われたカード'), '続ける');
     const same=GlobalFunctions.shuffle(deck().filter(c=>c.symbol===lost.symbol)).slice(0,8);
     const [target]=await api.pickCards(same,{min:1,max:1,title:`${symLabel(lost.symbol)}のカードから1枚選べ`});
@@ -401,6 +403,7 @@ const MajinEvent = (function(){
     if(kind==='enhance') GameData.setEnhance(target, key, G().gold); // #5 旧強化の即時加算を戻してから付与
     else target[kind]=key;
     GlobalFunctions.recordCard(target);
+    _se('upgrade');
     return lostHtml([lost])+beforeAfterHtml(before,target);
   }
 
@@ -412,6 +415,7 @@ const MajinEvent = (function(){
     }), {title:`記号パッシブを1つ選べ（${cands.length}択）`, head:headHtml});
     const nt=(G().symbolPassiveTier[key]||0)+1;
     G().symbolPassiveTier[key]=nt; GameData.refreshPassiveEnhance(); GameData.enforceCrossAll();
+    _se('levelUp');
     return passiveHtml(key, nt);
   }
 
@@ -594,7 +598,7 @@ const MajinEvent = (function(){
     card.innerHTML=`<div class="mj-sc-sigil">${circleSvg()}</div><div class="stage-tag">MAJIN EVENT</div><div class="stage-name">魔神イベント</div><div class="mj-sc-desc">${who}</div>`
       +(isCleared?`<div class="stage-actions"><div class="stage-done-tag">クリア済み</div></div>`:`<div class="stage-actions"><button class="mj-meet-btn" ${locked?'disabled':''}>魔神に会う</button></div>`);
     const b=card.querySelector('.mj-meet-btn');
-    if(b) b.addEventListener('click',()=>{ if(locked||isCleared) return; open(floor); });
+    if(b) b.addEventListener('click',()=>{ if(locked||isCleared){ _se('error',{suppressTap:true}); return; } _se('confirm',{suppressTap:true}); open(floor); });
     return card;
   }
 
@@ -656,11 +660,11 @@ const MajinEvent = (function(){
       const complete=()=>{
         if(done) return; done=true; if(iv) clearInterval(iv);
         box.textContent=text;
-        if(opts.wait){ more.hidden=false; ui.tap=()=>{ ui.tap=null; more.hidden=true; res(); }; }
+        if(opts.wait){ more.hidden=false; ui.tap=()=>{ ui.tap=null; more.hidden=true; _se('tap',{volume:0.6}); res(); }; }
         else { ui.tap=null; res(); }
       };
       if(reduced()){ complete(); return; }
-      box.textContent=''; ui.tap=complete;
+      box.textContent=''; ui.tap=complete; _se('page',{volume:0.5});
       iv=setInterval(()=>{ i++; box.textContent=chars.slice(0,i).join(''); if(i>=chars.length) complete(); }, 32);
       ui.timers.push(iv);
     });
@@ -671,6 +675,7 @@ const MajinEvent = (function(){
     const v=ui.goldV; dur=T(dur||700);
     v.classList.remove('mj-gold-down','mj-gold-up'); void v.offsetWidth;
     v.classList.add(to<from?'mj-gold-down':'mj-gold-up');
+    if(to!==from) _se('coin');
     if(!dur){ v.textContent=to; return; }
     const t0=performance.now();
     const step=now=>{ if(!ui) return; const k=Math.min(1,(now-t0)/dur); v.textContent=Math.round(from+(to-from)*k); if(k<1) requestAnimationFrame(step); };
@@ -722,6 +727,7 @@ const MajinEvent = (function(){
   }
   function reaction(kind, cost){
     if(!ui) return;
+    _se(kind==='coins'?'coin':kind==='laugh'?'glitch':kind==='seal'?'jam':kind==='sparkle'?'rare':'heartbeat',{volume:0.8});
     if(kind==='coins'){ spawnCoins(Math.min(14, 4+Math.ceil((cost||10)/5))); pulse('rx-gulp',1400); pulse('rx-eyes',1400); }
     else if(kind==='laugh'){ pulse('rx-laugh',1300); pulse('rx-eyes',1300); spawnSmoke(4,80); }
     else if(kind==='seal'){ pulse('rx-seal',1800); pulse('rx-eyes',1500); pulse('rx-flash',500); }
@@ -740,11 +746,13 @@ const MajinEvent = (function(){
       ui.tap=()=>{ o.classList.add('mj-noanim'); finish(); ui.timers.push(setTimeout(()=>ui&&ui.ov.classList.remove('mj-noanim'),60)); };
       const at=(ms,fn)=>ui.timers.push(setTimeout(()=>{ if(!finished&&ui) fn(); }, ms));
       requestAnimationFrame(()=>o.classList.add('st-dark'));
+      _se('heartbeat');
+      at(350,()=>_se('glitch'));
       at(350,()=>o.classList.add('st-circle'));
-      at(1000,()=>{ o.classList.add('st-bolt'); pulse('rx-flash',260); pulse('rx-quake',520); });
+      at(1000,()=>{ _se('thunder'); o.classList.add('st-bolt'); pulse('rx-flash',260); pulse('rx-quake',520); });
       at(1150,()=>{ o.classList.add('st-smoke'); spawnSmoke(12,130); });
       at(1300,()=>{ pulse('rx-flash',200); });
-      at(1400,()=>o.classList.add('st-rise'));
+      at(1400,()=>{ _se('boss'); o.classList.add('st-rise'); });
       at(2300,()=>{ o.classList.add('st-talk'); finish(); });
     });
   }
@@ -752,7 +760,7 @@ const MajinEvent = (function(){
     return new Promise(res=>{
       if(!ui) return res();
       if(reduced()){ return res(); }
-      ui.ov.classList.add('st-leave'); spawnSmoke(12,130);
+      ui.ov.classList.add('st-leave'); spawnSmoke(12,130); _se('glitch',{volume:0.7});
       ui.timers.push(setTimeout(res, 1500));
     });
   }
@@ -784,8 +792,8 @@ const MajinEvent = (function(){
         item.dataset.ev=o.id;
         item.addEventListener('click',()=>{
           if(ui.busy) return;
-          if(reason){ reaction('eyes'); say(`${ui.m.refuse}（${reason}）`); return; }
-          chosen=o.id;
+          if(reason){ _se('error',{suppressTap:true}); reaction('eyes'); say(`${ui.m.refuse}（${reason}）`); return; }
+          chosen=o.id; _se('select',{suppressTap:true});
           list.querySelectorAll('.mj-opt').forEach(x=>x.classList.toggle('chosen', x===item));
           confirm.disabled=false;
           confirm.textContent = o.id==='leave' ? '立ち去る' : `契約する：${o.ev.title}`;
@@ -793,7 +801,7 @@ const MajinEvent = (function(){
         list.appendChild(item);
       });
       p.appendChild(list);
-      confirm.addEventListener('click',()=>{ if(!chosen||ui.busy) return; ui.busy=true; res(chosen); });
+      confirm.addEventListener('click',()=>{ if(!chosen||ui.busy) return; ui.busy=true; _se(chosen==='leave'?'skip':'confirm',{suppressTap:true}); res(chosen); });
       p.appendChild(confirm);
     });
   }
@@ -812,8 +820,8 @@ const MajinEvent = (function(){
         const w=el('div','mj-pick-card', cardHtml(c)+(opts.desc?`<div class="mj-pick-desc">${cardDescHtml(c)}</div>`:''));
         w.dataset.i=i;
         w.addEventListener('click',()=>{
-          if(sel.has(i)) sel.delete(i);
-          else{ if(max===1) sel.clear(); if(sel.size<max) sel.add(i); }
+          if(sel.has(i)){ sel.delete(i); _se('deselect',{suppressTap:true}); }
+          else{ if(max===1) sel.clear(); if(sel.size<max){ sel.add(i); _se('select',{suppressTap:true}); } else _se('error',{suppressTap:true}); }
           grid.querySelectorAll('.mj-pick-card').forEach(x=>x.classList.toggle('picked', sel.has(+x.dataset.i)));
           upd();
         });
@@ -831,7 +839,7 @@ const MajinEvent = (function(){
         });
       }
       p.appendChild(grid);
-      confirm.addEventListener('click',()=>{ if(confirm.disabled) return; res([...sel].sort((a,b)=>a-b).map(i=>cards[i])); });
+      confirm.addEventListener('click',()=>{ if(confirm.disabled) return; _se('confirm',{suppressTap:true}); res([...sel].sort((a,b)=>a-b).map(i=>cards[i])); });
       p.appendChild(confirm); upd();
     });
   }
@@ -851,15 +859,15 @@ const MajinEvent = (function(){
           `${it.icon?`<span class="mj-pi-icon ${it.iconCls||''}">${it.icon}</span>`:''}<div class="mj-pi-body"><div class="mj-pi-label">${it.label}${it.disabled?`<span class="mj-pi-dis">${it.disabled}</span>`:''}</div>${it.desc?`<div class="mj-pi-desc">${it.desc}</div>`:''}</div>`);
         row.dataset.key=it.key;
         row.addEventListener('click',()=>{
-          if(it.disabled) return;
-          chosen=it.key;
+          if(it.disabled){ _se('error',{suppressTap:true}); return; }
+          chosen=it.key; _se('select',{suppressTap:true});
           list.querySelectorAll('.mj-pick-item').forEach(x=>x.classList.toggle('chosen', x===row));
           confirm.disabled=false;
         });
         list.appendChild(row);
       });
       p.appendChild(list);
-      confirm.addEventListener('click',()=>{ if(chosen==null) return; res(chosen); });
+      confirm.addEventListener('click',()=>{ if(chosen==null) return; _se('confirm',{suppressTap:true}); res(chosen); });
       p.appendChild(confirm);
     });
   }
@@ -869,7 +877,7 @@ const MajinEvent = (function(){
       clearPanel();
       ui.panel.appendChild(el('div','mj-result',html));
       const b=el('button','mj-confirm mj-next',label||'続ける');
-      b.addEventListener('click',()=>res());
+      b.addEventListener('click',()=>{ _se('page',{suppressTap:true}); res(); });
       ui.panel.appendChild(b);
     });
   }
@@ -878,9 +886,10 @@ const MajinEvent = (function(){
     return new Promise(res=>{
       clearPanel();
       ui.panel.appendChild(panelTitle('契約の結果'));
+      _se('reveal');
       ui.panel.appendChild(el('div','mj-result',html));
       const b=el('button','mj-confirm mj-done','マップへ戻る');
-      b.addEventListener('click',()=>res());
+      b.addEventListener('click',()=>{ _se('close',{suppressTap:true}); res(); });
       ui.panel.appendChild(b);
     });
   }

@@ -27,6 +27,7 @@
  */
 const HighLowGame = (function(){
   'use strict';
+  const _se=(n,o)=>{ try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} };
 
   const NPC_CARDS = [0, 10, 20, 40, 100];
   const MAX_ROUNDS = 5, WIN_POINTS = 3, HAND_SIZE = 8;
@@ -240,6 +241,7 @@ const HighLowGame = (function(){
   function renderScore(bump){
     const p = $('.hl-score-num[data-k="p"]'), n = $('.hl-score-num[data-k="n"]');
     p.textContent = st.score.p; n.textContent = st.score.n;
+    if(bump){ _se(bump === 'p' ? 'coin' : 'error'); }
     if(bump){ const el = bump === 'p' ? p : n; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
   }
   function renderHand(){
@@ -261,6 +263,7 @@ const HighLowGame = (function(){
     const s = $('.hl-speech');
     s.className = 'hl-speech' + (mood ? ' ' + mood : '');
     $('.hl-speech-text').textContent = text;
+    _se('page', { volume:0.5 });
     s.classList.remove('pop'); void s.offsetWidth; s.classList.add('pop');
   }
   function setMsg(html){ $('.hl-msg').innerHTML = html; }
@@ -301,7 +304,7 @@ const HighLowGame = (function(){
       </ul>
       <div class="hl-reward">勝利報酬：<b>${esc(st.rewardText)}</b></div>
       <button type="button" class="hl-btn hl-btn-main" data-act="start">勝負する</button>`);
-    p.querySelector('[data-act="start"]').addEventListener('click', () => { hidePanel(); startRound(); });
+    p.querySelector('[data-act="start"]').addEventListener('click', () => { _se('confirm', {suppressTap:true}); hidePanel(); startRound(); });
   }
 
   function showResult(){
@@ -313,7 +316,8 @@ const HighLowGame = (function(){
       <p class="hl-panel-lead">${win ? '「……視えていたはずなのに。見事だ」' : (false ? '' : '「未来は、最初から決まっていた」')}</p>
       ${win ? `<div class="hl-reward">獲得：<b>${esc(st.rewardText)}</b></div>` : `<div class="hl-reward dim">報酬なし</div>`}
       <button type="button" class="hl-btn hl-btn-main" data-act="close">戻る</button>`);
-    p.querySelector('[data-act="close"]').addEventListener('click', close);
+    if(win){ _se('win'); setTimeout(() => _se('fanfare'), 380); } else _se('lose');
+    p.querySelector('[data-act="close"]').addEventListener('click', () => { _se(win ? 'coin' : 'close', {suppressTap:true}); close(); });
   }
 
   // ---------- 進行 ----------
@@ -339,6 +343,7 @@ const HighLowGame = (function(){
     if(!h) return;
     st.phase = 'npc';
     h.used = true;
+    _se('select', {suppressTap:true});
     const pv = valOf(h);
     const falter = st.falterRounds.includes(st.round);
     // ジャミング「混乱」「スタン」「ブレイク」「ビンゴ阻害」付きの札 → 次の回戦で千里眼不調
@@ -358,6 +363,7 @@ const HighLowGame = (function(){
         <div class="hl-flip-face hl-flip-front"><div class="hl-npc-card">${nv}</div></div>
       </div></div>`;
     if(triggered){
+      setTimeout(() => _se('stun'), 200);
       setMsg(`千里眼が札を選んでいる…　<span class="hl-falter-txt">第${st.round + 1}回戦は千里眼不調！</span>`);
       setSpeech('ぐっ…札の力で視界が乱れる…', 'falter');
     } else {
@@ -372,6 +378,7 @@ const HighLowGame = (function(){
       ? (falter ? 'む…視界が霞む…だが、レイズだ' : '…見えたぞ。レイズだ')
       : (falter ? 'む…視界が霞む…チェックにしておこう' : '…チェックだ');
     setSpeech(line, (falter ? 'falter ' : '') + (decision === 'bet' ? 'bet' : 'check'));
+    _se(decision === 'bet' ? 'raise' : 'tap');
     setDecl('n', decision);
     st.phase = 'decide';
     setMsg(`千里眼は<b class="${decision === 'bet' ? 'hl-t-bet' : ''}">${decision === 'bet' ? 'レイズ' : 'チェック'}</b>。あなたは？`);
@@ -403,6 +410,7 @@ const HighLowGame = (function(){
     st.phase = 'reveal';
     const bet = act === 'bet';
     c.player = act;
+    _se(act === 'bet' ? 'raise' : act === 'call' ? 'call' : act === 'fold' ? 'fold' : 'tap', {suppressTap:true});
     setDecl('p', c.player);
     setActions('');
     $('.hl-actions').classList.remove('three');
@@ -416,7 +424,7 @@ const HighLowGame = (function(){
       await wait(450);
       if(!root) return;
       const fl = $('.hl-slot-npc .hl-flip');
-      if(fl) fl.classList.add('flipped'); if(st && st.cur){ st.cur.revealed = true; renderNpc(); }
+      if(fl){ fl.classList.add('flipped'); _se('cardFlip'); } if(st && st.cur){ st.cur.revealed = true; renderNpc(); }
       await wait(650);
       if(!root) return;
       const pts = roundPoints(false, false);
@@ -440,6 +448,7 @@ const HighLowGame = (function(){
       if(!root) return;
       root.classList.remove('gazing');
       setDecl('n', c.response);
+      _se(c.response === 'call' ? 'call' : 'fold');
       if(c.response === 'call'){
         setSpeech(falter ? 'む…霞んでよく視えぬ…コールだ' : '…コールだ', (falter ? 'falter ' : '') + 'call');
         setMsg('千里眼は<b class="hl-t-bet">コール</b>！');
@@ -450,7 +459,7 @@ const HighLowGame = (function(){
         await wait(350);
         if(!root) return;
         const fl = $('.hl-slot-npc .hl-flip');
-        if(fl) fl.classList.add('flipped'); if(st && st.cur){ st.cur.revealed = true; renderNpc(); }
+        if(fl){ fl.classList.add('flipped'); _se('cardFlip'); } if(st && st.cur){ st.cur.revealed = true; renderNpc(); }
         await wait(550);
         if(!root) return;
         if(fl) fl.classList.add('folded');
@@ -474,7 +483,7 @@ const HighLowGame = (function(){
     await wait(250);
     if(!root) return;
     const fl = $('.hl-slot-npc .hl-flip');
-    if(fl) fl.classList.add('flipped'); if(st && st.cur){ st.cur.revealed = true; renderNpc(); }
+    if(fl){ fl.classList.add('flipped'); _se('cardFlip'); } if(st && st.cur){ st.cur.revealed = true; renderNpc(); }
     await wait(650);
     if(!root) return;
     const pts = roundPoints(c.npc === 'bet', bet);
@@ -484,7 +493,7 @@ const HighLowGame = (function(){
     $('.hl-arena').classList.add(winner === 'p' ? 'res-w' : winner === 'n' ? 'res-l' : 'res-d');
     if(winner === 'p'){ st.score.p += pts; setMsg(`<span class="hl-t-win">${c.pv} ＞ ${c.nv}　あなたの勝ち！ +${pts}点</span>`); setSpeech(c.npc === 'bet' || c.response === 'call' ? 'ば、馬鹿な…！' : '……そう来たか。', 'hurt'); }
     else if(winner === 'n'){ st.score.n += pts; setMsg(`<span class="hl-t-lose">${c.pv} ＜ ${c.nv}　千里眼の勝ち +${pts}点</span>`); setSpeech('視えていた通りだ。', 'smug'); }
-    else { setMsg(`<span class="hl-t-draw">${c.pv} ＝ ${c.nv}　引き分け（得点なし）</span>`); setSpeech('……相打ちか。', null); }
+    else { _se('deselect'); setMsg(`<span class="hl-t-draw">${c.pv} ＝ ${c.nv}　引き分け（得点なし）</span>`); setSpeech('……相打ちか。', null); }
     renderScore(winner === 'd' ? null : winner);
     renderRounds();
     await wait(1200);
@@ -499,7 +508,7 @@ const HighLowGame = (function(){
       showResult();
     } else {
       setActions(`<button type="button" class="hl-btn hl-btn-main" data-act="next">次の勝負へ</button>`);
-      $('.hl-actions [data-act="next"]').addEventListener('click', () => { st.round++; startRound(); });
+      $('.hl-actions [data-act="next"]').addEventListener('click', () => { _se('confirm', {suppressTap:true}); st.round++; startRound(); });
     }
   }
 
@@ -528,6 +537,7 @@ const HighLowGame = (function(){
       falterRounds:[],   // 千里眼不調の回戦（ジャミング札を出すと次の回戦が追加される）
     };
     _debug.state = st;
+    _se('open');
     build();
     renderAll();
     setMsg('');

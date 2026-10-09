@@ -6,6 +6,7 @@
  */
 const UraSekai = (function(){
   let ov=null, cur=null;
+  const _se=(n,o)=>{ try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} };
 
   const ICONS={
     throw:'<svg viewBox="0 0 48 48"><path d="M8 38 Q20 8 40 14" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="4 4" stroke-linecap="round"/><rect x="30" y="8" width="12" height="16" rx="2" transform="rotate(20 36 16)" fill="currentColor"/><path d="M6 42h14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
@@ -67,17 +68,19 @@ const UraSekai = (function(){
       btn.addEventListener('click',(e)=>{
         e.stopPropagation();
         const type=btn.closest('.ura-ev-card').dataset.type;
+        _se('select',{suppressTap:true});
         const ok=MapSelectScene.startEvent(cur.stage, cur.ev, type);
-        if(!ok){ const m=ov&&ov.querySelector('.ura-msg'); if(m){ m.hidden=false; m.textContent='このイベントは今は始められない。'; } }
+        if(!ok){ _se('error'); const m=ov&&ov.querySelector('.ura-msg'); if(m){ m.hidden=false; m.textContent='このイベントは今は始められない。'; } }
       });
     });
-    ov.querySelector('.ura-exit-btn').addEventListener('click',()=>{ close(); if(MapSelectScene.container&&document.body.contains(MapSelectScene.container)) MapSelectScene.renderAll(); });
+    ov.querySelector('.ura-exit-btn').addEventListener('click',()=>{ _se('close',{suppressTap:true}); close(); if(MapSelectScene.container&&document.body.contains(MapSelectScene.container)) MapSelectScene.renderAll(); });
   }
 
   function open(stage, ev){
     close();
     if(!ev||!Array.isArray(ev.lineup)||ev.done) return;
     cur={stage, ev};
+    _se('glitch',{suppressTap:true});
     ov=document.createElement('div'); ov.id='ura-overlay'; ov.className='ura-overlay';
     document.body.appendChild(ov);
     document.body.classList.add('ura-open');
@@ -104,7 +107,10 @@ const UraSekai = (function(){
       +lines.join('')
       +`<button class="ura-rw-btn">ショップへ</button></div>`;
     document.body.appendChild(box);
-    box.querySelector('.ura-rw-btn').addEventListener('click',()=>{ box.remove(); if(typeof r.onNext==='function') r.onNext(); });
+    _se(r.win?'win':'lose');
+    if(r.gold>0) setTimeout(()=>_se('coin'),450);
+    if(r.special>0) setTimeout(()=>_se('upgrade'),r.gold>0?750:450);
+    box.querySelector('.ura-rw-btn').addEventListener('click',()=>{ _se('confirm',{suppressTap:true}); box.remove(); if(typeof r.onNext==='function') r.onNext(); });
   }
 
   return { open, close, showReward, render, ICONS };

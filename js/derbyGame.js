@@ -29,6 +29,9 @@
  */
 const DerbyGame = (function(){
   'use strict';
+  const _se=(n,o)=>{ try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} };
+  const _seLast = {};
+  const _seT = (n, ms, o) => { const now = (typeof performance!=='undefined'?performance.now():Date.now()); if(now - (_seLast[n] || 0) < ms) return; _seLast[n] = now; _se(n, o); };
 
   const SYMS = ['Circle', 'Triangle', 'Square', 'Cross'];
   const NAME = { Circle:'マル', Triangle:'サンカク', Square:'シカク', Cross:'バツ' };
@@ -301,14 +304,15 @@ const DerbyGame = (function(){
     low.querySelectorAll('.db-bet').forEach(el => {
       el.querySelectorAll('.db-step').forEach(b => b.addEventListener('click', () => changeBet(el.dataset.k, Number(b.dataset.d))));
     });
-    low.querySelector('[data-act="clear"]').addEventListener('click', () => { st.bets = {}; renderBets(); });
+    low.querySelector('[data-act="clear"]').addEventListener('click', () => { _se('cancel', {suppressTap:true}); st.bets = {}; renderBets(); });
     low.querySelector('[data-act="start"]').addEventListener('click', startRace);
   }
   function changeBet(k, d){
     if(!st || st.phase !== 'bet') return;
     const cur = st.bets[k] || 0;
-    if(d > 0 && betSum() >= STAKE) return;
+    if(d > 0 && betSum() >= STAKE){ _se('error', {suppressTap:true}); return; }
     const n = Math.max(0, cur + d);
+    if(n !== cur) _se(d > 0 ? 'coin' : 'tap', { suppressTap:true, volume: d > 0 ? 0.6 : 0.8 });
     if(n) st.bets[k] = n; else delete st.bets[k];
     renderBets();
   }
@@ -391,6 +395,9 @@ const DerbyGame = (function(){
     // 実況
     const boost = fx.find(f => f.kind === 'boost');
     const jam = fx.find(f => f.kind === 'jam');
+    _seT('draw', 80, { volume:0.7 });
+    if(jam) _seT(jam.j === 'スタン' ? 'stun' : 'jam', 120);
+    else if(boost && boost.d > 0) _seT('levelUp', 120, { volume:0.4 });
     if(jam){
       const lines = { 'スタン':`スタンだ！ ${symName(card.symbol)}以外の足が止まった！`, 'リンク':'リンク発動！ 速度が入れ替わる大混戦！',
         '延命':'延命カード！ 他のシンボルが少し失速！', '封印':'封印カード！ ライバルたちの脚色が鈍る！', '引き直し':'引き直しだ！ 他のシンボルが大きく減速！' };
@@ -402,6 +409,7 @@ const DerbyGame = (function(){
   function cycleFF(){
     if(!st || st.phase !== 'race') return;
     st.ff = st.ff === 1 ? 2 : st.ff === 2 ? 4 : 1;
+    _se('select', { suppressTap:true, rate: 0.8 + st.ff * 0.15 });
     $('[data-act="ff"]').textContent = `▶︎×${st.ff}`;
     $('[data-act="ff"]').classList.toggle('on', st.ff > 1);
   }
@@ -414,6 +422,7 @@ const DerbyGame = (function(){
     root.classList.add('racing');
     const ff = $('[data-act="ff"]'); ff.disabled = false;
     setCall('スタートしました！ 各シンボル、一斉に飛び出す！', true);
+    _se('raceStart', {suppressTap:true});
     st.last = null;
     raf = requestAnimationFrame(frame);
   }
@@ -439,7 +448,7 @@ const DerbyGame = (function(){
   function onFinish(s){
     st.finished.push(s);
     const n = st.finished.length;
-    if(n === 1) setCall(`${symName(s)}、1着でゴールイン！！`, true);
+    if(n === 1){ _se('raceFinish'); setCall(`${symName(s)}、1着でゴールイン！！`, true); }
     else if(n === 2) setCall(`2着は${symName(s)}！ 勝負あり！`, true);
   }
   function renderRace(){
@@ -470,10 +479,12 @@ const DerbyGame = (function(){
     if(st.finished.length === 0){
       if(lead !== st.lastLeader && st.t - st.lastLeadCall > 2.5 && st.t > 1){
         st.lastLeadCall = st.t;
+        _seT('raceTick', 400);
         setCall(st.lastLeader ? `先頭交代！ ${symName(lead)}が前に出た！` : `先頭は${symName(lead)}！`);
       }
       if(!st.stretchCalled && st.runners[lead].x > DIST * 0.8){
         st.stretchCalled = true;
+        _se('heartbeat', { volume:0.7 });
         setCall(`最後の直線！ ${symName(lead)}先頭、${symName(order[1])}が追う！`, true);
       }
     }
@@ -502,10 +513,12 @@ const DerbyGame = (function(){
     const go = () => { if(root && st) showResult(); };
     if(st.photo){
       root.classList.add('photo');
+      _se('heartbeat');
       setCall('きわどい！ 写真判定……！', true);
       setTimeout(() => {
         if(!root) return;
         root.classList.remove('photo');
+        _se('reveal');
         setCall(`判定の結果、1着${symName(order[0])}・2着${symName(order[1])}！`, true);
         setTimeout(go, reduced() ? 200 : 900);
       }, reduced() ? 300 : 1400);
@@ -544,6 +557,7 @@ const DerbyGame = (function(){
     return cardChip(card, true);
   }
   function showDeck(){
+    _se('open', {suppressTap:true});
     if(!root) return;
     const layer = $('.db-deck-layer');
     const all = deckSource();
@@ -587,6 +601,7 @@ const DerbyGame = (function(){
   }
   function hideDeck(){
     if(!root) return;
+    if($('.db-deck-layer').classList.contains('show')) _se('close', {suppressTap:true});
     const l = $('.db-deck-layer'); l.classList.remove('show'); l.innerHTML = '';
   }
 
@@ -613,7 +628,7 @@ const DerbyGame = (function(){
         <li>受け取りは<b>最大100G</b>。合計（返却＋払戻）が<b>120G超</b>なら<b>特別アップグレード1枚</b>を追加。</li>
       </ul>
       <button type="button" class="db-btn db-btn-main" data-act="go">オッズを見る</button>`);
-    p.querySelector('[data-act="go"]').addEventListener('click', () => { hidePanel(); st.phase = 'bet'; renderBets(); setCall('本日のオッズが発表されました。ベットをどうぞ！'); });
+    p.querySelector('[data-act="go"]').addEventListener('click', () => { _se('confirm', {suppressTap:true}); hidePanel(); st.phase = 'bet'; renderBets(); setCall('本日のオッズが発表されました。ベットをどうぞ！'); });
   }
 
   function showResult(){
@@ -634,7 +649,9 @@ const DerbyGame = (function(){
       </div>
       <div class="db-reward">獲得：<b>${r.gold}G</b>${capped ? '<small>（上限100G）</small>' : ''}${r.special ? '<div class="db-special">120G超え！ 特別アップグレード×1</div>' : ''}</div>
       <button type="button" class="db-btn db-btn-main" data-act="close">戻る</button>`);
-    p.querySelector('[data-act="close"]').addEventListener('click', close);
+    if(st.win){ _se('win'); setTimeout(() => _se('coin'), 300); if(r.special || r.payout >= 40) setTimeout(() => _se('fanfare'), 600); }
+    else _se('lose');
+    p.querySelector('[data-act="close"]').addEventListener('click', () => { _se(r.gold > 0 ? 'coin' : 'close', {suppressTap:true}); close(); });
   }
 
   function summaryText(){
@@ -678,6 +695,7 @@ const DerbyGame = (function(){
       t:0, next:0, acc:0, ff:1, finished:[], order:null, result:null, win:false,
     };
     _debug.state = st;
+    _se('open');
     build();
     renderGates();
     renderRace();

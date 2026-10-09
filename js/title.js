@@ -19,6 +19,7 @@ const TitleScene = {
         <button id="btn-gallery">図鑑（発見した効果）</button>
         <button id="btn-best-run">最高到達デッキ・レリックを見る</button>
         <button id="btn-skip-tutorial" class="title-toggle" type="button" aria-pressed="false">チュートリアルスキップ：<b>OFF</b></button>
+        <button id="btn-sound" class="title-toggle" type="button" aria-pressed="true">サウンド：<b>ON</b></button>
       </div>
       ${typeof GameVersion!=='undefined'?`<div class="title-version"><span class="tv-ver">${GameVersion.version}</span><span class="tv-date">最終更新日 ${GameVersion.updated}</span><button type="button" id="btn-update-history" class="tv-history-btn">アップデート履歴</button></div>`:''}
     `;
@@ -39,6 +40,10 @@ const TitleScene = {
     const skipBtn=el.querySelector('#btn-skip-tutorial');
     const paintSkip=()=>{ const on=typeof TutorialOverlay!=='undefined'&&TutorialOverlay.isSkipOn&&TutorialOverlay.isSkipOn(); skipBtn.classList.toggle('on',!!on); skipBtn.setAttribute('aria-pressed',on?'true':'false'); skipBtn.querySelector('b').textContent=on?'ON':'OFF'; };
     if(skipBtn){ paintSkip(); skipBtn.addEventListener('click',()=>{ if(typeof TutorialOverlay==='undefined') return; TutorialOverlay.setSkip(!TutorialOverlay.isSkipOn()); paintSkip(); }); }
+    // サウンド ON/OFF（SFX：js/sfx.js。localStorage に保存）
+    const sndBtn=el.querySelector('#btn-sound');
+    const paintSnd=()=>{ const on=typeof SFX!=='undefined'&&!SFX.isMuted(); sndBtn.classList.toggle('on',on); sndBtn.setAttribute('aria-pressed',on?'true':'false'); sndBtn.querySelector('b').textContent=on?'ON':'OFF'; };
+    if(sndBtn){ paintSnd(); sndBtn.addEventListener('click',()=>{ if(typeof SFX==='undefined') return; SFX.toggleMuted(); paintSnd(); }); }
     const histBtn=el.querySelector('#btn-update-history');
     if(histBtn) histBtn.addEventListener('click',()=>this.showUpdateHistory());
   },

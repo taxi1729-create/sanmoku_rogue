@@ -258,6 +258,7 @@ const TutorialOverlay = (function(){
     if(window.visualViewport) window.visualViewport.addEventListener('resize',ui.onResize);
 
     renderStep();
+    try{ if(typeof SFX!=='undefined') SFX.play('open'); }catch(e){} // 効果音（js/sfx.js）
     requestAnimationFrame(()=>{ if(ui) root.classList.add('tut-in'); });
     loop();
   }
@@ -277,6 +278,7 @@ const TutorialOverlay = (function(){
     while(i>=0&&i<ui.steps.length&&ui.steps[i].target&&!ui.steps[i].optionalTarget&&resolveTarget(ui.steps[i]).length===0) i+=d;
     if(i<0) return;
     if(i>=ui.steps.length){ close(true); return; }
+    try{ if(typeof SFX!=='undefined') SFX.play('page',{pitch:d<0?-3:0}); }catch(e){} // 効果音（js/sfx.js）
     ui.idx=i; ui.dir=d; renderStep();
   }
 
@@ -445,6 +447,7 @@ const TutorialOverlay = (function(){
     cancelPending();
     if(!ui) return;
     const u=ui; ui=null;
+    if(markAsSeen){ try{ if(typeof SFX!=='undefined') SFX.play('close'); }catch(e){} }
     if(markAsSeen) markSeen(u.key);
     if(u.typing) u.typing.stop();
     cancelAnimationFrame(u.raf);

@@ -6,6 +6,7 @@
 // 最大：特別アップグレード＋25G
 // 威力＝カードの実効基礎点（強化効果・性質変化・パッシブ効果込み）。最大3枚まで合わせて投げられる（威力を合計）。
 // 報酬の付与は呼び出し側で行う（ここでは表示のみ）。
+const _seThrow=(n,o)=>{ try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} };
 const ThrowGame = {
   TARGETS: [10, 30, 50],
   TARGET_GOLD: [0, 5, 5],   // 各目標達成時のG（10mは特別アップグレード）
@@ -25,6 +26,7 @@ const ThrowGame = {
     return new Promise(resolve => {
       this._resolve = resolve;
       this._floor = floor;
+      _seThrow('open');
       this._build();
     });
   },
@@ -136,7 +138,7 @@ const ThrowGame = {
     this.ov = ov;
     this._prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    ov.querySelector('.tg-start').addEventListener('click', () => this._renderPlay());
+    ov.querySelector('.tg-start').addEventListener('click', () => { _seThrow('confirm', {suppressTap:true}); this._renderPlay(); });
   },
 
   _fx(m) { return this.ORIGIN_X + Math.min(m, this.FIELD_MAX) * this.PX_PER_M; },
@@ -192,7 +194,12 @@ const ThrowGame = {
         <button class="tg-btn tg-throw" disabled>投げる</button>
       </div>`;
     this.slider = ov.querySelector('.tg-slider');
-    this.slider.addEventListener('input', () => this._setAngle(parseInt(this.slider.value, 10)));
+    this.slider.addEventListener('input', () => {
+      const prev = this.angle;
+      this._setAngle(parseInt(this.slider.value, 10));
+      const now = performance.now();
+      if (this.angle !== prev && now - (this._seAngleT || 0) >= 50) { this._seAngleT = now; _seThrow('tap', { rate: 0.7 + this.angle / 90 * 0.9, volume: 0.35, suppressTap: true }); }
+    });
     ov.querySelector('.tg-throw').addEventListener('click', () => this._throw());
     ov.querySelector('.tg-quit').addEventListener('click', () => this._confirmQuit());
     this._setAngle(this.angle);
@@ -305,9 +312,10 @@ const ThrowGame = {
       if (!e.used) slot.addEventListener('click', () => {
         if (this.busy || this.done) return;
         const k = this.sel.indexOf(i);
-        if (k >= 0) this.sel.splice(k, 1);
-        else if (this.sel.length < this.MAX_SELECT) this.sel.push(i);
+        if (k >= 0){ this.sel.splice(k, 1); _seThrow('deselect', {suppressTap:true}); }
+        else if (this.sel.length < this.MAX_SELECT){ this.sel.push(i); _seThrow('select', {suppressTap:true}); }
         else {
+          _seThrow('error', {suppressTap:true});
           const lab = this.ov.querySelector('.tg-hand-label');
           lab.classList.remove('warn'); void lab.offsetWidth; lab.classList.add('warn');
           return;
@@ -339,6 +347,7 @@ const ThrowGame = {
     const dist = this.distanceFor(power, this.angle);
     this.lastPower = power;
     this.lastDistance = dist;
+    _seThrow('throw', {suppressTap:true});
     this._animate(power, this.angle, dist).then(() => this._afterThrow(dist));
   },
 
@@ -381,6 +390,7 @@ const ThrowGame = {
     g.setAttribute('class', 'tg-mark');
     g.setAttribute('transform', `translate(${x},${this.GROUND_Y})`);
     const over = dist > this.FIELD_MAX;
+    _seThrow('land');
     g.innerHTML = `<path d="M-4,-4 L4,4 M4,-4 L-4,4" class="tg-x"/>`;
     marks.appendChild(g);
     const ro = this.ov.querySelector('.tg-readout');
@@ -423,6 +433,7 @@ const ThrowGame = {
     ro.classList.toggle('hit', hit > 0);
     ro.classList.toggle('miss', hit === 0);
     if (hit) ro.textContent += '  到達！';
+    if (hit) setTimeout(() => _seThrow('levelUp', { volume: 0.7 }), 120);
     if (pittaNow.length) this._pittaFx(pittaNow);
     this._renderProg();
     const won = this.targetIdx >= this.TARGETS.length;
@@ -443,6 +454,7 @@ const ThrowGame = {
     if (!fx) return;
     fx.innerHTML = `<div class="tg-pitta-big">ピッタリ！</div><div class="tg-pitta-sub">${ts.map(t => t + 'm').join('・')} ＋${this.PITTA_GOLD * ts.length}G</div>`;
     fx.classList.remove('show'); void fx.offsetWidth; fx.classList.add('show');
+    setTimeout(() => { _seThrow('pittari'); setTimeout(() => _seThrow('coin'), 260); }, 320);
     ts.forEach(t => this._sparkle(t));
   },
 
@@ -458,8 +470,10 @@ const ThrowGame = {
         <button class="tg-btn tg-danger tg-yes" type="button">終了する</button>
       </div></div>`;
     this.ov.appendChild(r);
-    r.querySelector('.tg-cancel').addEventListener('click', () => r.remove());
+    _seThrow('open', {suppressTap:true});
+    r.querySelector('.tg-cancel').addEventListener('click', () => { _seThrow('cancel', {suppressTap:true}); r.remove(); });
     r.querySelector('.tg-yes').addEventListener('click', () => {
+      _seThrow('confirm', {suppressTap:true});
       r.remove();
       if (this.done) return;
       this.quit = true;
@@ -493,7 +507,9 @@ const ThrowGame = {
       <div class="tg-reward">${rw.special ? '報酬：' + this._rewardText(rw) : '報酬なし'}</div>
       <button class="tg-btn tg-back">${win ? '報酬を受け取る' : '戻る'}</button></div>`;
     this.ov.appendChild(r);
-    r.querySelector('.tg-back').addEventListener('click', () => this._close());
+    if (all) { _seThrow('win'); setTimeout(() => _seThrow('fanfare'), 400); }
+    else _seThrow(win ? 'win' : 'lose');
+    r.querySelector('.tg-back').addEventListener('click', () => { _seThrow(win ? 'coin' : 'close', {suppressTap:true}); this._close(); });
   },
 
   _close() {

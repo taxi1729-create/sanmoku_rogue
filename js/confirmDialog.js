@@ -4,6 +4,7 @@
 //   confirmDialog({message, yes, no, onYes, onNo})
 (function(){
   let current=null;
+  const sfx=(n)=>{ try{ if(typeof SFX!=='undefined') SFX.play(n); }catch(e){} }; // 効果音（js/sfx.js）
   function close(){ if(current){ current.remove(); current=null; } }
   function confirmDialog(opts){
     opts=opts||{};
@@ -17,11 +18,12 @@
     row.appendChild(no); row.appendChild(yes);
     box.appendChild(msg); box.appendChild(row); ov.appendChild(box);
     let done=false;
-    const finish=(ok,e)=>{ if(e) e.stopPropagation(); if(done) return; done=true; close(); const fn=ok?opts.onYes:opts.onNo; if(typeof fn==='function') fn(); };
+    const finish=(ok,e)=>{ if(e) e.stopPropagation(); if(done) return; done=true; sfx(ok?'confirm':'cancel'); close(); const fn=ok?opts.onYes:opts.onNo; if(typeof fn==='function') fn(); };
     yes.addEventListener('click',e=>finish(true,e));
     no.addEventListener('click',e=>finish(false,e));
     ov.addEventListener('click',e=>{ e.stopPropagation(); if(e.target===ov) finish(false); });
     document.body.appendChild(ov); current=ov;
+    sfx('open');
     try{ yes.focus({preventScroll:true}); }catch(_){}
     return ov;
   }
