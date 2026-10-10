@@ -1,0 +1,52 @@
+/* retreat.css — 残機・一時撤退・ミニショップ */
+
+/* ---------- 残機アイコン（ステータスバー／マップ／ミニショップ共通） ---------- */
+.lives-badge{display:inline-flex;align-items:center;gap:2px;line-height:1;}
+.lives-badge .lives-label{font-size:10px;color:var(--text-dim,#8b90a5);margin-right:3px;letter-spacing:.06em;}
+.life-ico{display:inline-flex;font-size:16px;}
+.life-ico.on{filter:drop-shadow(0 0 4px rgba(248,113,113,.55));}
+.life-ico.off{opacity:.8;}
+/* ゲームメイン：点数欄の右上 */
+.score-combined-stat{position:relative;}
+.lives-badge-status{position:absolute;top:0;right:0;}
+.lives-badge-status .life-ico{font-size:15px;}
+/* マップのヘッダー */
+.map-header{align-items:center;gap:10px;}
+.lives-badge-map .life-ico{font-size:15px;}
+
+/* ---------- 一時撤退リザルト（StageFX） ---------- */
+.stfx-result.retreat .stfx-res-box{border-color:rgba(248,113,113,.45);box-shadow:0 0 30px rgba(248,113,113,.12);}
+.stfx-res-title.lose.retreat{color:#fca5a5;letter-spacing:.18em;text-shadow:0 0 14px rgba(248,113,113,.55),0 2px 0 #450a0a;}
+.stfx-rt{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 10px;border-radius:12px;background:rgba(0,0,0,.25);border:1px solid #3a3050;}
+.stfx-rt-sub{font-size:11px;color:#fca5a5;letter-spacing:.06em;display:inline-flex;align-items:center;gap:4px;}
+.stfx-rt-lives{display:flex;gap:10px;justify-content:center;}
+.stfx-rt-heart{display:inline-flex;font-size:38px;}
+.stfx-rt-heart.on,.stfx-rt-heart.breaking{filter:drop-shadow(0 0 8px rgba(248,113,113,.7));}
+.stfx-rt-heart.broken{opacity:.75;}
+.stfx-rt-left{font-size:13px;color:var(--text,#e7e9f0);}
+.stfx-rt-left b{font-family:'Space Mono',monospace;font-size:20px;color:#fca5a5;}
+.stfx-rt-left small{color:var(--text-dim,#8b90a5);}
+.stfx-rt-note{font-size:11px;color:var(--text-dim,#8b90a5);line-height:1.5;}
+.stfx-go .stfx-rt-left{color:#fca5a5;font-weight:700;}
+.stfx-rt-shard{position:fixed;width:7px;height:9px;background:#f87171;clip-path:polygon(50% 0,100% 100%,0 70%);pointer-events:none;}
+/* 演出前は隠し、演出完了（st-done）で必ず表示する */
+.stfx-result.retreat:not(.st-done):not(.stfx-reduced) :is(.stfx-res-score,.stfx-rt,.stfx-rt-left,.stfx-res-wallet,.stfx-res-panel,.stfx-res-line,.stfx-res-total,.stfx-rt-note,.stfx-res-title span){opacity:0;}
+.stfx-result.st-done :is(.stfx-rt,.stfx-rt-left,.stfx-rt-note){opacity:1;}
+
+/* ---------- ミニショップ ---------- */
+.mini-shop-title{display:inline-flex;align-items:center;gap:2px;color:#fca5a5;}
+.mini-shop-title small{font-size:12px;color:var(--text-dim,#8b90a5);font-weight:700;margin-left:2px;}
+.retreat-banner{width:100%;max-width:520px;display:flex;flex-direction:column;gap:4px;padding:7px 12px;border-radius:12px;
+  background:linear-gradient(180deg,rgba(248,113,113,.12),rgba(248,113,113,.03));border:1px solid rgba(248,113,113,.4);font-size:12px;}
+.retreat-banner-main{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+.retreat-banner-stage{font-weight:700;color:var(--text,#e7e9f0);}
+.retreat-banner-gold{font-family:'Space Mono',monospace;color:var(--gold,#fbbf24);font-weight:700;}
+.retreat-banner-lives{display:flex;align-items:center;gap:4px;}
+.retreat-banner-note{margin-left:auto;font-size:10px;color:var(--text-dim,#8b90a5);}
+.mini-slot-tag{align-self:flex-start;font-size:9px;font-weight:900;letter-spacing:.08em;padding:1px 7px;border-radius:999px;
+  color:#bfdbfe;border:1px solid rgba(125,211,252,.5);background:rgba(125,211,252,.1);}
+.mini-slot-tag.fixed{color:#fecaca;border-color:rgba(248,113,113,.5);background:rgba(248,113,113,.1);}
+
+@media (prefers-reduced-motion: reduce){
+  .stfx-rt-shard{display:none;}
+}

@@ -1,0 +1,69 @@
+/* ショップUI：見出しのアイコンボタン／レア効果の豪華な選択肢枠（js/shop.js） */
+
+/* ---- 見出し：デッキ確認・マップ一覧（設定ボタンと揃えたアイコンボタン） ---- */
+.shop-view-btns{display:flex;gap:8px;justify-content:center;align-items:center;margin-top:6px;}
+.shop-icon-btn{position:relative;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:48px;min-height:44px;padding:5px 9px 4px;line-height:1;}
+.shop-icon-btn .shop-icon-ico{width:22px;height:22px;flex:none;}
+.shop-icon-cap{font-size:9.5px;font-weight:700;letter-spacing:.04em;opacity:.85;white-space:nowrap;}
+.shop-icon-badge{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:var(--gold,#fbbf24);color:#1a1a1a;font-size:10px;font-weight:800;line-height:17px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.45);pointer-events:none;}
+
+/* ---- 通常/爆発通常アップグレード：レア効果の選択肢 ---- */
+@property --ecr-a{syntax:'<angle>';inherits:false;initial-value:0deg;}
+.effect-choice-item.effect-choice-rare{
+  position:relative;isolation:isolate;overflow:hidden;
+  padding:14px 14px 12px;border:2px solid transparent;border-radius:11px;
+  background:
+    linear-gradient(160deg,#2e2410 0%,#1d1a2e 55%,#2a1c34 100%) padding-box,
+    conic-gradient(from var(--ecr-a),#fde68a,#fbbf24,#f472b6,#a78bfa,#7dd3fc,#4ade80,#fde68a) border-box;
+  box-shadow:0 0 12px rgba(251,191,36,.45),0 0 26px rgba(244,114,182,.18),inset 0 0 18px rgba(253,230,138,.12);
+  transform:scale(1.03);transform-origin:center;margin:3px 0;
+  animation:ecrSpin 4s linear infinite,ecrGlow 2.4s ease-in-out infinite;
+}
+.effect-choice-item.effect-choice-rare:hover{transform:scale(1.045);border-color:transparent;}
+.effect-choice-item.effect-choice-rare.chosen{
+  background:
+    linear-gradient(160deg,#4a3810 0%,#2c2410 60%,#3a2410 100%) padding-box,
+    conic-gradient(from var(--ecr-a),#fff7cc,#fbbf24,#f472b6,#a78bfa,#7dd3fc,#4ade80,#fff7cc) border-box;
+  box-shadow:0 0 0 2px rgba(253,230,138,.55),0 0 22px rgba(251,191,36,.7),0 0 40px rgba(244,114,182,.3);
+}
+.effect-choice-rare .slot-title{position:relative;z-index:2;font-size:15px;font-weight:900;padding-right:44px;
+  background:linear-gradient(90deg,#fff7cc,#fbbf24 40%,#fde68a 60%,#fff7cc);-webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:none;filter:drop-shadow(0 0 4px rgba(251,191,36,.45));}
+.effect-choice-rare .slot-title .gi{vertical-align:-3px;width:17px;height:17px;}
+.effect-choice-rare .slot-desc{position:relative;z-index:2;font-size:10.5px;color:#ecdcb8;}
+/* RAREリボン（右上の斜め帯） */
+.ecr-ribbon{position:absolute;z-index:3;top:9px;right:-22px;width:84px;transform:rotate(38deg);text-align:center;
+  font:900 9px/15px 'Space Mono',monospace,sans-serif;letter-spacing:.18em;color:#3a2200;
+  background:linear-gradient(90deg,#fbbf24,#fff3b0,#fbbf24);box-shadow:0 1px 4px rgba(0,0,0,.45);pointer-events:none;}
+/* 光の帯 */
+.ecr-shine{position:absolute;z-index:1;inset:0;pointer-events:none;
+  background:linear-gradient(105deg,transparent 35%,rgba(255,250,220,.28) 48%,rgba(255,255,255,.45) 50%,rgba(255,250,220,.28) 52%,transparent 65%);
+  background-size:250% 100%;background-position:150% 0;animation:ecrShine 3.2s ease-in-out infinite;}
+/* キラ */
+.ecr-spark{position:absolute;z-index:2;width:9px;height:9px;pointer-events:none;opacity:0;
+  background:radial-gradient(circle,#fff 0 14%,transparent 16%),linear-gradient(0deg,transparent 44%,#fff7cc 44% 56%,transparent 56%),linear-gradient(90deg,transparent 44%,#fff7cc 44% 56%,transparent 56%);
+  filter:drop-shadow(0 0 3px #fde68a);animation:ecrTwinkle 2.6s ease-in-out infinite;}
+.ecr-spark.s1{top:7px;left:10px;}
+.ecr-spark.s2{bottom:8px;right:18px;animation-delay:.9s;width:7px;height:7px;}
+.ecr-spark.s3{top:45%;right:52%;animation-delay:1.7s;width:6px;height:6px;}
+@keyframes ecrSpin{to{--ecr-a:360deg;}}
+@keyframes ecrGlow{0%,100%{box-shadow:0 0 10px rgba(251,191,36,.4),0 0 22px rgba(244,114,182,.15),inset 0 0 16px rgba(253,230,138,.1);}50%{box-shadow:0 0 18px rgba(251,191,36,.65),0 0 34px rgba(167,139,250,.3),inset 0 0 22px rgba(253,230,138,.18);}}
+@keyframes ecrShine{0%,30%{background-position:150% 0;}80%,100%{background-position:-60% 0;}}
+@keyframes ecrTwinkle{0%,100%{opacity:0;transform:scale(.4) rotate(0deg);}45%{opacity:1;transform:scale(1.15) rotate(45deg);}70%{opacity:0;transform:scale(.6) rotate(90deg);}}
+
+/* スタートイベントの選択肢（js/startEvent.js pickList の rare） */
+.sev-opt.sev-opt-rare{border:2px solid transparent;border-left-width:4px;
+  background:linear-gradient(180deg,rgba(255,252,236,.98),rgba(248,234,196,.97)) padding-box,
+    conic-gradient(from var(--ecr-a),#fbbf24,#f472b6,#a78bfa,#38bdf8,#4ade80,#fbbf24) border-box;
+  box-shadow:0 0 12px rgba(251,191,36,.5),0 0 22px rgba(244,114,182,.2);
+  animation:sevOptIn .45s ease calc(var(--k,0) * .1s) both,ecrSpin 4s linear infinite;}
+.sev-opt.sev-opt-rare .sev-opt-title::after{content:'RARE';display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;vertical-align:2px;
+  font:900 9px/13px 'Space Mono',monospace,sans-serif;letter-spacing:.14em;color:#3a2200;background:linear-gradient(90deg,#fbbf24,#fff3b0,#fbbf24);}
+
+@media (prefers-reduced-motion: reduce){
+  .effect-choice-item.effect-choice-rare{animation:none;}
+  .ecr-shine,.ecr-spark{animation:none;}
+  .ecr-spark{opacity:.8;}
+  .ecr-shine{display:none;}
+  .sev-opt.sev-opt-rare{animation:none;}
+}

@@ -1,0 +1,52 @@
+/* 設定ボタン・設定モーダル（js/settings.js） */
+.settings-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:6px 9px;font-size:12px;font-weight:700;line-height:1;white-space:nowrap;}
+.settings-btn .settings-ico{width:17px;height:17px;flex:none;}
+.settings-btn-label{font-size:12px;}
+/* ゲーム画面のコントロール行ではアイコンのみ */
+.controls-row .settings-btn{padding:6px 8px;}
+.controls-row .settings-btn .settings-btn-label{display:none;}
+/* タイトル：右上に固定 */
+.title-settings-wrap{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:12px;z-index:5;}
+.title-settings-wrap .settings-btn{padding:8px 11px;font-size:13px;background:rgba(36,42,61,.85);border:1px solid #3a4160;}
+/* マップ・ショップ見出し */
+.map-header .settings-btn,.shop-header .settings-btn{padding:6px 9px;}
+.shop-header{position:relative;}
+.shop-header .settings-btn-shop{position:absolute;top:0;right:0;}
+
+.settings-overlay{position:fixed;inset:0;z-index:9000;background:rgba(6,7,12,.66);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;animation:stFade .14s ease;}
+.settings-modal{background:var(--panel);border:1px solid #3a4160;border-radius:16px;padding:16px 16px 14px;width:100%;max-width:340px;max-height:calc(100vh - 32px);overflow-y:auto;box-sizing:border-box;box-shadow:0 12px 34px rgba(0,0,0,.6);animation:stPop .16s ease;}
+.settings-modal h3{margin:0 0 12px;font-size:17px;display:flex;align-items:center;justify-content:center;gap:6px;}
+.settings-modal h3 .settings-ico{width:20px;height:20px;color:var(--accent);}
+.st-group{background:var(--panel-2);border-radius:12px;padding:4px 12px;margin-bottom:10px;}
+.st-row{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:4px 0;}
+.st-row+.st-row{border-top:1px solid rgba(255,255,255,.06);}
+.st-label{font-size:14px;font-weight:700;display:flex;flex-direction:column;}
+.st-label small{font-size:10.5px;font-weight:500;color:var(--text-dim);margin-top:2px;}
+.st-ctrl{flex:none;display:flex;align-items:center;}
+.st-switch{position:relative;display:inline-flex;align-items:center;justify-content:flex-end;width:68px;height:30px;padding:0 9px;border-radius:15px;background:#3a4160;font-size:12px;box-sizing:border-box;}
+.st-switch b{color:#94a3b8;}
+.st-switch .st-knob{position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#cbd5e1;transition:left .15s ease;}
+.st-switch.on{background:#059669;justify-content:flex-start;}
+.st-switch.on b{color:#ecfdf5;}
+.st-switch.on .st-knob{left:41px;background:#fff;}
+.st-switch:hover:not(:disabled){transform:none;}
+.st-volume .st-ctrl{flex:1;max-width:200px;}
+.st-slider-wrap{gap:8px;width:100%;}
+.st-volume.muted .st-slider-wrap{opacity:.45;}
+.st-vol-num{width:28px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums;color:var(--text-dim);}
+#st-volume{--fill:70%;-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:28px;background:transparent;margin:0;touch-action:pan-x;}
+#st-volume::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(90deg,var(--accent) var(--fill),#3a4160 var(--fill));}
+#st-volume::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;margin-top:-8px;box-shadow:0 1px 4px rgba(0,0,0,.5);}
+#st-volume::-moz-range-track{height:6px;border-radius:3px;background:#3a4160;}
+#st-volume::-moz-range-progress{height:6px;border-radius:3px;background:var(--accent);}
+#st-volume::-moz-range-thumb{width:22px;height:22px;border:none;border-radius:50%;background:#fff;}
+.st-save-group{padding:10px 12px;text-align:center;}
+.st-save-title{width:100%;padding:11px;font-weight:700;background:#7c2d12;border:1px solid #c2410c;}
+.st-save-title:hover:not(:disabled){background:#9a3412;}
+.st-save-title:disabled{opacity:.45;cursor:not-allowed;}
+.st-save-note{font-size:11px;color:#fca5a5;min-height:0;margin-top:4px;}
+.st-save-note:empty{display:none;}
+.st-close{width:100%;padding:11px;}
+.confirm-dialog-msg.st-confirm-msg{white-space:pre-line;line-height:1.55;font-size:13px;}
+@keyframes stFade{from{opacity:0}to{opacity:1}}
+@keyframes stPop{from{transform:scale(.94);opacity:0}to{transform:none;opacity:1}}
