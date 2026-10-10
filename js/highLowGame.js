@@ -266,7 +266,7 @@ const HighLowGame = (function(){
     _se('page', { volume:0.5 });
     s.classList.remove('pop'); void s.offsetWidth; s.classList.add('pop');
   }
-  function setMsg(html){ $('.hl-msg').innerHTML = html; }
+  function setMsg(html){ const m = $('.hl-msg'); m.innerHTML = html; GGoldifyDom(m); }
   function setActions(html){ $('.hl-actions').innerHTML = html; }
   function setDecl(who, kind){
     const el = $(who === 'n' ? '.hl-decl-npc' : '.hl-decl-player');
@@ -280,6 +280,7 @@ const HighLowGame = (function(){
   function showPanel(html){
     const layer = $('.hl-panel-layer');
     layer.innerHTML = `<div class="hl-panel">${html}</div>`;
+    GGoldifyDom(layer);
     layer.classList.add('show');
     return layer.querySelector('.hl-panel');
   }

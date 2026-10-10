@@ -75,7 +75,7 @@ const Revelation = (function(){
     if(g.totalBingoCount!=null) rows.push(['総ビンゴ数', `${g.totalBingoCount}`]);
     if(full){
       rows.push(['最終スコア', fmt(g.currentScore||0), 1]);
-      rows.push(['所持G', `${g.gold||0}G`]);
+      rows.push([`所持${GCoin()}`, GCoinAmt(g.gold||0)]);
       rows.push(['残機', `${g.lives!=null?g.lives:'-'}`]);
     }
     return `<div class="rev-stats">${rows.map(([k,v,w])=>`<div class="rev-stat${w?' wide':''}"><span>${k}</span><b>${v}</b></div>`).join('')}</div>`;
@@ -91,7 +91,7 @@ const Revelation = (function(){
   function isOpen(){ return !!ui; }
   function T(ms){ return reduced()?0:ms; }
   function wait(ms){ return new Promise(r=>{ if(!ui) return r(); const id=setTimeout(r, T(ms)); ui.timers.push(id); }); }
-  function el(tag, cls, html){ const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; }
+  function el(tag, cls, html){ const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=GGoldify(String(html)); return e; } // ゴールド表記は金貨アイコンに
 
   function emblemSvg(){
     let rays=''; for(let i=0;i<24;i++){ const a=i*15; rays+= i%2 ? `<path d="M100 14 L102 26 L98 26 Z" transform="rotate(${a} 100 100)"/>` : `<path d="M100 4 L104 24 L96 24 Z" transform="rotate(${a} 100 100)"/>`; }

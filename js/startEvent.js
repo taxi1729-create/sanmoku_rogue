@@ -124,7 +124,7 @@ const StartEvent = (function(){
   function isOpen(){ return !!ui; }
   function T(ms){ return reduced()?0:ms; }
   function wait(ms){ return new Promise(r=>{ if(!ui) return r(); const id=setTimeout(r, T(ms)); ui.timers.push(id); }); }
-  function el(tag, cls, html){ const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; }
+  function el(tag, cls, html){ const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=GGoldify(String(html)); return e; } // ゴールド表記は金貨アイコンに
 
   function emblemSvg(){
     let rays=''; for(let i=0;i<24;i++){ const a=i*15; rays+= i%2 ? `<path d="M100 14 L102 26 L98 26 Z" transform="rotate(${a} 100 100)"/>` : `<path d="M100 4 L104 24 L96 24 Z" transform="rotate(${a} 100 100)"/>`; }
@@ -164,7 +164,7 @@ const StartEvent = (function(){
       <div class="sev-flash"></div>
       <div class="sev-top">
         <span class="sev-chapter">${ico('divine_favor',{cls:'gi-gap'})}序章・神の寵愛</span>
-        <span class="sev-stat"><span class="sev-deck">デッキ <b class="sev-deck-v">${G().currentDeck.length}</b>枚</span><span class="sev-gold">所持G <b class="sev-gold-v">${G().gold}</b></span></span>
+        <span class="sev-stat"><span class="sev-deck">デッキ <b class="sev-deck-v">${G().currentDeck.length}</b>枚</span><span class="sev-gold">所持${GCoin()} <b class="sev-gold-v">${G().gold}</b></span></span>
       </div>
       <div class="sev-stage">
         <div class="sev-halo"></div>

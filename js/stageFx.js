@@ -255,7 +255,7 @@ const StageFX = (function(){
     return e;
   }
   function floatText(sub, text, x, y, t0, t1, cls){
-    const e=putC(sub.g,'stfx-ftext '+(cls||''),x,y,null,null,esc(text));
+    const e=putC(sub.g,'stfx-ftext '+(cls||''),x,y,null,null,GGoldify(esc(text)));
     T(sub,e,[{opacity:0,transform:'translate(-50%,-30%) scale(.7)'},{opacity:1,transform:'translate(-50%,-80%) scale(1.1)',offset:.3},{opacity:1,transform:'translate(-50%,-110%) scale(1)',offset:.75},{opacity:0,transform:'translate(-50%,-150%)'}],t0,t1,'ease-out');
     return e;
   }
@@ -904,7 +904,7 @@ const StageFX = (function(){
     const hasGoldFx=!!(gf&&(gf.relic||gf.ren));
     const lineHtml=(l)=>{
       const g=l[3]&&gf?gf[l[3]]:null;
-      if(!g) return `<div class="stfx-res-line ${l[2]||''}"><span>${l[0]}</span><b>${l[1]}</b></div>`;
+      if(!g) return `<div class="stfx-res-line ${l[2]||''}"><span>${GGoldify(l[0])}</span><b>${l[1]}</b></div>`;
       // 金貨はこの行のアイコンから飛び出し、値は +0 から加算される（最終値は data-final）
       return `<div class="stfx-res-line g-line ${l[3]}" data-g="${l[3]}" data-amt="${g.amount}" data-gname="${esc(g.name)}"><span><span class="stfx-res-gicons">${Array.from({length:Math.min(3,Math.max(1,g.count||1))},()=>`<i class="stfx-res-gico">${g.iconHtml}</i>`).join('')}</span>${l[0]}</span><b data-final="+${g.amount}">+0</b></div>`;
     };
@@ -930,16 +930,16 @@ const StageFX = (function(){
         <div class="stfx-rt-lives">${livesRowHtml(Math.max(rt.maxLives||2,rt.livesBefore||0), rt.livesLeft, rt.livesLeft)}</div>
         <div class="stfx-rt-left">残り残機 <b>${rt.livesLeft}</b><small> / ${rt.maxLives||2}</small></div>
       </div>
-      <div class="stfx-res-wallet"><span class="stfx-coin static">G</span>所持G <b class="stfx-res-wallet-v">${opts.goldBefore}</b></div>
+      <div class="stfx-res-wallet">所持${GCoin()} <b class="stfx-res-wallet-v">${opts.goldBefore}</b></div>
       <div class="stfx-res-panel stfx-rt-panel">
-        <div class="gr-label">撤退G</div>
+        <div class="gr-label">撤退${GCoin()}</div>
         <div class="stfx-res-lines">
-          <div class="stfx-res-line"><span>基本G10 × num${rt.num}<small>（基本1${rt.num>1?'・階層6以上+1':''}）</small></span><b>${10*rt.num}</b></div>
+          <div class="stfx-res-line"><span>基本${GCoin()}10 × num${rt.num}<small>（基本1${rt.num>1?'・階層6以上+1':''}）</small></span><b>${10*rt.num}</b></div>
           <div class="stfx-res-line"><span>× 達成率（点数 / 目標点数）</span><b>${pct}%</b></div>
           <div class="stfx-res-line sub"><span>端数切り捨て</span><b>= ${rt.gold}</b></div>
         </div>
-        <div class="stfx-res-total">+<span class="stfx-res-total-v" data-final="${rt.gold}">0</span>G</div>
-        <div class="stfx-res-formula">撤退G ＝ floor(10 × num × 現在の点数 / 目標点数)</div>
+        <div class="stfx-res-total">+${GCoin()}<span class="stfx-res-total-v" data-final="${rt.gold}">0</span></div>
+        <div class="stfx-res-formula">撤退${GCoin()} ＝ floor(10 × num × 現在の点数 / 目標点数)</div>
       </div>
       <div class="stfx-rt-note">ミニショップで体制を整え、同じステージに再挑戦できます</div>`:'';
     const goHtml=go?`
@@ -954,11 +954,11 @@ const StageFX = (function(){
       <div class="stfx-res-score">${opts.scoreText}</div>
       ${rtHtml}${goHtml}
       ${rfx.length?`<div class="stfx-res-relics"><div class="stfx-res-relics-h">発動した効果<small>タップで確認</small></div><div class="stfx-res-rchips">${rfx.map((f,i)=>`<button type="button" class="stfx-res-rchip${f.grade?' rg-'+f.grade:''}" data-i="${i}"><span class="stfx-res-rchip-ico">${f.iconHtml}</span>${esc(f.name)}</button>`).join('')}</div></div>`:''}
-      ${hasGold?`<div class="stfx-res-wallet"><span class="stfx-coin static">G</span>所持G <b class="stfx-res-wallet-v">${opts.goldBefore}</b><span class="stfx-res-wallet-d"></span></div>
+      ${hasGold?`<div class="stfx-res-wallet">所持${GCoin()} <b class="stfx-res-wallet-v">${opts.goldBefore}</b><span class="stfx-res-wallet-d"></span></div>
       <div class="stfx-res-panel">
         <div class="gr-label">獲得ゴールド</div>
         <div class="stfx-res-lines">${lines.map(lineHtml).join('')}</div>
-        <div class="stfx-res-total">+<span class="stfx-res-total-v" data-final="${r.gold}">${hasGoldFx?b.subtotal:r.gold}</span>G</div>
+        <div class="stfx-res-total">+${GCoin()}<span class="stfx-res-total-v" data-final="${r.gold}">${hasGoldFx?b.subtotal:r.gold}</span></div>
         ${opts.formulaText?`<div class="stfx-res-formula">${opts.formulaText}</div>`:''}
       </div>`:''}
       ${extras.length?`<div class="stfx-res-extras"><div class="stfx-res-extras-h">追加報酬</div>${extras.map(x=>`<div class="stfx-res-extra">${x}</div>`).join('')}</div>`:''}
@@ -990,7 +990,7 @@ const StageFX = (function(){
       const wv=box.querySelector('.stfx-res-wallet-v'); if(wv) wv.textContent=opts.goldAfter;
       // 一時撤退：砕ける途中でスキップされても、残機は割れた状態にそろえる
       box.querySelectorAll('.stfx-rt-heart.breaking').forEach(n=>{ n.classList.remove('breaking'); n.classList.add('broken'); n.innerHTML=icon('life_heart_broken'); });
-      const wd=box.querySelector('.stfx-res-wallet-d'); if(wd && r && opts.goldBefore+r.gold!==opts.goldAfter){ wd.textContent=`（${opts.goldAfter-(opts.goldBefore+r.gold)}G 消費）`; }
+      const wd=box.querySelector('.stfx-res-wallet-d'); if(wd && r && opts.goldBefore+r.gold!==opts.goldAfter){ wd.innerHTML=`（${GCoinAmt(opts.goldAfter-(opts.goldBefore+r.gold))} 消費）`; }
       btn.disabled=false; btn.classList.add('ready');
       const hint=box.querySelector('.stfx-res-hint'); if(hint) hint.remove();
     };
@@ -1052,7 +1052,7 @@ const StageFX = (function(){
         // 大爆発などで消費があった場合
         const spent=(opts.goldBefore+r.gold)-opts.goldAfter;
         if(!ui.skip && spent>0){
-          const wd=box.querySelector('.stfx-res-wallet-d'); wd.textContent=`−${spent}G`; wd.classList.add('spend');
+          const wd=box.querySelector('.stfx-res-wallet-d'); wd.innerHTML=`−${GCoinAmt(spent)}`; wd.classList.add('spend');
           anim(wd,[{opacity:0,transform:'translateY(-8px)'},{opacity:1,transform:'none'}],{duration:260,fill:'both'});
           await countTo(ui, box.querySelector('.stfx-res-wallet-v'), opts.goldBefore+r.gold, opts.goldAfter, 500);
         }
@@ -1198,7 +1198,7 @@ const StageFX = (function(){
     sfx('relic');
     if(icons) anim(icons,[{transform:'scale(1)',filter:'brightness(1)'},{transform:'scale(1.7) translateY(-3px)',filter:'brightness(2.2)',offset:.35},{transform:'scale(1)',filter:'brightness(1)'}],{duration:R?60:620,easing:'ease-out'});
     const rr=row.getBoundingClientRect();
-    const tag=el('div','stfx-rfx-tag'+(small?' small':''),`<span class="stfx-rfx-tag-ico">${row.querySelector('.stfx-res-gico')?row.querySelector('.stfx-res-gico').innerHTML:''}</span>レリック${small?'強化':''}効果が発動：${esc(row.dataset.gname)} <b>+${amt}G</b>`);
+    const tag=el('div','stfx-rfx-tag'+(small?' small':''),`<span class="stfx-rfx-tag-ico">${row.querySelector('.stfx-res-gico')?row.querySelector('.stfx-res-gico').innerHTML:''}</span>レリック${small?'強化':''}効果が発動：${esc(row.dataset.gname)} <b>+${GCoinAmt(amt)}</b>`);
     tag.style.left=Math.max(110,Math.min(innerWidth-110,rr.left+rr.width/2))+'px'; tag.style.top=(rr.top-4)+'px';
     ui.rl.appendChild(tag);
     anim(tag,[{opacity:0,transform:'translate(-50%,-60%) scale(.7)'},{opacity:1,transform:'translate(-50%,-100%) scale(1)',offset:.18},{opacity:1,transform:'translate(-50%,-110%) scale(1)',offset:.85},{opacity:0,transform:'translate(-50%,-130%) scale(1)'}],{duration:R?300:1500,fill:'forwards'}).finished.catch(()=>{}).then(()=>tag.remove());

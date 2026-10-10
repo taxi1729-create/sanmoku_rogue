@@ -3,8 +3,10 @@
 .settings-btn .settings-ico{width:17px;height:17px;flex:none;}
 .settings-btn-label{font-size:12px;}
 /* ゲーム画面のコントロール行ではアイコンのみ */
-.controls-row .settings-btn{padding:6px 8px;}
-.controls-row .settings-btn .settings-btn-label{display:none;}
+/* ゲームメイン上画面：隣のデッキ等のアイコンボタン（.shop-icon-btn）と同じ「アイコン＋小キャプション」・同サイズ */
+.controls-row .settings-btn{flex-direction:column;gap:2px;min-width:44px;min-height:44px;padding:5px 7px 4px;}
+.controls-row .settings-btn .settings-ico{width:22px;height:22px;}
+.controls-row .settings-btn .settings-btn-label{font-size:9.5px;font-weight:700;letter-spacing:.04em;opacity:.85;}
 /* タイトル：右上に固定 */
 .title-settings-wrap{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:12px;z-index:5;}
 .title-settings-wrap .settings-btn{padding:8px 11px;font-size:13px;background:rgba(36,42,61,.85);border:1px solid #3a4160;}

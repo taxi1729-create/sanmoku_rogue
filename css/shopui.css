@@ -2,10 +2,7 @@
 
 /* ---- 見出し：デッキ確認・マップ一覧（設定ボタンと揃えたアイコンボタン） ---- */
 .shop-view-btns{display:flex;gap:8px;justify-content:center;align-items:center;margin-top:6px;}
-.shop-icon-btn{position:relative;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:48px;min-height:44px;padding:5px 9px 4px;line-height:1;}
-.shop-icon-btn .shop-icon-ico{width:22px;height:22px;flex:none;}
-.shop-icon-cap{font-size:9.5px;font-weight:700;letter-spacing:.04em;opacity:.85;white-space:nowrap;}
-.shop-icon-badge{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:var(--gold,#fbbf24);color:#1a1a1a;font-size:10px;font-weight:800;line-height:17px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.45);pointer-events:none;}
+/* .shop-icon-btn / .shop-icon-ico / .shop-icon-cap / .shop-icon-badge の共通スタイルは css/icons.css（ゲームメイン上画面のボタン列と共用） */
 
 /* ---- 通常/爆発通常アップグレード：レア効果の選択肢 ---- */
 @property --ecr-a{syntax:'<angle>';inherits:false;initial-value:0deg;}

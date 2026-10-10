@@ -133,6 +133,7 @@ const ThrowGame = {
         <button class="tg-btn tg-start">はじめる</button>
       </div>`;
     document.body.appendChild(ov);
+    GGoldifyDom(ov);
     this.ov = ov;
     this._prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -198,6 +199,7 @@ const ThrowGame = {
       const now = performance.now();
       if (this.angle !== prev && now - (this._seAngleT || 0) >= 50) { this._seAngleT = now; _seThrow('tap', { rate: 0.7 + this.angle / 90 * 0.9, volume: 0.35, suppressTap: true }); }
     });
+    GGoldifyDom(ov);
     ov.querySelector('.tg-throw').addEventListener('click', () => this._throw());
     ov.querySelector('.tg-quit').addEventListener('click', () => this._confirmQuit());
     this._setAngle(this.angle);
@@ -284,6 +286,7 @@ const ThrowGame = {
       rw.classList.toggle('got', !!r.special);
       rw.innerHTML = `<span class="tg-rwd-l">報酬：</span><b>${r.special ? this._rewardText(r) : 'まだなし（10mで特別アップグレード）'}</b>`
         + (np ? `<span class="tg-rwd-p">ピッタリ×${np}</span>` : '');
+      GGoldifyDom(rw);
     }
     this.ov.querySelectorAll('.tg-flag').forEach(f => {
       const i = +f.dataset.i;
@@ -451,6 +454,7 @@ const ThrowGame = {
     const fx = this.ov && this.ov.querySelector('.tg-pitta-fx');
     if (!fx) return;
     fx.innerHTML = `<div class="tg-pitta-big">ピッタリ！</div><div class="tg-pitta-sub">${ts.map(t => t + 'm').join('・')} ＋${this.PITTA_GOLD * ts.length}G</div>`;
+    GGoldifyDom(fx);
     fx.classList.remove('show'); void fx.offsetWidth; fx.classList.add('show');
     setTimeout(() => { _seThrow('pittari'); setTimeout(() => _seThrow('coin'), 260); }, 320);
     ts.forEach(t => this._sparkle(t));
@@ -468,6 +472,7 @@ const ThrowGame = {
         <button class="tg-btn tg-danger tg-yes" type="button">終了する</button>
       </div></div>`;
     this.ov.appendChild(r);
+    GGoldifyDom(r);
     _seThrow('open', {suppressTap:true});
     r.querySelector('.tg-cancel').addEventListener('click', () => { _seThrow('cancel', {suppressTap:true}); r.remove(); });
     r.querySelector('.tg-yes').addEventListener('click', () => {
@@ -505,6 +510,7 @@ const ThrowGame = {
       <div class="tg-reward">${rw.special ? '報酬：' + this._rewardText(rw) : '報酬なし'}</div>
       <button class="tg-btn tg-back">${win ? '報酬を受け取る' : '戻る'}</button></div>`;
     this.ov.appendChild(r);
+    GGoldifyDom(r);
     if (all) { _seThrow('win'); setTimeout(() => _seThrow('fanfare'), 400); }
     else _seThrow(win ? 'win' : 'lose');
     r.querySelector('.tg-back').addEventListener('click', () => { _seThrow(win ? 'coin' : 'close', {suppressTap:true}); this._close(); });

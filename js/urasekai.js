@@ -50,8 +50,8 @@ const UraSekai = (function(){
     const label=resume?'再開する':(type==='altar'?`残機${GameData.ALTAR_LIFE_COST}を捧げて挑む`:'このイベントに挑む');
     return `<div class="ura-ev-card ura-ev-${type}${av.ok?'':' disabled'}${resume?' resume':''}" data-type="${type}">`
       +`<div class="ura-ev-head"><div class="ura-ev-icon">${ICONS[type]||''}</div><div class="ura-ev-titles"><div class="ura-ev-tag">${esc(info.tag||'EVENT')}</div><div class="ura-ev-name">${esc(info.name)}</div></div></div>`
-      +`<div class="ura-ev-desc">${esc(info.desc)}</div>${extra}`
-      +`<div class="ura-ev-reward"><span>報酬</span>${esc(info.reward)}</div>`
+      +`<div class="ura-ev-desc">${GGoldify(esc(info.desc))}</div>${extra}`
+      +`<div class="ura-ev-reward"><span>報酬</span>${GGoldify(esc(info.reward))}</div>`
       +(av.ok?`<button class="ura-ev-go">${label}</button>`:`<div class="ura-ev-warn">${esc(av.why)}</div>`)
       +`</div>`;
   }
@@ -103,12 +103,12 @@ const UraSekai = (function(){
     const old=document.getElementById('ura-reward'); if(old) old.remove();
     const box=document.createElement('div'); box.id='ura-reward'; box.className='ura-reward-overlay';
     const lines=[];
-    if(r.gold>0) lines.push(`<div class="ura-rw-gold">+${r.gold}G</div>`);
+    if(r.gold>0) lines.push(`<div class="ura-rw-gold">+${GCoinAmt(r.gold)}</div>`);
     if(r.special>0) lines.push(`<div class="ura-rw-special">特別アップグレード ×${r.special}<small>ショップで最初に選択</small></div>`);
     if(lines.length===0) lines.push(`<div class="ura-rw-none">報酬なし</div>`);
     box.innerHTML=`<div class="ura-reward-box"><div class="ura-rw-head">裏世界 // RESULT</div><div class="ura-rw-name">${esc(r.name)}</div>`
       +`<div class="ura-rw-verdict ${r.win?'win':'lose'}">${r.win?'成功':'失敗'}</div>`
-      +(r.summary?`<div class="ura-rw-summary">${esc(r.summary)}</div>`:'')
+      +(r.summary?`<div class="ura-rw-summary">${GGoldify(esc(r.summary))}</div>`:'')
       +lines.join('')
       +`<button class="ura-rw-btn">ショップへ</button></div>`;
     document.body.appendChild(box);

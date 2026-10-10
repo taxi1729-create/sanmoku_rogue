@@ -869,6 +869,10 @@ button.gallery-item:active{ transform:scale(.97); }
 /* 操作ボタン列：スマホ幅で横にはみ出さないよう折り返し＆文字の縦並びを防止 */
 .controls-row{flex-wrap:wrap;justify-content:center;gap:6px;max-width:100%;}
 .controls-row button{white-space:nowrap;padding:6px 10px;min-width:0;}
+/* デッキ/山札/捨て札/廃棄札/マップ：ショップ見出しと同じアイコン＋キャプション＋枚数バッジ（.shop-icon-btn 本体は css/icons.css）。
+   バッジが上・右にはみ出す分の余白を確保し、390px幅でも1行に収める */
+.controls-row:has(.shop-icon-btn){flex-wrap:nowrap;gap:9px;padding:6px 6px 0 0;}
+.controls-row .shop-icon-btn{flex:0 1 auto;min-width:44px;min-height:44px;padding:5px 7px 4px;}
 
 /* #6 ステータス上段：ラウンド・Gの右にパッシブを隙間なく配置 */
 .status-top-row{display:flex;align-items:center;gap:10px;width:100%;flex-wrap:nowrap;}
@@ -1085,3 +1089,17 @@ button.gallery-item:active{ transform:scale(.97); }
 .sfx-toggle-btn .sfx-ico path:first-child{fill:currentColor;fill-opacity:.25;}
 .sfx-toggle-btn.muted{opacity:.6;}
 .sfx-toggle-btn.muted .sfx-ico{color:#f87171;}
+
+/* v1.28 右枠（カード変化・ビンゴ倍率変化）の演出速度を2/3に（時間を1.5倍） */
+.card-reveal-toast .flip-card-inner{ animation-duration:480ms; }
+.card-reveal-toast .pack-card-grid > :nth-child(2) .flip-card-inner{ animation-delay:90ms; }
+.card-reveal-toast .pack-card-grid > :nth-child(3) .flip-card-inner{ animation-delay:180ms; }
+.card-reveal-toast .pack-card-grid > :nth-child(4) .flip-card-inner{ animation-delay:270ms; }
+.card-reveal-toast .pack-card-grid > :nth-child(n+5) .flip-card-inner{ animation-delay:360ms; }
+.card-reveal-toast .mult-change-table tr.mc-up .mc-after,.card-reveal-toast .mult-change-table tr.mc-down .mc-after,
+.card-reveal-toast .mult-change-table tr.mc-up .mc-diff,.card-reveal-toast .mult-change-table tr.mc-down .mc-diff{ animation-duration:480ms, 1050ms; }
+.card-reveal-toast .mult-change-table tr:nth-child(2) td{ animation-delay:90ms; }
+.card-reveal-toast .mult-change-table tr:nth-child(3) td{ animation-delay:180ms; }
+.card-reveal-toast .mult-change-table tr:nth-child(4) td{ animation-delay:270ms; }
+.card-reveal-toast .mult-change-table tr:nth-child(n+5) td{ animation-delay:360ms; }
+@media (prefers-reduced-motion: reduce){ .card-reveal-toast .flip-card-inner{ animation:none; } }

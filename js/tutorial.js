@@ -435,6 +435,8 @@ const TutorialOverlay = (function(){
     const u=ui; ui=null;
     if(markAsSeen){ try{ if(typeof SFX!=='undefined') SFX.play('close'); }catch(e){} }
     if(markAsSeen) markSeen(u.key);
+    // v1.28 ショップのチュートリアルまで見終えたら、自動でチュートリアルスキップをONにする
+    if(u.key==='shop'){ setSkip(true); }
     if(u.typing) u.typing.stop();
     cancelAnimationFrame(u.raf);
     document.removeEventListener('keydown',u.onKey,true);

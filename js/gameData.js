@@ -1,5 +1,28 @@
 // GUIアイコン（js/icons.js の GameIcons）をインラインSVG文字列で返す。icons.js は本ファイルより前に読み込むこと
 const GIcon = (key, opts) => (typeof GameIcons!=='undefined' ? GameIcons.svg(key, opts) : '');
+// ゴールド（G）のGUIアイコン（インラインSVG。innerHTML で描画すること）。GCoinAmt(5) →「[金貨]5」
+const GCoin = () => GIcon('gold_coin',{cls:'gi-gold-inline'}) || 'G';
+const GCoinAmt = n => `${GCoin()}${n}`;
+// テキスト中のゴールド表記（「5G」「+5G」「所持G」「現在G×4」「Gを得る」等）を金貨アイコンに置き換える。
+// HTMLタグ（SVG含む）の中は触らず、英単語中のG（GOAL・BINGO等）も置き換えない。何度通しても結果は同じ（冪等）
+const GGoldify = t => {
+  if(typeof t!=='string' || t.indexOf('G')<0) return t;
+  const c = GCoin(); if(c==='G') return t;
+  return t.split(/(<[^>]*>)/).map(seg => (seg.charAt(0)==='<') ? seg : seg
+    .replace(/(\d+(?:\.\d+)?)G(?![A-Za-z])/g, (m,n)=>c+n)
+    .replace(/(?<![A-Za-z])G(?![A-Za-z])/g, c)).join('');
+};
+// 描画済みDOMのテキストノード内のゴールド表記を金貨アイコンに置き換える（ミニゲーム等の画面用。SVG/入力欄の中は触らない）
+const GGoldifyDom = root => {
+  if(!root || typeof document==='undefined' || GCoin()==='G') return root;
+  const re = /(\d+(?:\.\d+)?G|(?<![A-Za-z])G)(?![A-Za-z])/;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n =>
+    (re.test(n.nodeValue) && !(n.parentElement && n.parentElement.closest('svg,script,style,textarea,title'))) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
+  const nodes = []; while(w.nextNode()) nodes.push(w.currentNode);
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  nodes.forEach(n => { const t = document.createElement('template'); t.innerHTML = GGoldify(esc(n.nodeValue)); n.replaceWith(t.content); });
+  return root;
+};
 // 記号アイコン（.sym-* の色を currentColor で継承）を色クラス付き span で返す（説明文・メッセージ埋め込み用）
 const GICON_SYM_KEY = { Circle:'sym_circle', Triangle:'sym_triangle', Square:'sym_square', Cross:'sym_cross', Hoshi:'passive_hoshi', Check:'passive_check', Seven:'passive_seven' };
 const GIconSym = sym => `<span class="sym-${sym}">${GIcon(GICON_SYM_KEY[sym])}</span>`;
@@ -863,7 +886,8 @@ const GameData = {
 // v1.04 パッシブの説明欄に出る「STAR」をSTARのGUIアイコンに置き換える（説明文・現在値の両方）
 (function(){
   const starIco = () => GIcon('star_var',{cls:'gi-star-inline'}) || 'STAR';
-  const conv = (t) => (typeof t==='string') ? t.replace(/STAR/g, starIco()) : t;
+  // STAR → STARアイコン、ゴールド表記（5G・所持G・現在G×4 等）→ 金貨アイコン（GGoldify：タグ内は触らない・冪等）
+  const conv = (t) => (typeof t==='string') ? GGoldify(t.replace(/STAR/g, starIco())) : t;
   // 効果の説明で②③…がある場合は、その前で改行する（二重に入れない）
   const br = (t) => (typeof t==='string') ? t.replace(/(<br>)?([②③④⑤⑥⑦⑧⑨⑩])/g, '<br>$2') : t;
   GameData.fmtDesc = br;
@@ -876,7 +900,9 @@ const GameData = {
     });
   });
   // カード強化・ジャミング・性質変化・魔力ステージ・レリック・レリック強化の説明も同様に改行
-  ['ENHANCE_DESC','JAMMING_DESC','TRAIT_DESC'].forEach(k=>{ const m=GameData[k]; if(m) Object.keys(m).forEach(n=>{ m[n]=br(m[n]); }); });
-  Object.values(GameData.MANA_STAGES||{}).forEach(o=>{ if(o&&o.desc) o.desc=br(o.desc); });
-  [...(GameData.RELIC_POOL||[]),...(GameData.RELIC_ENHANCE_POOL||[]),GameData.MAJIN_SEAL_RELIC].forEach(o=>{ if(o&&o.desc) o.desc=br(o.desc); });
+  ['ENHANCE_DESC','JAMMING_DESC','TRAIT_DESC'].forEach(k=>{ const m=GameData[k]; if(m) Object.keys(m).forEach(n=>{ m[n]=br(GGoldify(m[n])); }); });
+  Object.values(GameData.MANA_STAGES||{}).forEach(o=>{ if(o&&o.desc) o.desc=br(GGoldify(o.desc)); });
+  [...(GameData.RELIC_POOL||[]),...(GameData.RELIC_ENHANCE_POOL||[]),GameData.MAJIN_SEAL_RELIC].forEach(o=>{ if(o&&o.desc) o.desc=br(GGoldify(o.desc)); });
+  // アップグレード効果（換金「G獲得」等）の説明も金貨アイコンに
+  [...(GameData.NORMAL_SELECT_POOL||[]),...(GameData.SPECIAL_SELECT_POOL||[])].forEach(o=>{ if(o&&typeof o.desc==='string') o.desc=GGoldify(o.desc); });
 })();

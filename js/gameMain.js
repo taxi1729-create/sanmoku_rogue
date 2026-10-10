@@ -803,7 +803,7 @@ const GameMainScene = {
   clearRewardBreakdownText(b){
     const fmt=v=>Math.round(v*100)/100;
     const numNote=['基本2',b.floorBonus?'階層6以上+1':'',b.scoreBonus?'目標点数の2倍以上+1':''].filter(Boolean).join('、');
-    return `基本G${b.base}×num${b.num}（${numNote}） ＋ 残りラウンド${fmt(b.roundBonus)}×1 ＝ ${b.subtotal} ＋ レリック効果${b.relicBonus} ＋ レリック強化効果${b.relicEnhanceBonus}`+(b.derbyDebt?' → ダービー前借り返済：G報酬0':'');
+    return GGoldify(`基本G${b.base}×num${b.num}（${numNote}） ＋ 残りラウンド${fmt(b.roundBonus)}×1 ＝ ${b.subtotal} ＋ レリック効果${b.relicBonus} ＋ レリック強化効果${b.relicEnhanceBonus}`+(b.derbyDebt?' → ダービー前借り返済：G報酬0':''));
   },
 
   drawToHandSize(){ const n=GameState.effectiveHandSize()-GameState.handCountForLimit(); for(let i=0;i<n;i++) this.drawOne(); },
@@ -2594,8 +2594,8 @@ const GameMainScene = {
     roundBox.innerHTML=`<div class="label">ラウンド</div><div class="round-big-value">${GameState.round}<span class="round-big-max">/${GameState.effectiveMaxRounds()+(this.stageBonusRounds||0)}</span></div>`;
     topRow.appendChild(roundBox);
     // #16 ステージ欄は削除。ラウンドとGを隣り合わせ、その右にパッシブを配置する
-    const stats=[['G',GameState.gold]];
-    for(const [label,val] of stats){const d=document.createElement('div');d.className='stat';d.innerHTML=`<div class="label">${label}</div><div class="value">${val}</div>`;topRow.appendChild(d);}
+    const stats=[[GCoin(),GameState.gold]];
+    for(const [label,val] of stats){const d=document.createElement('div');d.className='stat stat-gold';d.innerHTML=`<div class="label">${label}</div><div class="value">${val}</div>`;topRow.appendChild(d);}
     // #4 パッシブ一覧をラウンド・ステージと同じ行の右側に配置する
     const passiveBar=this.renderPassiveBar(); passiveBar.classList.add('passive-bar-inline');
     topRow.appendChild(passiveBar);
@@ -2763,7 +2763,7 @@ const GameMainScene = {
       let extra='';
       // #1 ブルジョワ：付与時に確定した実際の加算数値を説明欄に明記する
       if(card.enhance==='ブルジョワ'){
-        extra=`（現在${GameState.gold}G → ビンゴ時に基礎点+${GameData.bourgeoisBonus(card)}）`;
+        extra=`（現在${GCoinAmt(GameState.gold)} → ビンゴ時に基礎点+${GameData.bourgeoisBonus(card)}）`;
       }
       l.push(`<div class="info-desc desc-enhance">【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}${extra}</div>`);
     }
@@ -3268,7 +3268,7 @@ const GameMainScene = {
       order.forEach((id,i)=>{ sched.set(id,{start:now+(fast?0:40)+i*stagger,dur}); });
     }
     if(!sched.size) return;
-    const deckBtn=this.container&&this.container.querySelector('.top-info-box button[title="山札"]');
+    const deckBtn=this.container&&(this.container.querySelector('.top-info-box .ctrl-drawpile-btn')||this.container.querySelector('.top-info-box button[title="山札"]'));
     const dr=deckBtn?deckBtn.getBoundingClientRect():null;
     const dx0=dr&&dr.width?dr.left+dr.width/2:window.innerWidth-30, dy0=dr&&dr.width?dr.top+dr.height/2:40;
     // 先に全カードの位置を測ってからアニメーションを付ける（付けた後に測ると途中の transform が混ざる）
@@ -3440,7 +3440,7 @@ const GameMainScene = {
     // レリック強化効果：アイコン＋名称＋説明
     const renHtml=ren?`<div class="relic-ren-detail"><span class="relic-ren-detail-ico">${GameIcons.has(ren.id)?GameIcons.svg(ren.id):''}</span><div class="relic-ren-detail-text"><div class="relic-ren-detail-name">レリック強化：${ren.name}</div><div class="info-desc relic-enhance-desc">${ren.desc}</div></div></div>`:'';
     panel.className+=' rg-panel-'+this.relicGradeOf(relic);
-    panel.innerHTML=`<div class="info-title">${this.relicGradeIconHtml(relic,'relic-ico-lg')}${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span>${this.relicGradeBadgeHtml(relic)}<span class="relic-pos-tag">${idx+1}/${GameState.relics.length}</span></div><div class="info-desc">${relic.desc}</div>${renHtml}${liveInfo?`<div class="info-desc relic-live-value">${liveInfo}</div>`:''}<div class="relic-reorder-row"><button class="relic-move-btn" ${idx<=0?'disabled':''}>${GIcon('btn_left',{cls:'gi-gap'})}左へ</button><button class="relic-move-btn" ${idx>=GameState.relics.length-1?'disabled':''}>右へ${GIcon('btn_right',{cls:'gi-gap-l'})}</button>${ctx.openList?`<button class="relic-move-btn relic-back-list">${GIcon('btn_list',{cls:'gi-gap'})}一覧</button>`:''}</div>${ctx.onSell?`<button class="sell-relic-btn">売却（${sellPrice}G）</button>`:''}`;
+    panel.innerHTML=`<div class="info-title">${this.relicGradeIconHtml(relic,'relic-ico-lg')}${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span>${this.relicGradeBadgeHtml(relic)}<span class="relic-pos-tag">${idx+1}/${GameState.relics.length}</span></div><div class="info-desc">${relic.desc}</div>${renHtml}${liveInfo?`<div class="info-desc relic-live-value">${GGoldify(liveInfo)}</div>`:''}<div class="relic-reorder-row"><button class="relic-move-btn" ${idx<=0?'disabled':''}>${GIcon('btn_left',{cls:'gi-gap'})}左へ</button><button class="relic-move-btn" ${idx>=GameState.relics.length-1?'disabled':''}>右へ${GIcon('btn_right',{cls:'gi-gap-l'})}</button>${ctx.openList?`<button class="relic-move-btn relic-back-list">${GIcon('btn_list',{cls:'gi-gap'})}一覧</button>`:''}</div>${ctx.onSell?`<button class="sell-relic-btn">売却（${GCoinAmt(sellPrice)}）</button>`:''}`;
     const moveBtns=panel.querySelectorAll('.relic-move-btn');
     moveBtns[0].addEventListener('click',()=>{ if(GameState.moveRelic(idx,-1)){ ctx.setIdx(idx-1); ctx.redraw(); } });
     moveBtns[1].addEventListener('click',()=>{ if(GameState.moveRelic(idx,1)){ ctx.setIdx(idx+1); ctx.redraw(); } });
@@ -3498,14 +3498,18 @@ const GameMainScene = {
     // リロール中の「キャンセル」ボタンは廃止（リロールボタン再押下で抜ける）
     // #7 ターン終了ボタン（旧スキップ）は盤面右上の早送りボタンの下へ移動（renderBoardSideButtons）
     // #4 デッキ/山札/捨て札/廃棄札確認ボタン（上画面に配置。GameIcons のSVGアイコン表記）
-    const deckBtn=document.createElement('button'); deckBtn.innerHTML=`${GIcon('btn_deck',{cls:'gi-btn'})}(${GameState.currentDeck.length})`; deckBtn.title='デッキ'; deckBtn.addEventListener('click',()=>this.showDeckModal('deck')); controls.appendChild(deckBtn);
-    const drawBtn=document.createElement('button'); drawBtn.innerHTML=`${GIcon('btn_drawpile',{cls:'gi-btn'})}(${GameState.drawPile.length})`; drawBtn.title='山札'; drawBtn.addEventListener('click',()=>this.showDeckModal('drawpile')); controls.appendChild(drawBtn);
-    const discBtn=document.createElement('button'); discBtn.innerHTML=`${GIcon('btn_discard',{cls:'gi-btn'})}(${GameState.discardPile.length})`; discBtn.title='捨て札'; discBtn.addEventListener('click',()=>this.showDeckModal('discard')); controls.appendChild(discBtn);
+    // ショップ見出しと同じ「アイコン＋小キャプション＋枚数バッジ」のボタン（.shop-icon-btn／css/icons.css で共用）
+    const iconBtn=(icon,label,cap,badge,fn,extraCls)=>{ const b=document.createElement('button'); b.type='button'; b.className='shop-icon-btn'+(extraCls?' '+extraCls:''); b.setAttribute('aria-label',badge!=null?`${label}（${badge}枚）`:label); b.title=label;
+      b.innerHTML=`${GIcon(icon,{cls:'shop-icon-ico'})}<span class="shop-icon-cap">${cap}</span>${badge!=null?`<span class="shop-icon-badge">${badge}</span>`:''}`; b.addEventListener('click',fn); return b; };
+    controls.appendChild(iconBtn('btn_deck','デッキ','デッキ',GameState.currentDeck.length,()=>this.showDeckModal('deck'),'ctrl-deck-btn'));
+    // 山札ボタンは手札の配り演出の起点（applyDealAnim が .ctrl-drawpile-btn を参照）
+    controls.appendChild(iconBtn('btn_drawpile','山札','山札',GameState.drawPile.length,()=>this.showDeckModal('drawpile'),'ctrl-drawpile-btn'));
+    controls.appendChild(iconBtn('btn_discard','捨て札','捨て札',GameState.discardPile.length,()=>this.showDeckModal('discard'),'ctrl-discard-btn'));
     if(GameState.discardedPile.length>0){
-      const exlBtn=document.createElement('button'); exlBtn.innerHTML=`${GIcon('btn_trash',{cls:'gi-btn'})}(${GameState.discardedPile.length})`; exlBtn.title='廃棄札'; exlBtn.addEventListener('click',()=>this.showDeckModal('discarded')); controls.appendChild(exlBtn);
+      controls.appendChild(iconBtn('btn_trash','廃棄札','廃棄札',GameState.discardedPile.length,()=>this.showDeckModal('discarded'),'ctrl-discarded-btn'));
     }
     // #1 マップ一覧（確認のみ、遷移不可）
-    const mapBtn=document.createElement('button'); mapBtn.innerHTML=GIcon('btn_map',{cls:'gi-btn',title:'マップ'}); mapBtn.setAttribute('aria-label','マップ'); mapBtn.addEventListener('click',()=>this.showDeckModal('map')); controls.appendChild(mapBtn);
+    controls.appendChild(iconBtn('btn_map','マップ','マップ',null,()=>this.showDeckModal('map'),'ctrl-map-btn'));
     // 設定（サウンド音量・チュートリアルスキップ・早送り・カード詳細表示・セーブしてタイトルへ。js/settings.js）
     if(typeof Settings!=='undefined') controls.appendChild(Settings.button('game'));
     return controls;
@@ -3621,7 +3625,7 @@ const GameMainScene = {
     const el=document.createElement('div'); el.className='result-screen pack-modal-overlay';
     const win=this.resultState==='win'; const goShop=win&&GameState.currentFloor<10; // #4 ボスクリア時もショップへ（第10階層の最終決戦クリア時はショップ不要）
     const r=GameState.lastReward;
-    const gr=(win&&r?.breakdown)?`<div class="gold-reveal-popup"><div class="gr-label">獲得ゴールド</div><div class="gr-total">+${r.gold}G</div><div class="gr-breakdown">${GameMainScene.clearRewardBreakdownText(r.breakdown)}</div>${r.extra?`<div class="gr-breakdown">追加報酬：${r.extra}</div>`:''}</div>`:'';
+    const gr=(win&&r?.breakdown)?`<div class="gold-reveal-popup"><div class="gr-label">獲得ゴールド</div><div class="gr-total">+${GCoinAmt(r.gold)}</div><div class="gr-breakdown">${GameMainScene.clearRewardBreakdownText(r.breakdown)}</div>${r.extra?`<div class="gr-breakdown">追加報酬：${r.extra}</div>`:''}</div>`:'';
     // #3 ゲームメイン画面のデバッグ用ログを報酬画面にも表示
     // #11 ステージクリア時のデバッグログ表示（復活用にコメントアウト）
     //     const debugHtml=(r?.debugLog&&r.debugLog.length>0)?`<div class="result-debug-log"><div class="result-debug-title">デバッグログ</div>${r.debugLog.map(l=>`<div class="result-debug-line">${l}</div>`).join('')}</div>`:'';
@@ -3661,7 +3665,7 @@ const GameMainScene = {
       });
       const ph=document.createElement('div'); ph.className='stfx-result-placeholder'; ph.hidden=true; return ph;
     }
-    const retreatHtml=retreat?`<div class="gold-reveal-popup"><div class="gr-label">撤退G</div><div class="gr-total">+${retreat.gold}G</div><div class="gr-breakdown">残機 ${retreat.livesLeft} / ${GameState.MAX_LIVES}</div></div>`:'';
+    const retreatHtml=retreat?`<div class="gold-reveal-popup"><div class="gr-label">撤退${GCoin()}</div><div class="gr-total">+${GCoinAmt(retreat.gold)}</div><div class="gr-breakdown">残機 ${retreat.livesLeft} / ${GameState.MAX_LIVES}</div></div>`:'';
     box.innerHTML=`<div class="result-title ${win?'win':'lose'}">${win?'STAGE CLEAR':(retreat?'一時撤退':'GAME OVER')}</div><div>最終点数：${GlobalFunctions.formatScore(GameState.currentScore)} / ${GlobalFunctions.formatScore(GameState.targetScore)}</div>${gr}${retreatHtml}${debugHtml}<button id="btn-next">${btnLabel}</button>`;
     el.appendChild(box);
     setTimeout(()=>{el.querySelector('#btn-next').addEventListener('click',()=>{

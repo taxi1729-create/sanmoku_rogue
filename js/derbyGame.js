@@ -301,6 +301,7 @@ const DerbyGame = (function(){
       <div class="db-sec">連複 <small>1・2着の組（順不同）／単勝×単勝</small></div>
       <div class="db-grid three">${PAIRS.map(([a, b]) => cell(`Q:${a}-${b}`, `<span class="sym-${a}">${symIcon(a)}</span><span class="sym-${b}">${symIcon(b)}</span>`, pairOdds(st.odds, a, b))).join('')}</div>
       <button type="button" class="db-btn db-btn-main" data-act="start">${betSum() ? `スタート（${betSum()}Gベット）` : 'ベットせずにスタート'}</button>`;
+    GGoldifyDom(low);
     low.querySelectorAll('.db-bet').forEach(el => {
       el.querySelectorAll('.db-step').forEach(b => b.addEventListener('click', () => changeBet(el.dataset.k, Number(b.dataset.d))));
     });
@@ -343,6 +344,7 @@ const DerbyGame = (function(){
         <div class="db-order">${[1, 2, 3, 4].map(n => `<div class="db-ord" data-n="${n}"><b>${n}着</b><span>—</span></div>`).join('')}</div>
         <div class="db-mybets">${Object.keys(st.bets).length ? Object.keys(st.bets).map(k => `<span class="db-chip" data-k="${k}">${keyLabel(k)} ${st.bets[k]}G</span>`).join('') : '<span class="db-chip dim">ベットなし（観戦）</span>'}</div>
       </div>`;
+    GGoldifyDom($('.db-lower'));
   }
   function cardChip(card, big){
     const s = card.symbol;
@@ -609,6 +611,7 @@ const DerbyGame = (function(){
   function showPanel(html){
     const layer = $('.db-panel-layer');
     layer.innerHTML = `<div class="db-panel">${html}</div>`;
+    GGoldifyDom(layer);
     layer.classList.add('show');
     return layer.querySelector('.db-panel');
   }

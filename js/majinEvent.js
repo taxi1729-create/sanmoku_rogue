@@ -374,7 +374,7 @@ const MajinEvent = (function(){
         await api.packFx(cands);
         const [c]=await api.pickCards(cands,{min:1,max:1,title:'ドリームカードを1枚選べ',desc:true});
         deck().push(c); GlobalFunctions.recordCard(c);
-        return `<div class="mj-grant mj-grant-gold"><div class="mj-grant-icon">G</div><div><b>+50G</b> を獲得</div></div><div class="mj-sub-label">ドリームカードを獲得</div><div class="mj-card-row">${cardHtml(c,'mj-reveal')}</div><div class="mj-ba-desc">${cardDescHtml(c)}</div>`;
+        return `<div class="mj-grant mj-grant-gold"><div class="mj-grant-icon">${GIcon('gold_coin')}</div><div><b>+50G</b> を獲得</div></div><div class="mj-sub-label">ドリームカードを獲得</div><div class="mj-card-row">${cardHtml(c,'mj-reveal')}</div><div class="mj-ba-desc">${cardDescHtml(c)}</div>`;
       } },
     luck_4: { majin:'luck', title:'星の導き', cost:0, rx:'sparkle',
       desc: () => '記号パッシブ4つから1つを習得（次のLv）。',
@@ -607,7 +607,7 @@ const MajinEvent = (function(){
   function isOpen(){ return !!ui; }
   function T(ms){ return reduced()?0:ms; }
   function wait(ms){ return new Promise(r=>{ if(!ui) return r(); const id=setTimeout(r, T(ms)); ui.timers.push(id); }); }
-  function el(tag, cls, html){ const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; }
+  function el(tag, cls, html){ const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=GGoldify(String(html)); return e; } // ゴールド表記は金貨アイコンに
 
   function buildOverlay(floor, info){
     const m=MAJINS[info.id];
@@ -617,7 +617,7 @@ const MajinEvent = (function(){
     ov.innerHTML=`
       <div class="mj-bg"></div>
       <div class="mj-flash"></div>
-      <div class="mj-top"><span class="mj-floor">第${floor}階層・魔神の間</span><span class="mj-gold">所持G <b class="mj-gold-v">${G().gold}</b></span></div>
+      <div class="mj-top"><span class="mj-floor">第${floor}階層・魔神の間</span><span class="mj-gold">所持${GCoin()} <b class="mj-gold-v">${G().gold}</b></span></div>
       <div class="mj-stage">
         <div class="mj-circle">${circleSvg()}</div>
         <div class="mj-smokes"></div>
@@ -915,7 +915,7 @@ const MajinEvent = (function(){
       const g0=G().gold; G().gold+=sr.total;
       markCleared();
       clearPanel();
-      ui.panel.appendChild(el('div','mj-result',`<div class="mj-grant mj-grant-gold"><div class="mj-grant-icon">G</div><div>スキップ報酬 <b>+${sr.total}G</b></div></div>`));
+      ui.panel.appendChild(el('div','mj-result',`<div class="mj-grant mj-grant-gold"><div class="mj-grant-icon">${GIcon('gold_coin')}</div><div>スキップ報酬 <b>+${sr.total}G</b></div></div>`));
       animateGold(g0, G().gold);
       pulse('rx-laugh',1000);
       await say(m.leave,{wait:true});

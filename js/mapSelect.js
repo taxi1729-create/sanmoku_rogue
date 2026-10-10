@@ -50,7 +50,7 @@ const MapSelectScene = {
     topRow.appendChild(GameMainScene.renderPassiveBar(()=>this.renderAll()));
     el.appendChild(topRow);
     const header=document.createElement('div'); header.className='map-header';
-    header.innerHTML=`<span>所持G：${GameState.gold}</span><span>第${GameState.currentFloor}階層${(GameState.gameMode&&GameState.gameMode!=='normal'&&GameData.GAME_MODES[GameState.gameMode])?`<small class="map-mode-tag">${GameData.GAME_MODES[GameState.gameMode].name}</small>`:''}</span><span class="lives-badge lives-badge-map" title="残機"><span class="lives-label">残機</span>${GameState.livesIconsHtml()}</span>`;
+    header.innerHTML=`<span class="map-gold">所持${GCoin()}：${GameState.gold}</span><span>第${GameState.currentFloor}階層${(GameState.gameMode&&GameState.gameMode!=='normal'&&GameData.GAME_MODES[GameState.gameMode])?`<small class="map-mode-tag">${GameData.GAME_MODES[GameState.gameMode].name}</small>`:''}</span><span class="lives-badge lives-badge-map" title="残機"><span class="lives-label">残機</span>${GameState.livesIconsHtml()}</span>`;
     // #2(B) デバッグ促進用：タップで20000G付与するボタン
     //const debugGoldBtn=document.createElement('button'); debugGoldBtn.className='debug-gold-btn'; debugGoldBtn.textContent='🐞+20000G';
     //debugGoldBtn.addEventListener('click',()=>{ GameState.gold+=20000; this.renderAll(); });
@@ -72,7 +72,7 @@ const MapSelectScene = {
       shopCard.className='stage-card final-shop-card'+(GameState.finalShopDone?' visited':' guide');
       shopCard.innerHTML=GameState.finalShopDone
         ? `<div class="stage-tag">SHOP</div><div class="stage-name">最終決戦前の商店</div><div class="stage-goal">買い物を済ませた。最終決戦へ挑め</div><div class="stage-actions"><div class="stage-done-tag">訪問済み</div></div>`
-        : `<div class="stage-tag">SHOP</div><div class="stage-name">最終決戦前の商店</div><div class="stage-goal">最終決戦の前に、ここで支度を整えよう（入店時に10G獲得）</div><div class="stage-actions"><button class="challenge-btn final-shop-btn">商店へ向かう</button></div>`;
+        : `<div class="stage-tag">SHOP</div><div class="stage-name">最終決戦前の商店</div><div class="stage-goal">最終決戦の前に、ここで支度を整えよう（入店時に${GCoinAmt(10)}獲得）</div><div class="stage-actions"><button class="challenge-btn final-shop-btn">商店へ向かう</button></div>`;
       const fb=shopCard.querySelector('.final-shop-btn');
       if(fb) fb.addEventListener('click',()=>{
         _seMap('confirm',{suppressTap:true}); setTimeout(()=>_seMap('coin'),120);
@@ -115,7 +115,7 @@ const MapSelectScene = {
       if(stage.skippable&&!isCleared&&!locked){
         skipBonus=this.getSkipBonus(stage);
         const sr=GameState.calcSkipReward(); // #8
-        skipBonusHtml=`<div class="skip-bonus-tag">スキップ報酬：G+${sr.total}${skipBonus?`　＋　${skipBonus.label}`:'（追加報酬なし）'}</div>`;
+        skipBonusHtml=`<div class="skip-bonus-tag">スキップ報酬：${GCoin()}+${sr.total}${skipBonus?`　＋　${skipBonus.label}`:'（追加報酬なし）'}</div>`;
       }
       const evCommitted=!!(ev&&ev.committed&&!ev.done&&!isCleared);
       if(evCommitted) skipBonusHtml='';
@@ -396,7 +396,7 @@ const MapSelectScene = {
     const r=this.pendingReward;
     const overlay=document.createElement('div'); overlay.className='pack-modal-overlay';
     const box=document.createElement('div'); box.className='gold-reveal-popup';
-    box.innerHTML=`<div class="gr-label">${r.stageName}をスキップ</div><div class="gr-total">+${r.gold}G</div><div class="gr-breakdown">基本G${r.breakdown.base} × num${r.breakdown.num}${r.breakdown.num>1?'（階層6以上+1）':''} ＋ レリック効果${r.breakdown.relicBonus} ＋ レリック強化効果${r.breakdown.relicEnhanceBonus}${r.extra?`<br>追加報酬：${r.extra}`:''}</div><button id="btn-goto-shop" style="margin-top:16px;">ショップへ</button>`;
+    box.innerHTML=`<div class="gr-label">${r.stageName}をスキップ</div><div class="gr-total">+${GCoinAmt(r.gold)}</div><div class="gr-breakdown">基本${GCoin()}${r.breakdown.base} × num${r.breakdown.num}${r.breakdown.num>1?'（階層6以上+1）':''} ＋ レリック効果${r.breakdown.relicBonus} ＋ レリック強化効果${r.breakdown.relicEnhanceBonus}${r.extra?`<br>追加報酬：${r.extra}`:''}</div><button id="btn-goto-shop" style="margin-top:16px;">ショップへ</button>`;
     overlay.appendChild(box);
     if(this._seRewardShown!==r){ this._seRewardShown=r; _seMap('reveal'); setTimeout(()=>_seMap('coin'),200); }
     setTimeout(()=>{ box.querySelector('#btn-goto-shop').addEventListener('click',()=>{ _seMap('confirm',{suppressTap:true}); this.pendingReward=null; App.showShop(); }); });

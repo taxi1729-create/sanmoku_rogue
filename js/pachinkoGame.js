@@ -92,7 +92,7 @@ const PachinkoGame = (function(){
   function zoneIcon(z){
     if(z.key === 'none') return '<span class="pc-z-ico pc-z-none">×</span>';
     if(z.key === 'sp') return `<span class="pc-z-ico pc-z-star">★</span>`;
-    return `<span class="pc-z-ico pc-z-coin">G</span>`;
+    return `<span class="pc-z-ico pc-z-coin">${GIcon('gold_coin')}</span>`;
   }
 
   // ---------- 盤面生成 ----------
@@ -175,8 +175,9 @@ const PachinkoGame = (function(){
       const cls = r ? 'done' : (i === st.ballIdx && st.phase !== 'setup' && st.phase !== 'intro' ? 'cur' : '');
       return `<span class="pc-bpip ${cls}"><i></i>${r ? esc(r.short) : (i + 1) + '球目'}</span>`;
     }).join('');
+    GGoldifyDom(balls);
     const t = $('.pc-total');
-    if(t) t.innerHTML = `<span class="pc-tg">${st.reward.gold}G</span><span class="pc-ts">★${st.reward.special}</span>`;
+    if(t) t.innerHTML = `<span class="pc-tg">${GCoinAmt(st.reward.gold)}</span><span class="pc-ts">★${st.reward.special}</span>`;
   }
 
   function renderZones(animate){
@@ -186,7 +187,7 @@ const PachinkoGame = (function(){
       first = {};
       el.querySelectorAll('.pc-zone').forEach(z => { first[z.dataset.id] = z.getBoundingClientRect().left; });
     }
-    el.innerHTML = st.zones.map((z, i) => `<div class="pc-zone pc-zone-${z.key}" data-id="${z.id}" data-pos="${i}">${zoneIcon(z)}<span class="pc-z-lab">${esc(z.short)}</span></div>`).join('');
+    el.innerHTML = st.zones.map((z, i) => `<div class="pc-zone pc-zone-${z.key}" data-id="${z.id}" data-pos="${i}">${zoneIcon(z)}<span class="pc-z-lab">${z.gold ? esc(String(z.short).replace(/G$/, '')) : esc(z.short)}</span></div>`).join('');
     if(first){
       el.querySelectorAll('.pc-zone').forEach(z => {
         const dx = (first[z.dataset.id] || 0) - z.getBoundingClientRect().left;
@@ -253,7 +254,7 @@ const PachinkoGame = (function(){
     sh.querySelector('[data-act="start"]').addEventListener('click', () => { if(st.slots.every(Boolean)){ _se('confirm', {suppressTap:true}); startPlay(); } else _se('error', {suppressTap:true}); });
   }
 
-  function setMsg(html){ const m = $('.pc-msg'); if(m) m.innerHTML = html || ''; }
+  function setMsg(html){ const m = $('.pc-msg'); if(m){ m.innerHTML = html || ''; GGoldifyDom(m); } }
   function setActions(html){ const a = $('.pc-actions'); if(a) a.innerHTML = html || ''; return a; }
   function banner(text, cls){
     const b = $('.pc-banner'); if(!b) return;
@@ -332,6 +333,7 @@ const PachinkoGame = (function(){
       </div>
       <button type="button" class="pc-btn pc-btn-main" data-act="go">カードを選ぶ</button>
     </div>`;
+    GGoldifyDom(wrap);
     wrap.classList.add('show');
     wrap.querySelector('[data-act="go"]').addEventListener('click', () => {
       _se('confirm', {suppressTap:true});
@@ -567,11 +569,12 @@ const PachinkoGame = (function(){
       <div class="pc-p-title">${win ? '獲得！' : '残念…'}</div>
       <div class="pc-res-list">${st.results.map((r, i) => `<div class="pc-res-row"><span>${i + 1}球目</span><b class="pc-zone-${r.key}">${esc(r.label)}</b></div>`).join('')}</div>
       <div class="pc-res-total">
-        <div class="pc-res-t"><span class="pc-z-ico pc-z-coin">G</span><b>${g}G</b></div>
+        <div class="pc-res-t"><span class="pc-z-ico pc-z-coin">${GIcon('gold_coin')}</span><b>${g}</b></div>
         <div class="pc-res-t"><span class="pc-z-ico pc-z-star">★</span><b>特別アップグレード×${s}</b></div>
       </div>
       <button type="button" class="pc-btn pc-btn-main" data-act="close">戻る</button>
     </div>`;
+    GGoldifyDom(wrap);
     wrap.classList.add('show');
     if(win){ _se('win'); if(s > 0) setTimeout(() => _se('fanfare'), 380); } else _se('lose');
     wrap.querySelector('[data-act="close"]').addEventListener('click', () => { _se(win ? 'coin' : 'close', {suppressTap:true}); close(); });

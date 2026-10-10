@@ -220,7 +220,7 @@ const App = {
       <div class="br-stats">
         <div class="br-stat br-stat-floor"><span class="br-stat-ico">${GIcon('btn_map')}</span><span class="br-stat-label">到達階層</span><b class="br-stat-val">${esc(b.floor??'-')}<small>階層</small></b></div>
         <div class="br-stat br-stat-score"><span class="br-stat-ico">${GIcon('fx_sparkle')}</span><span class="br-stat-label">最終スコア</span><b class="br-stat-val">${b.score!=null?esc(GlobalFunctions.formatScore(b.score)):'-'}</b></div>
-        <div class="br-stat br-stat-gold"><span class="br-stat-ico br-coin">G</span><span class="br-stat-label">所持金</span><b class="br-stat-val">${b.gold!=null?esc(b.gold):'-'}<small>G</small></b></div>
+        <div class="br-stat br-stat-gold"><span class="br-stat-ico">${GIcon('gold_coin')}</span><span class="br-stat-label">所持金</span><b class="br-stat-val">${b.gold!=null?esc(b.gold):'-'}</b></div>
       </div>
     </div>`;
     // ---- パッシブ：記号アイコン＋名称＋Lv（段階ピップ） ----
