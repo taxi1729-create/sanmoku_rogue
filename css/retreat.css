@@ -12,6 +12,7 @@
 .lives-badge-status .life-ico{font-size:15px;}
 /* マップのヘッダー */
 .map-header{align-items:center;gap:10px;}
+.map-header .map-deck-btn{margin-left:auto;}
 .lives-badge-map .life-ico{font-size:15px;}
 
 /* ---------- 一時撤退リザルト（StageFX） ---------- */

@@ -42,15 +42,19 @@
 /* --- 筐体 --- */
 .pc-cab{
   flex:1; min-height:0; display:flex; flex-direction:column; border-radius:14px; padding:6px;
-  background:linear-gradient(180deg,#3a3f52,#1b1f2c 40%,#2a2f3f);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.25), 0 0 0 1px #0b0e18, 0 10px 30px rgba(0,0,0,.55);
+  border-radius:52px 52px 14px 14px;
+  background:linear-gradient(90deg,#3d4357,#8a93a9 12%,#3a3f52 24%,#1b1f2c 50%,#3a3f52 76%,#8a93a9 88%,#3d4357);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 1px #0b0e18, 0 0 18px rgba(236,72,153,.18), 0 10px 30px rgba(0,0,0,.55);
 }
 .pc-board{
-  position:relative; flex:1; min-height:0; overflow:hidden; border-radius:10px 10px 4px 4px;
+  position:relative; flex:1; min-height:0; overflow:hidden; border-radius:46px 46px 0 0;
+  /* ピンボール台のプレイフィールド（アーチ・レーン・レールは canvas 側で描画） */
   background:
-    radial-gradient(ellipse 80% 50% at 50% 30%, rgba(80,120,220,.20), transparent 70%),
-    linear-gradient(180deg,#0e1a3c,#0a1230 60%,#070c22);
-  box-shadow:inset 0 0 0 1px rgba(160,190,255,.18), inset 0 0 30px rgba(0,0,0,.6);
+    radial-gradient(ellipse 70% 40% at 46% 34%, rgba(236,72,153,.16), transparent 70%),
+    radial-gradient(ellipse 80% 50% at 50% 80%, rgba(56,189,248,.14), transparent 70%),
+    repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 6px, transparent 6px 14px),
+    linear-gradient(180deg,#141a46,#0c1236 55%,#080b24);
+  box-shadow:inset 0 0 0 1px rgba(200,210,235,.25), inset 0 0 30px rgba(0,0,0,.6);
 }
 .pc-canvas{ position:absolute; left:0; top:0; display:block; }
 .pc-flash{ position:absolute; inset:0; pointer-events:none; opacity:0; }
@@ -64,15 +68,21 @@
 }
 .pc-banner.show{ animation:pcBanner 1.3s ease both; }
 .pc-banner.win{ color:var(--pc-gold2); }
+.pc-banner.shuffle{ color:#fed7aa; text-shadow:0 0 14px rgba(251,146,60,.95), 0 2px 0 #000; font-size:22px; }
 .pc-banner.miss{ color:#cbd5e1; text-shadow:0 0 10px rgba(148,163,184,.7), 0 2px 0 #000; }
 @keyframes pcBanner{ 0%{opacity:0; transform:translate(-50%,-50%) scale(.6);} 18%{opacity:1; transform:translate(-50%,-50%) scale(1.08);} 30%{transform:translate(-50%,-50%) scale(1);} 80%{opacity:1;} 100%{opacity:0;} }
 
 /* --- 報酬ゾーン --- */
-.pc-zones{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0; height:40px; margin-top:2px; }
+/* 盤面底の5つのポケット（canvas のポケットの真下に続く受け皿） */
+.pc-zones{
+  display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0; height:40px; margin-top:0;
+  background:linear-gradient(180deg,#080b24,#0b0f22); border-radius:0 0 10px 10px; box-shadow:inset 0 0 0 1px rgba(200,210,235,.2);
+}
 .pc-zone{
   position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
-  margin:0 1.5px; border-radius:3px 3px 8px 8px; font-size:10.5px; font-weight:800; line-height:1.05;
-  border:1px solid rgba(255,255,255,.12); background:#1c2236; color:#cbd5e1;
+  margin:0 2px 3px; border-radius:0 0 12px 12px; font-size:10.5px; font-weight:800; line-height:1.05;
+  border:1px solid rgba(255,255,255,.12); border-top:none; background:#1c2236; color:#cbd5e1;
+  box-shadow:inset 0 6px 8px -4px rgba(0,0,0,.7);
   transition:transform .55s cubic-bezier(.2,.9,.25,1.15);
 }
 .pc-zone-none{ background:linear-gradient(180deg,#2a2f3e,#1a1e2a); color:#8b93a7; }

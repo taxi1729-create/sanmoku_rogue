@@ -57,7 +57,35 @@
 .sev-opt.sev-opt-rare .sev-opt-title::after{content:'RARE';display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;vertical-align:2px;
   font:900 9px/13px 'Space Mono',monospace,sans-serif;letter-spacing:.14em;color:#3a2200;background:linear-gradient(90deg,#fbbf24,#fff3b0,#fbbf24);}
 
+/* ---- 購入ボックス右上の価格バッジ（js/shop.js priceBadge） ---- */
+.shop-slot{position:relative;}
+.shop-row .shop-slot:not(.sold){padding-top:14px;}
+.shop-row.shop-row-4{margin-top:4px;}
+.slot-price{position:absolute;z-index:4;top:-6px;right:-4px;display:inline-flex;align-items:center;gap:1px;
+  padding:1px 6px 1px 3px;border-radius:999px;white-space:nowrap;pointer-events:none;
+  font:800 11px/16px 'Space Mono',monospace,sans-serif;color:#2a1a00;
+  background:linear-gradient(180deg,#fff3b0,#fbbf24 60%,#e59e0b);border:1px solid #fff7d6;
+  box-shadow:0 1px 3px rgba(0,0,0,.55),0 0 6px rgba(251,191,36,.35);}
+.slot-price .gi{width:13px;height:13px;vertical-align:0;}
+.slot-price.ng{color:#ffe1e1;background:linear-gradient(180deg,#7f1d1d,#5b1414);border-color:#f87171;
+  box-shadow:0 1px 3px rgba(0,0,0,.55);opacity:.9;}
+.slot-price.ng .gi{filter:grayscale(.6) brightness(.85);}
+.shop-slot.sold .slot-price{display:none;}
+
+/* ---- 陳列アニメーション（入店時・品揃え更新時） ---- */
+.shop-slot.stock-in{animation:shopStockIn .38s cubic-bezier(.2,.9,.3,1.25) both;}
+.shop-slot.stock-in:not(.rg-rare):not(.rg-super):not(.rg-legend)::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:3;
+  background:linear-gradient(105deg,transparent 35%,rgba(255,250,220,.35) 50%,transparent 65%);background-size:260% 100%;
+  background-position:150% 0;animation:shopStockShine .55s ease-out both;animation-delay:inherit;}
+@keyframes shopStockIn{
+  0%{opacity:0;transform:translateY(-16px) scale(.9);}
+  60%{opacity:1;transform:translateY(2px) scale(1.03);}
+  100%{opacity:1;transform:none;}
+}
+@keyframes shopStockShine{0%,40%{background-position:150% 0;}100%{background-position:-60% 0;}}
+
 @media (prefers-reduced-motion: reduce){
+  .shop-slot.stock-in,.shop-slot.stock-in::before{animation:none;}
   .effect-choice-item.effect-choice-rare{animation:none;}
   .ecr-shine,.ecr-spark{animation:none;}
   .ecr-spark{opacity:.8;}

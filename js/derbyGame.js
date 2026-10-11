@@ -235,7 +235,7 @@ const DerbyGame = (function(){
         <div class="db-top">
           <div class="db-title">シンボルダービー</div>
           <div class="db-clock"><span class="db-time">0.0</span><small>s</small></div>
-          <button type="button" class="db-deckbtn" data-act="deck" aria-label="デッキ確認">デッキ確認</button>
+          <button type="button" class="db-deckbtn shop-icon-btn" data-act="deck" aria-label="デッキ確認（${deckSource().length}枚）" title="デッキ確認（${deckSource().length}枚）">${typeof GIcon === 'function' ? GIcon('btn_deck', { cls:'shop-icon-ico' }) : ''}<span class="shop-icon-cap">デッキ</span><span class="shop-icon-badge">${deckSource().length}</span></button>
           <button type="button" class="db-ff" data-act="ff" disabled aria-label="早送り">▶︎×1</button>
         </div>
         <div class="db-track">

@@ -42,10 +42,14 @@ const GameData = {
   // ビンゴ倍率の変化表示（右枠）用：スナップショットと差分HTML
   snapshotMult(){ return {...this.BINGO_MULTIPLIER_BASE}; },
   multChanged(before){ return this.SYMBOLS.some(s=>before[s]!==this.BINGO_MULTIPLIER_BASE[s]); },
-  multChangeHtml(before){
+  // 常に「変化前 → 変化後（符号付き差分）」で表示する。after を渡さない時だけ現在値を変化後とみなす
+  //   （トースト等は描画のたびにこの関数を呼ぶため、変化直後のスナップショットを after として渡すこと。
+  //    現在値を後から読むと、その後の別の倍率変化・ボス効果「統一」の復元などが混ざり、変化前後が逆に見えることがあった）
+  multChangeHtml(before,after){
     const f=v=>Math.round(v*100)/100;
+    const cur=after||this.BINGO_MULTIPLIER_BASE;
     const rows=this.SYMBOLS.map(s=>{
-      const a=before[s], b=this.BINGO_MULTIPLIER_BASE[s], d=b-a;
+      const b=cur[s], a=(before&&before[s]!=null)?before[s]:b, d=f(b)-f(a);
       const cls=d>0?'mc-up':(d<0?'mc-down':'mc-same');
       return `<tr class="${cls}"><td class="sym-${s}">${this.SYMBOL_LABEL[s]}</td><td>${f(a)}</td><td>→</td><td class="mc-after">${f(b)}</td><td class="mc-diff">${d===0?'':(d>0?'+':'')+f(d)}</td></tr>`;
     }).join('');
@@ -302,7 +306,7 @@ const GameData = {
       1: { name:'バツ・スケール', desc:'①NPCのバツのカード基礎点が常にデッキ枚数×3×STARに変化する。②ショップにバツカードが出現するようになる',
         live(){ const n=GameState.currentDeck.length; return `デッキ枚数:${n}枚 → NPCのバツ基礎点=${n*3*GameState.star()}`; } },
       2: { name:'バツ・ミラー', desc:'①一番高いビンゴ倍率を常にバツ倍率に反映し続ける',
-        live(){ const max=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s])); return `現在の最大倍率:${Math.round(max*100)/100} → バツ倍率に反映`; } },
+        live(){ const max=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s])); return `バツ倍率 ${Math.round(GameData.BINGO_MULTIPLIER_BASE.Cross*100)/100} → ${Math.round(max*100)/100}（現在の最大倍率を反映）`; } },
       3: { name:'バツ・クアドラプル', desc:'①点数計算時、現在のバツビンゴ倍率をさらに4倍して補正する。②全てのカードが常にバツカードになる',
         live(){ const max=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s])); return `バツ倍率(${Math.round(max*100)/100}) × 4 = ${Math.round(max*4*100)/100}`; } },
     },
@@ -618,16 +622,18 @@ const GameData = {
   pickupCardBasePrice(card){ return 1 + (card&&card.jamming?2:0) + (card&&card.enhance?4:0) + (card&&card.trait?6:0); },
   rollRandomShopSlotType(){ return Math.random() < this.PICKUP_CARD_RATE ? 'pickup_card' : this.pickWeightedType(); },
 
-  // #3 スキップ報酬：爆発通常アップグレードを100%排出率にする（旧抽選プールは参考として残す）
+  // スキップ報酬のパック抽選：爆発通常アップグレード50%・特別アップグレード20%・ドリームカードパック10%・レリックパック20%
   SKIP_BONUS_TYPES: [
-    { id:'relic', name:'ランダムレリック', weight:35 },
-    { id:'normal_upgrade', name:'通常アップグレード', weight:40 },
-    { id:'special_upgrade', name:'特別アップグレード', weight:10 },
-    { id:'normal_explosive_upgrade', name:'爆発通常アップグレード', weight:5 },
-    { id:'dream_card', name:'ドリームカードパック', weight:5 },
+    { id:'normal_explosive_upgrade', name:'爆発通常アップグレード', weight:50 },
+    { id:'special_upgrade', name:'特別アップグレード', weight:20 },
+    { id:'dream_card', name:'ドリームカードパック', weight:10 },
+    { id:'relic_pack', name:'レリックパック', weight:20 },
   ],
   pickSkipBonusType(){
-    return 'normal_explosive_upgrade'; // #3 100%排出率
+    const list=this.SKIP_BONUS_TYPES, sum=list.reduce((a,t)=>a+t.weight,0);
+    let r=Math.random()*sum;
+    for(const t of list){ r-=t.weight; if(r<0) return t.id; }
+    return list[0].id;
   },
   // #3 ステージクリア報酬：爆発通常アップグレードを100%排出率にする（旧抽選プールは参考として残す）
   CLEAR_BONUS_TYPES: [
@@ -839,7 +845,7 @@ const GameData = {
 
   // #7/#8 報酬G計算式の基本G
   CLEAR_REWARD_BASE_G: 5,
-  SKIP_REWARD_BASE_G: 8, // #9 スキップ報酬の基本G
+  SKIP_REWARD_BASE_G: 5, // スキップ報酬G（固定）
 
   // #12 多階層
   buildFloorStages(floor){

@@ -222,6 +222,8 @@ button:disabled{opacity:.35;cursor:not-allowed;}
 
 /* Pack modals */
 .pack-modal-overlay{position:fixed;inset:0;background:rgba(6,7,12,.82);display:flex;align-items:center;justify-content:center;z-index:60;}
+/* クリア報酬のパック選択（ゲームメイン画面の上）：背景の盤面が見えるよう薄めに暗転 */
+.reward-pack-layer .pack-modal-overlay.reward-over-game{background:rgba(6,7,12,.5);}
 .pack-modal{background:var(--panel);border-radius:16px;padding:22px;max-width:640px;max-height:88vh;overflow-y:auto;text-align:center;}
 .pack-modal-wide{max-width:760px;}
 .pack-modal h3{font-size:14px;margin-bottom:14px;}
@@ -549,6 +551,8 @@ button.gallery-item:active{ transform:scale(.97); }
 .relic-shop-badge{font-size:10px;color:#ff5566;font-weight:700;margin-bottom:2px;letter-spacing:.02em;}
 /* #7 ステージ上のスキップ報酬表示 */
 .skip-bonus-tag{font-size:11px;margin:6px 0;color:var(--gold,#f0c419);}
+.skip-bonus-tag .skip-bonus-pack{white-space:nowrap;}
+.stage-actions .skip-bonus-tag{margin:0;text-align:center;}
 /* #4 クリア済みステージの表示（再挑戦なし） */
 .stage-done-tag{padding:6px 10px;background:#333a4a;border-radius:6px;font-size:12px;text-align:center;color:#9aa0b0;}
 .pack-modal-wide{max-width:640px;}
@@ -806,7 +810,9 @@ button.gallery-item:active{ transform:scale(.97); }
 .mult-change-table tr.mc-down .mc-after,.mult-change-table tr.mc-down .mc-diff{color:var(--cross);font-weight:900;}
 /* 演出変更：変化した倍率はパキッと一回だけ縦回転＋ポップ→静止。色も一度だけ光る */
 .mult-change-table tr.mc-up .mc-after,.mult-change-table tr.mc-down .mc-after,
-.mult-change-table tr.mc-up .mc-diff,.mult-change-table tr.mc-down .mc-diff{animation:mcSnap 320ms cubic-bezier(.2,1.4,.4,1) both, mcPulse 700ms ease-out both;}
+.mult-change-table tr.mc-up .mc-diff,.mult-change-table tr.mc-down .mc-diff{animation:mcSnap 320ms cubic-bezier(.2,1.4,.4,1) both, mcPulse 700ms ease-out both;backface-visibility:hidden;}
+/* 再描画（renderAll）のたびに回転が最初からやり直され、裏返った（上下反転した）数字「-99→66-」が見え続けていたため、2回目以降の描画では静止表示にする */
+.mc-static .mult-change-table td{animation:none !important;}
 .mult-change-table tr.mc-down .mc-after,.mult-change-table tr.mc-down .mc-diff{animation-name:mcSnap, mcPulseDown;}
 .mult-change-table tr:nth-child(2) td{animation-delay:60ms;}
 .mult-change-table tr:nth-child(3) td{animation-delay:120ms;}
@@ -1090,16 +1096,16 @@ button.gallery-item:active{ transform:scale(.97); }
 .sfx-toggle-btn.muted{opacity:.6;}
 .sfx-toggle-btn.muted .sfx-ico{color:#f87171;}
 
-/* v1.28 右枠（カード変化・ビンゴ倍率変化）の演出速度を2/3に（時間を1.5倍） */
-.card-reveal-toast .flip-card-inner{ animation-duration:480ms; }
-.card-reveal-toast .pack-card-grid > :nth-child(2) .flip-card-inner{ animation-delay:90ms; }
-.card-reveal-toast .pack-card-grid > :nth-child(3) .flip-card-inner{ animation-delay:180ms; }
-.card-reveal-toast .pack-card-grid > :nth-child(4) .flip-card-inner{ animation-delay:270ms; }
-.card-reveal-toast .pack-card-grid > :nth-child(n+5) .flip-card-inner{ animation-delay:360ms; }
+/* v1.29 右枠（カード変化・ビンゴ倍率変化）の演出速度をさらに5/8倍に（v1.28比で時間1.6倍） */
+.card-reveal-toast .flip-card-inner{ animation-duration:768ms; }
+.card-reveal-toast .pack-card-grid > :nth-child(2) .flip-card-inner{ animation-delay:144ms; }
+.card-reveal-toast .pack-card-grid > :nth-child(3) .flip-card-inner{ animation-delay:288ms; }
+.card-reveal-toast .pack-card-grid > :nth-child(4) .flip-card-inner{ animation-delay:432ms; }
+.card-reveal-toast .pack-card-grid > :nth-child(n+5) .flip-card-inner{ animation-delay:576ms; }
 .card-reveal-toast .mult-change-table tr.mc-up .mc-after,.card-reveal-toast .mult-change-table tr.mc-down .mc-after,
-.card-reveal-toast .mult-change-table tr.mc-up .mc-diff,.card-reveal-toast .mult-change-table tr.mc-down .mc-diff{ animation-duration:480ms, 1050ms; }
-.card-reveal-toast .mult-change-table tr:nth-child(2) td{ animation-delay:90ms; }
-.card-reveal-toast .mult-change-table tr:nth-child(3) td{ animation-delay:180ms; }
-.card-reveal-toast .mult-change-table tr:nth-child(4) td{ animation-delay:270ms; }
-.card-reveal-toast .mult-change-table tr:nth-child(n+5) td{ animation-delay:360ms; }
+.card-reveal-toast .mult-change-table tr.mc-up .mc-diff,.card-reveal-toast .mult-change-table tr.mc-down .mc-diff{ animation-duration:768ms, 1680ms; }
+.card-reveal-toast .mult-change-table tr:nth-child(2) td{ animation-delay:144ms; }
+.card-reveal-toast .mult-change-table tr:nth-child(3) td{ animation-delay:288ms; }
+.card-reveal-toast .mult-change-table tr:nth-child(4) td{ animation-delay:432ms; }
+.card-reveal-toast .mult-change-table tr:nth-child(n+5) td{ animation-delay:576ms; }
 @media (prefers-reduced-motion: reduce){ .card-reveal-toast .flip-card-inner{ animation:none; } }

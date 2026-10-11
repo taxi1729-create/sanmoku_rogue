@@ -30,7 +30,9 @@
 .db-ff{ padding:6px 10px; font-size:13px; font-weight:900; border-radius:8px; background:#1f3a2a; border:1px solid #2f5d40; color:#d1fae5; min-width:58px; }
 .db-ff.on{ background:var(--db-gold); color:#1a1205; border-color:var(--db-gold); }
 .db-ff:disabled{ opacity:.4; }
-.db-deckbtn{ padding:6px 9px; font-size:12px; font-weight:900; border-radius:8px; background:#1f3a2a; border:1px solid #2f5d40; color:#d1fae5; white-space:nowrap; }
+/* デッキ確認：ショップ／ゲームと同じ「アイコン＋小キャプション＋枚数バッジ」（.shop-icon-btn 本体は css/icons.css） */
+.db-deckbtn{ border-radius:8px; background:#1f3a2a; border:1px solid #2f5d40; color:#d1fae5; white-space:nowrap; margin:4px 4px 0 0; min-width:46px; min-height:42px; padding:4px 8px 3px; cursor:pointer; }
+.db-deckbtn .shop-icon-badge{ top:-5px; right:-5px; }
 .db-deckbtn:active{ transform:scale(.95); }
 
 /* --- トラック --- */

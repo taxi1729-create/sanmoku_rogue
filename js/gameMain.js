@@ -156,7 +156,7 @@ const GameMainScene = {
     GameData.BOARD_SIZE = GameState.symbolPassiveTier.Hoshi>=2 ? 5 : 4;
     this.board=new Array(GameData.BOARD_SIZE*GameData.BOARD_SIZE).fill(null);
     this.windows=this.buildWindows(GameData.BOARD_SIZE);
-    this.logs=[]; this.resultState=null; this.boardInfoCell=null; this.scoringAnim=null; this.scoringAnims=[];
+    this.logs=[]; this.resultState=null; this._rewardPacksOpen=false; this.boardInfoCell=null; this.scoringAnim=null; this.scoringAnims=[];
     this.rerollMode=false; this.rerollSelected=new Set();
     this.prevRoundBingoSymbol=null; this.prevRoundScore=0; this.chargeActive=false; this.chargeN=0; this._chargeUpdatedThisRound=false; this.roundCorrMultBonus=0; this.roundBoostAdd=0; // #3 チャージn・ジャミング増強の今ラウンド補正
     this.bossEffect=null; this.bossEffects=null; this.blockedCells=new Set(); this.bossBlackedOut=false;
@@ -542,15 +542,16 @@ const GameMainScene = {
   showMultChangeToast(before){
     if(!GameData.multChanged(before)) return;
     const token={}; this._multToastToken=token;
-    this.multChangeToast={before};
+    this.multChangeToast={before,after:GameData.snapshotMult()}; // 変化直後の値を固定（再描画時に後の変化が混ざらないように）
     this.sfx('levelUp',{volume:0.8});
     setTimeout(()=>{ if(this._multToastToken===token){ this.multChangeToast=null; const el=document.querySelector('.mult-change-toast'); if(el) el.remove(); } },3000);
   },
   renderMultChangeToast(){
     if(!this.multChangeToast) return null;
-    const outer=document.createElement('div'); outer.className='card-reveal-toast mult-change-toast'+(this.cardChangeToast?' stacked':'');
+    const outer=document.createElement('div'); outer.className='card-reveal-toast mult-change-toast'+(this.cardChangeToast?' stacked':'')+(this.multChangeToast._drawn?' mc-static':'');
+    this.multChangeToast._drawn=true; // 回転演出は最初の描画だけ（再描画のたびにやり直すと数字が裏返って見える）
     const box=document.createElement('div'); box.className='card-reveal-popup';
-    box.innerHTML=GameData.multChangeHtml(this.multChangeToast.before);
+    box.innerHTML=GameData.multChangeHtml(this.multChangeToast.before,this.multChangeToast.after);
     outer.appendChild(box); return outer;
   },
   renderCardChangeToast(){
@@ -572,15 +573,7 @@ const GameMainScene = {
   },
 
   // #演出 ビンゴ倍率の変化表（before→after を明示。GameData.multChangeHtml と同じ見た目）
-  multDiffHtml(before,after){
-    const f=v=>Math.round(v*100)/100;
-    const rows=GameData.SYMBOLS.map(s=>{
-      const a=before[s], b=after[s], d=b-a;
-      const cls=d>0?'mc-up':(d<0?'mc-down':'mc-same');
-      return `<tr class="${cls}"><td class="sym-${s}">${GameData.SYMBOL_LABEL[s]}</td><td>${f(a)}</td><td>→</td><td class="mc-after">${f(b)}</td><td class="mc-diff">${d===0?'':(d>0?'+':'')+f(d)}</td></tr>`;
-    }).join('');
-    return `<div class="gr-label">ビンゴ倍率が変化しました</div><table class="mult-change-table">${rows}</table>`;
-  },
+  multDiffHtml(before,after){ return GameData.multChangeHtml(before,after||GameData.snapshotMult()); },
   // #演出 カード変化（横回転で変化後を見せる）。renderCardChangeToast と同じ見た目
   cardChangeGridHtml(list){
     const cls=(c)=>'card'+(c.trait?' trait-'+c.trait.replace(/[()]/g,''):'');
@@ -1025,6 +1018,18 @@ const GameMainScene = {
     else this.checkAutoSkip();
   },
 
+  // ジャミング「ビンゴ阻害」「延命」によるバツビンゴの制限（detectNewBingos と予測 computeHints で共通）
+  //   ビンゴ阻害：盤面n枚（分身マス含む）で 1枚=縦不可 / 2枚=縦横不可（斜めは可） / 3枚以上=全方向不可
+  //   延命：盤面にある間、バツは4列（以上）ビンゴのみ有効（3列は不可）
+  //   以前は「2枚」の段階が「3列のバツビンゴ全方向不可＋縦不可」になっており、横の4列ビンゴが通り斜めの3列ビンゴが止まっていた
+  crossBingoBlocked(win,blockCnt,lifeExt){
+    if(blockCnt>=3) return true;
+    if(blockCnt>=2&&(win.type==='col'||win.type==='row')) return true;
+    if(blockCnt>=1&&win.type==='col') return true;
+    if(lifeExt>0&&win.cells.length===3) return true;
+    return false;
+  },
+
   detectNewBingos(){
     const results=[];
     const lifeExt=this.countBoardJamming('延命');
@@ -1038,11 +1043,7 @@ const GameMainScene = {
       const candidates=GameData.SYMBOLS.filter(sym=>cells.every(c=>this.cellCanBeSymbol(c,sym)));
       if(candidates.length===0) return null;
       const sym=candidates.find(s=>s!=='Cross')||candidates[0];
-      if(sym==='Cross'){
-        if(blockCnt>=3) return null;
-        if((lifeExt>0||blockCnt>=2)&&win.cells.length===3) return null;
-        if(blockCnt>=1&&win.type==='col') return null;
-      }
+      if(sym==='Cross'&&this.crossBingoBlocked(win,blockCnt,lifeExt)) return null;
       if(quadOnly&&sym!=='Cross'&&!(win.isQuad||win.isPenta)) return null; // #8 プレイヤーのみ4列以上
       return {sym,cells};
     };
@@ -1086,9 +1087,11 @@ const GameMainScene = {
       };
       const cardScores=win.cells.map((ci,i)=>perCellScore(r.cells[i],ci));
       // #6 バツパッシブ1/2入れ替えにより、ミラー効果はLv2条件に変更
+      //   ミラー後の値は「素のビンゴ倍率」を置き換えるだけで、4列・5列の列補正（魔力A・B込み）は従来どおり掛ける
+      //   （以前は列補正込みの baseMult を素の最大倍率で上書きしており、倍率表の4列欄や演出の列補正表示と食い違っていた）
       if(r.sym==='Cross'&&GameState.symbolPassiveTier.Cross>=2){
-        baseMult=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s]));
-        pureBaseMult=baseMult;
+        pureBaseMult=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s]));
+        baseMult=pureBaseMult*lineFactor;
       }
       // #A バツパッシブ3：点数計算時にバツ倍率をさらに4倍
       if(r.sym==='Cross'&&GameState.symbolPassiveTier.Cross>=3){ baseMult*=4; pureBaseMult*=4; }
@@ -1476,7 +1479,8 @@ const GameMainScene = {
       //    こうすると表示の途中経過が最終の加算点数(b.score)と完全に一致し、最後に数字が不自然に戻ることがない
       tr('×','t-op');
       // #バツ実効倍率 バツパッシブLv2/3でバツ倍率が変化している時は青色で表示する
-      const crossEffOn=b.symbol==='Cross'&&(GameState.symbolPassiveTier.Cross||0)>=2;
+      //   （レリック強化「バツ強化」×2 で素の倍率が変わっている時も、倍率表の値 → 実効値 として明示する）
+      const crossEffOn=b.symbol==='Cross'&&((GameState.symbolPassiveTier.Cross||0)>=2||Math.abs(b.pureBaseMult-GameData.BINGO_MULTIPLIER_BASE.Cross)>1e-9);
       cap(crossEffOn?`ビンゴ倍率（バツ ${fmtNum(GameData.BINGO_MULTIPLIER_BASE.Cross)}→${fmtNum(b.pureBaseMult)}）`:'ビンゴ倍率',crossEffOn?'cap-mult cap-cross-eff':'cap-mult');
       let m=b.pureBaseMult;
       const multParts=b.correctionMultParts||[];
@@ -2080,11 +2084,7 @@ const GameMainScene = {
           const candidates=GameData.SYMBOLS.filter(sy=>cells.every(c=>this.cellCanBeSymbol(c,sy)));
           if(candidates.length===0) return null;
           const s=candidates.find(x=>x!=='Cross')||candidates[0];
-          if(s==='Cross'){
-            if(blockCnt>=3) return null;
-            if((lifeExt>0||blockCnt>=2)&&win.cells.length===3) return null;
-            if(blockCnt>=1&&win.type==='col') return null;
-          }
+          if(s==='Cross'&&this.crossBingoBlocked(win,blockCnt,lifeExt)) return null;
           if(quadOnly&&s!=='Cross'&&!(win.isQuad||win.isPenta)) return null;
           return {s,cells};
         };
@@ -2123,7 +2123,7 @@ const GameMainScene = {
           };
           const cardScores=cells.map((c,i)=>perCellScore(c,win.cells[i]));
           let baseMult=multObj[s];
-          if(s==='Cross'&&GameState.symbolPassiveTier.Cross>=2) baseMult=Math.max(...GameData.SYMBOLS.map(sy=>GameData.BINGO_MULTIPLIER_BASE[sy]+simBaseAdd));
+          if(s==='Cross'&&GameState.symbolPassiveTier.Cross>=2) baseMult=Math.max(...GameData.SYMBOLS.map(sy=>GameData.BINGO_MULTIPLIER_BASE[sy]+simBaseAdd))*GameData.lineFactor(kind); // 列補正は実計算と同じく掛ける
           if(s==='Cross'&&GameState.symbolPassiveTier.Cross>=3) baseMult*=4;
           if(s==='Cross'&&!noRelic) baseMult*=Math.pow(2,GameState.relics.filter(x=>x.relicEnhance==='ren_cross').length); // #2
           let correctionBase=GameData.CORRECTION_BASE_SCORE;
@@ -2557,7 +2557,7 @@ const GameMainScene = {
     // wrap.appendChild(this.renderLog());
     this.container.appendChild(wrap);
     // #1 報酬画面／パッシブ選択はゲームメイン画面の上にオーバーレイ表示する（両方同時に出ても良いよう独立したifにする）
-    if(this.resultState) this.container.appendChild(this.renderResult());
+    if(this.resultState&&!this._rewardPacksOpen) this.container.appendChild(this.renderResult()); // クリア報酬のパック選択中は報酬画面を出さない
     else if(typeof StageFX!=='undefined') StageFX.hideResult(); // #演出 報酬演出は body 直下の永続要素
     if(this.pendingPassiveChoice && this.passiveModalOpen) this.container.appendChild(this.renderPassiveChoiceModal());
     else if(typeof StageFX!=='undefined') StageFX.hidePassive();
@@ -3660,7 +3660,7 @@ const GameMainScene = {
         onNext:()=>{
           if(!win){ goLose(); return; }
           if(hasPassiveChoice){ this.passiveModalOpen=true; this.renderAll(); }
-          else{ StageFX.clearAll(); if(goShop){ App.showShop(); } else if(GameState.currentFloor>=10&&this.stage&&this.stage.key==='boss'){ App.saveGame(); App.showEnding(); } else { App.showMapSelect(); } } // 第10階層（最終決戦）クリア → エンディング演出
+          else{ StageFX.clearAll(); if(goShop){ this.goShopAfterClear(); } else if(GameState.currentFloor>=10&&this.stage&&this.stage.key==='boss'){ App.saveGame(); App.showEnding(); } else { App.showMapSelect(); } } // 第10階層（最終決戦）クリア → エンディング演出
         },
       });
       const ph=document.createElement('div'); ph.className='stfx-result-placeholder'; ph.hidden=true; return ph;
@@ -3671,11 +3671,21 @@ const GameMainScene = {
     setTimeout(()=>{el.querySelector('#btn-next').addEventListener('click',()=>{
       if(!win){ goLose(); return; }
       if(hasPassiveChoice){ this.passiveModalOpen=true; this.renderAll(); }
-      else if(goShop){ App.showShop(); } else { App.showMapSelect(); }
+      else if(goShop){ this.goShopAfterClear(); } else { App.showMapSelect(); }
     });});
     return el;
   },
 
+  // クリア報酬のパック（趣味レリック集め・爆発通常アップグレード・大爆発）は、報酬（ボスはパッシブ報酬）を受け取った直後に
+  //   ゲームメイン画面（盤面）を背景にして開く。全て選び終えたら（スキップ含む）セーブしてショップへ
+  goShopAfterClear(){
+    if(typeof ShopScene!=='undefined' && !ShopScene.miniShop && ShopScene.hasRewardPacks && ShopScene.hasRewardPacks()){
+      this._rewardPacksOpen=true;
+      ShopScene.openRewardPacksOverGame(()=>{ this._rewardPacksOpen=false; App.saveGame(); App.showShop(); });
+      return;
+    }
+    App.showShop();
+  },
   // #A ボスクリア時：記号パッシブ選択モーダル（ゲームメイン画面上にオーバーレイ表示）
   renderPassiveChoiceModal(){
     // #演出 神々しい降臨演出（光の柱・降る光の粒・後光）。body 直下の永続要素で描画し、同じ候補なら作り直さない
@@ -3733,7 +3743,7 @@ const GameMainScene = {
     this.passiveChoiceContext=null;
     App.saveGame();
     if(typeof StageFX!=='undefined') StageFX.clearAll(); // #演出 報酬・パッシブ演出を片付けてからショップへ
-    App.showShop();
+    this.goShopAfterClear();
   },
   choosePassive(idx){
     const cand=this.pendingPassiveChoice[idx]; if(!cand) return;
@@ -3753,7 +3763,7 @@ const GameMainScene = {
     // #1 パッシブ選択後、ショップへ進む
     App.saveGame();
     if(typeof StageFX!=='undefined') StageFX.clearAll(); // #演出
-    App.showShop();
+    this.goShopAfterClear();
   },
 
   // #A 常時表示の記号パッシブバー（タップで詳細確認）

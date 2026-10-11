@@ -56,7 +56,10 @@ const MapSelectScene = {
     //debugGoldBtn.addEventListener('click',()=>{ GameState.gold+=20000; this.renderAll(); });
     //header.appendChild(debugGoldBtn);
     // #2 マップ選択画面でデッキを確認できるようにする
-    const deckBtn=document.createElement('button'); deckBtn.className='debug-gold-btn'; deckBtn.textContent=`デッキ確認(${GameState.currentDeck.length})`;
+    // ショップ／ゲームメインと同じ「アイコン＋小キャプション＋枚数バッジ」のGUIボタン（.shop-icon-btn は css/icons.css）
+    const deckBtn=document.createElement('button'); deckBtn.type='button'; deckBtn.className='shop-icon-btn map-deck-btn';
+    const deckLabel=`デッキ確認（${GameState.currentDeck.length}枚）`; deckBtn.setAttribute('aria-label',deckLabel); deckBtn.title=deckLabel;
+    deckBtn.innerHTML=`${GIcon('btn_deck',{cls:'shop-icon-ico'})}<span class="shop-icon-cap">デッキ</span><span class="shop-icon-badge">${GameState.currentDeck.length}</span>`;
     deckBtn.addEventListener('click',()=>{ _seMap('open',{suppressTap:true}); GameMainScene.showDeckModal('deck'); });
     header.appendChild(deckBtn);
     if(typeof Settings!=='undefined') header.appendChild(Settings.button('map')); // 設定（js/settings.js）
@@ -109,24 +112,25 @@ const MapSelectScene = {
           bossRerollBtnHtml=`<button class="boss-reroll-btn">${GIcon('btn_boss_reroll',{cls:'gi-gap'})}ボス効果リロール（残り1回）</button>`;
         }
       }
-      // #7 スキップ報酬内容をステージ上に表示
-      let skipBonusHtml='';
+      // スキップ報酬（G固定＋事前抽選済みのパック1つ）はスキップボタンの直下に表示する
       let skipBonus=null;
-      if(stage.skippable&&!isCleared&&!locked){
-        skipBonus=this.getSkipBonus(stage);
-        const sr=GameState.calcSkipReward(); // #8
-        skipBonusHtml=`<div class="skip-bonus-tag">スキップ報酬：${GCoin()}+${sr.total}${skipBonus?`　＋　${skipBonus.label}`:'（追加報酬なし）'}</div>`;
-      }
       const evCommitted=!!(ev&&ev.committed&&!ev.done&&!isCleared);
-      if(evCommitted) skipBonusHtml='';
-      const evHtml=evInfo?this.eventCardHtml(ev,stage,isCleared):'';
+      const canSkip=!!(stage.skippable&&!evCommitted);
+      let skipLineHtml='';
+      if(canSkip&&!isCleared){
+        skipBonus=this.getSkipBonus(stage);
+        const sr=GameState.calcSkipReward();
+        skipLineHtml=`<div class="skip-bonus-tag">スキップ報酬：${GCoinAmt(sr.total)}${skipBonus?` ＋ <span class="skip-bonus-pack">${skipBonus.label}</span>`:''}</div>`;
+      }
+      const skipBtnHtml=canSkip?`<button class="skip-btn" ${locked?'disabled':''}>スキップ</button>${skipLineHtml}`:'';
+      // v1.13 裏世界の入口ボックス（説明・ラインナップ）はマップでは表示しない（ボタン3つのみ）
       const uraOpen=!!(evInfo&&!ev.done&&!isCleared);
       const actionsHtml=isCleared
         ? `<div class="stage-actions"><div class="stage-done-tag">クリア済み</div></div>`
         : uraOpen
-          ? `<div class="stage-actions ura-actions">${evCommitted?'':`<button class="challenge-btn" ${locked?'disabled':''}>コモンを攻略</button>`}<button class="ura-enter-btn" ${locked?'disabled':''}>${evCommitted?'裏世界に戻る（イベント再開）':'裏世界に入る'}</button>${(stage.skippable&&!evCommitted)?`<button class="skip-btn" ${locked?'disabled':''}>スキップ</button>`:''}</div>`
-          : `<div class="stage-actions"><button class="challenge-btn" ${locked?'disabled':''}>挑戦する</button>${(stage.skippable&&!evCommitted)?`<button class="skip-btn" ${locked?'disabled':''}>スキップ</button>`:''}</div>`;
-      card.innerHTML=`<div class="stage-tag">${stage.tag}${evInfo?`<span class="ev-tag ura-tag">裏世界</span>`:''}</div><div class="stage-name">${stage.name}</div><div class="stage-goal">目標：${GlobalFunctions.formatScore(stage.targetScore)}点</div>${evHtml}${bossInfoHtml}${bossRerollBtnHtml}${skipBonusHtml}${actionsHtml}`;
+          ? `<div class="stage-actions ura-actions">${evCommitted?'':`<button class="challenge-btn" ${locked?'disabled':''}>コモンを攻略</button>`}<button class="ura-enter-btn" ${locked?'disabled':''}>${evCommitted?'裏世界に戻る（イベント再開）':'裏世界に入る'}</button>${skipBtnHtml}</div>`
+          : `<div class="stage-actions"><button class="challenge-btn" ${locked?'disabled':''}>挑戦する</button>${skipBtnHtml}</div>`;
+      card.innerHTML=`<div class="stage-tag">${stage.tag}</div><div class="stage-name">${stage.name}</div><div class="stage-goal">目標：${GlobalFunctions.formatScore(stage.targetScore)}点</div>${bossInfoHtml}${bossRerollBtnHtml}${actionsHtml}`;
       path.appendChild(card);
       const challengeBtn=card.querySelector('.challenge-btn');
       if(challengeBtn) challengeBtn.addEventListener('click',()=>{
@@ -158,7 +162,7 @@ const MapSelectScene = {
       });
       const doSkip=()=>{
         if(locked||isCleared||GameState.clearedStages.includes(stage.key)) return;
-        // #8 スキップ報酬G＝(基本G4)×num＋レリック効果＋レリック強化効果（num=1、階層6以上で+1）
+        // スキップ報酬：G固定（GameData.SKIP_REWARD_BASE_G）＋事前抽選済みのパック1つ
         const sr=GameState.calcSkipReward();
         const total=sr.total;
         GameState.gold+=total;
@@ -167,6 +171,7 @@ const MapSelectScene = {
         const bonusMsg=this.applySkipBonusEffect(bonus);
         GameState.lastReward={type:'skip',stageName:stage.name,gold:total,breakdown:sr,extra:bonusMsg};
         if(!GameState.clearedStages.includes(stage.key)) GameState.clearedStages.push(stage.key);
+        if(GameState.skipBonusRolls) delete GameState.skipBonusRolls[GameState.currentFloor+'_'+stage.key]; // 使用済みの抽選結果を破棄
         // #8 スキップ時セーブ
         App.saveGame();
         this.pendingReward={stageName:stage.name,breakdown:sr,gold:total,extra:bonusMsg};
@@ -396,28 +401,34 @@ const MapSelectScene = {
     const r=this.pendingReward;
     const overlay=document.createElement('div'); overlay.className='pack-modal-overlay';
     const box=document.createElement('div'); box.className='gold-reveal-popup';
-    box.innerHTML=`<div class="gr-label">${r.stageName}をスキップ</div><div class="gr-total">+${GCoinAmt(r.gold)}</div><div class="gr-breakdown">基本${GCoin()}${r.breakdown.base} × num${r.breakdown.num}${r.breakdown.num>1?'（階層6以上+1）':''} ＋ レリック効果${r.breakdown.relicBonus} ＋ レリック強化効果${r.breakdown.relicEnhanceBonus}${r.extra?`<br>追加報酬：${r.extra}`:''}</div><button id="btn-goto-shop" style="margin-top:16px;">ショップへ</button>`;
+    box.innerHTML=`<div class="gr-label">${r.stageName}をスキップ</div><div class="gr-total">+${GCoinAmt(r.gold)}</div><div class="gr-breakdown">スキップ報酬${GCoinAmt(r.gold)}（固定）${r.extra?`<br>追加報酬：${r.extra}`:''}</div><button id="btn-goto-shop" style="margin-top:16px;">ショップへ</button>`;
     overlay.appendChild(box);
     if(this._seRewardShown!==r){ this._seRewardShown=r; _seMap('reveal'); setTimeout(()=>_seMap('coin'),200); }
     setTimeout(()=>{ box.querySelector('#btn-goto-shop').addEventListener('click',()=>{ _seMap('confirm',{suppressTap:true}); this.pendingReward=null; App.showShop(); }); });
     return overlay;
   },
 
-  // #7 スキップ報酬の追加ボーナスを階層＋ステージごとに1回だけ抽選してキャッシュする
-  getSkipBonus(stage){
-    if(!this._skipBonusCache) this._skipBonusCache={};
-    const key=GameState.currentFloor+'_'+stage.key;
-    if(this._skipBonusCache[key]===undefined){
-      const type=GameData.pickSkipBonusType();
-      let label=null;
-      if(type==='relic'){ label='レリック：ランダムレリック1つを獲得'; }
-      else if(type==='normal_upgrade'){ label='通常アップグレード：ショップでカードと効果を選択'; }
-      else if(type==='special_upgrade'){ label='特別アップグレード：ショップでカードと効果を選択'; }
-      else if(type==='normal_explosive_upgrade'){ label=GIcon('pack_explosive',{cls:'gi-gap'})+'爆発通常アップグレード：ショップで最大3つ選択'; }
-      else if(type==='dream_card'){ label='ドリームカードパック'; }
-      this._skipBonusCache[key]=type?{type,label}:null;
+  // スキップ報酬のパックを階層＋ステージごとに1回だけ抽選し、GameState.skipBonusRolls に保存する（リロードしても同じ）
+  skipBonusLabel(type){
+    switch(type){
+      case 'normal_explosive_upgrade': return GIcon('pack_explosive',{cls:'gi-gap'})+'爆発UP';
+      case 'special_upgrade': return GIcon('pack_special',{cls:'gi-gap'})+'特別UP';
+      case 'dream_card': return GIcon('pack_dream',{cls:'gi-gap'})+'ドリームパック';
+      case 'relic_pack': return GIcon('pack_relic',{cls:'gi-gap'})+'レリックパック';
     }
-    return this._skipBonusCache[key];
+    return null;
+  },
+  getSkipBonus(stage){
+    if(!GameState.skipBonusRolls||typeof GameState.skipBonusRolls!=='object') GameState.skipBonusRolls={};
+    const key=GameState.currentFloor+'_'+stage.key;
+    let type=GameState.skipBonusRolls[key];
+    if(!type||!this.skipBonusLabel(type)){
+      type=GameData.pickSkipBonusType();
+      GameState.skipBonusRolls[key]=type;
+      try{ App.saveGame(); }catch(e){}
+    }
+    const label=this.skipBonusLabel(type);
+    return label?{type,label}:null;
   },
 
   // #8 スキップ報酬の追加ボーナスを実際に付与する（通常/特別アップグレードは通常通りショップでカード・効果を選択させる）
@@ -468,6 +479,19 @@ const MapSelectScene = {
       if(GameState.currentDeck.length===0) return '';
       ShopScene.pickingPack = ShopScene.buildExplosiveUpgradePack(null);
       return 'ショップで'+GIcon('pack_explosive',{cls:'gi-gap'})+'爆発通常アップグレードを選択してください（5つから最大3つまで選択可）';
+    }
+    // 特別アップグレード（無料）：ショップで効果とカードを選択
+    if(bonus.type==='special_upgrade'){
+      const pk=ShopScene.buildSpecialUpgradePack();
+      if(!pk){ GameState.gold+=5; return '特別アップグレードの効果はすべて入手済みのため代わりに'+GCoinAmt(5); }
+      pk.revelationGift=false;
+      ShopScene.pickingPack=pk;
+      return 'ショップで'+GIcon('pack_special',{cls:'gi-gap'})+'特別アップグレードを選択してください';
+    }
+    // レリックパック（無料）：ショップでレリック3つから1つを選択
+    if(bonus.type==='relic_pack'){
+      ShopScene.pickingRelicPack = { candidates:ShopScene.genRelicPackCandidates(), free:true, packType:'relic_pack' };
+      return 'ショップで'+GIcon('pack_relic',{cls:'gi-gap'})+'レリックパックを選択してください';
     }
     return '';
   },

@@ -35,6 +35,7 @@ const ShopScene = {
       this.offers = this.merchantShop ? this.generateMerchantOffers() : this.generateOffers();
     }
     this.grantFloor5Gift();
+    this.requestStockAnim(); // ショップ入店時：商品が陳列されていく演出
     this.renderAll();
     TutorialOverlay.show('shop');
   },
@@ -399,10 +400,10 @@ const ShopScene = {
     if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup();
     const revealToken = {};
     this._activeRevealToken = revealToken;
-    this.cardRevealPopup = { cards, effectId, before, cashGain, multBefore };
+    this.cardRevealPopup = { cards, effectId, before, cashGain, multBefore, multAfter: multBefore ? GameData.snapshotMult() : null }; // 変化直後の倍率を固定
     setTimeout(() => {
       // 後から出た別のポップアップを誤って消さないよう、また既にショップを離れていたら何もしない
-      if(this._activeRevealToken === revealToken && this.offers){ if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup(); this.cardRevealPopup = null; this.renderAll(); }
+      if(this._activeRevealToken === revealToken && (this.offers||this._rewardLayer)){ if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup(); this.cardRevealPopup = null; this.renderAll(); }
     }, 2200);
   },
   // #12 レリック効果（大爆発）などで待機しているパックを、現在のパックが終わった後に順番に開く
@@ -605,7 +606,32 @@ const ShopScene = {
       this.offers=this.generateMiniOffers();
       if(GameState.retreat){ GameState.retreat.offers=this.offers; App.saveGame(); }
     } else this.offers=this.merchantShop?this.generateMerchantOffers():this.generateOffers();
-    this.message='品揃えを更新した'; this.renderAll();
+    this.message='品揃えを更新した'; this.requestStockAnim(); this.renderAll();
+  },
+
+  // ===== 陳列アニメーション（入店時・品揃え更新時のみ） =====
+  // 次の renderAll で開始し、演出時間内の再描画では経過時間ぶん負の delay で続きから再生する（購入等で全商品が再アニメしない）
+  STOCK_STAGGER: 70, STOCK_DUR: 380,
+  requestStockAnim(){ this._stockAnimPending=true; },
+  applyStockAnim(root){
+    const slots=Array.from(root.querySelectorAll('.shop-row .shop-slot'));
+    const now=performance.now();
+    if(this._stockAnimPending){ this._stockAnimPending=false; this._stockAnimStart=now; this._stockAnimSfx=true; }
+    if(this._stockAnimStart==null) return;
+    const total=this.STOCK_DUR+this.STOCK_STAGGER*Math.max(0,slots.length-1)+120;
+    const elapsed=now-this._stockAnimStart;
+    if(elapsed>=total){ this._stockAnimStart=null; return; }
+    let reduce=false; try{ reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+    if(reduce){ this._stockAnimStart=null; return; }
+    slots.forEach((s,i)=>{ s.classList.add('stock-in'); s.style.animationDelay=(i*this.STOCK_STAGGER-elapsed)+'ms'; });
+    if(this._stockAnimSfx){
+      this._stockAnimSfx=false;
+      slots.forEach((s,i)=>{ if(i%2===0) _seShop('place',{volume:0.35,pitch:(i%4)*1.5,delay:i*this.STOCK_STAGGER+120}); });
+    }
+  },
+  // 購入ボックス右上の価格バッジ（GUI＋金額）。所持G不足は赤
+  priceBadge(price){
+    return `<div class="slot-price${GameState.gold<price?' ng':''}" aria-label="価格${price}G">${GCoinAmt(price)}</div>`;
   },
 
   leaveShop(){ if(typeof PackFX!=='undefined'&&PackFX.isPlaying()) PackFX.skip&&PackFX.skip(); this._fxPack=null; this.packQueue=[]; this.pendingRelicPacks=0; this.pickingRelicPack=null; this.packBreakdownOpen=false; this.packBreakdownSelected=null; if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup(); this.offers=null; this.fixedFinalShop=false; this.pickingPack=null; this.pickingCardPack=null; this.cardRevealPopup=null; this.message=null; this.activeRelicId=null; this.relicListOpen=false; this.packActiveRelicId=null; this.packRelicListOpen=false; GameState.lastReward=null;
@@ -636,7 +662,7 @@ const ShopScene = {
     const rare=(pk.packType==='normal_upgrade'||pk.packType==='normal_explosive_upgrade')&&(pk.effectPool||[]).some(e=>e.rarity);
     PackFX.play({type:pk.packType, items:this.packFxItems(pk), rare}).then(()=>{
       pk._opened=true; if(this._fxPack===pk) this._fxPack=null;
-      if(this.offers&&this.container) this.renderAll();
+      if((this.offers||this._rewardLayer)&&this.container) this.renderAll();
     });
   },
 
@@ -651,7 +677,49 @@ const ShopScene = {
     GameState.retreat.offers=this.offers;
     App.saveGame();
   },
+  // ===== クリア報酬のパック（趣味レリック集め→爆発通常アップグレード→大爆発）をゲームメイン画面の上で開く =====
+  //   リザルト（ボスはパッシブ報酬）を受け取った直後、ショップへ移る前に盤面を背景にして選択させる。全て選び終えたら onDone（ショップへ）
+  hasRewardPacks(){ return !!(this.pickingPack||this.pickingRelicPack||(this.pendingRelicPacks||0)>0||(this.packQueue&&this.packQueue.length)); },
+  openRewardPacksOverGame(onDone){
+    if(!this.hasRewardPacks()){ if(onDone) onDone(); return false; }
+    if(this._rewardLayer&&this._rewardLayer.el) this._rewardLayer.el.remove();
+    const layer=document.createElement('div'); layer.className='reward-pack-layer';
+    document.body.appendChild(layer);
+    this._rewardLayer={ el:layer, onDone };
+    this.container=layer;
+    this.renderAll();
+    return true;
+  },
+  renderRewardLayer(){
+    const L=this._rewardLayer, c=L.el;
+    try{ GameData.enforceCrossAll(); }catch(e){}
+    const prevPickModal=c.querySelector('#pick-modal-el');
+    const prevTop=prevPickModal?prevPickModal.scrollTop:0;
+    c.innerHTML='';
+    const fxPack=this.pendingPackFx(); if(fxPack) this.startPackFx(fxPack);
+    const opened=(pk)=>pk&&(!pk.packType||pk._opened);
+    if(opened(this.pickingPack) && !this.pickingRelicPack){
+      const pickOverlay=this.renderPickModal();
+      pickOverlay.classList.add('reward-over-game');
+      c.appendChild(pickOverlay);
+      const newModal=pickOverlay.querySelector('.pack-modal');
+      this.layoutPickFan(pickOverlay);
+      if(newModal){ newModal.id='pick-modal-el'; newModal.scrollTop=prevTop; }
+      this.placePickBubble(pickOverlay);
+    }
+    if(opened(this.pickingRelicPack)){ const ro=this.renderRelicPackModal(); ro.classList.add('reward-over-game'); c.appendChild(ro); }
+    if(this.cardRevealPopup) c.appendChild(this.renderCardRevealPopup());
+    const joker=(typeof GameMainScene!=='undefined' && GameMainScene.pendingJokerPick);
+    if(joker) c.appendChild(this.renderJokerPickModalForShop());
+    if(!this.hasRewardPacks() && !this._fxPack && !joker){
+      // 全て選び終えた：レイヤーを片付けてショップへ（カード変化の表示はショップ側で引き継いで描画される）
+      this._rewardLayer=null; this.container=null; this.message=null; this.pickBubble=null;
+      c.remove();
+      if(L.onDone) L.onDone();
+    }
+  },
   renderAll(){
+    if(this._rewardLayer){ this.renderRewardLayer(); return; }
     try{ GameData.enforceCrossAll(); }catch(e){} // v1.00 #9 バツパッシブLv3
     try{ this.miniShopAutoSave(); }catch(e){}
     // #4 タップのたびに画面が一番上に戻る不具合を防ぐ：スクロール位置を保持
@@ -740,6 +808,7 @@ const ShopScene = {
     }
     const backBtn = document.createElement('button'); backBtn.textContent=this.miniShop?'マップに戻って再挑戦':'マップに戻る'; backBtn.addEventListener('click',()=>this.leaveShop()); actions.appendChild(backBtn);
     el.appendChild(actions);
+    try{ this.applyStockAnim(el); }catch(e){}
     this.container.appendChild(el);
     // #19 パック内訳モーダル
     const pip = GameMainScene.renderPassiveInfoPanel(()=>this.renderAll()); if(pip) this.container.appendChild(pip); // #16
@@ -817,7 +886,7 @@ const ShopScene = {
       const price = this.relicPrice(relic);
       const ren = relic.relicEnhance ? GameData.RELIC_ENHANCE_POOL.find(r=>r.id===relic.relicEnhance) : null;
       slot.className='shop-slot relic-shop-slot pickup-slot '+GameMainScene.relicGradeClass(relic);
-      slot.innerHTML=`<div class="relic-shop-card pickup"><div class="relic-shop-badge">レリック</div><div class="relic-name"><span class="relic-ico">${GameIcons.relic(relic)}</span>${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}</div><div class="slot-desc">${relic.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||!this.canAcquireRelic(relic)?'disabled':''}>購入（${GCoinAmt(price)}）</button>`;
+      slot.innerHTML=`${this.priceBadge(price)}<div class="relic-shop-card pickup"><div class="relic-shop-badge">レリック</div><div class="relic-name"><span class="relic-ico">${GameIcons.relic(relic)}</span>${relic.name}<span class="relic-size">${GameState.relicSizeDots(relic)}</span></div>${ren?`<div class="relic-enhance-tag">${ren.name}</div>`:''}</div><div class="slot-desc">${relic.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||!this.canAcquireRelic(relic)?'disabled':''}>購入</button>`;
       slot.querySelector('.buy-btn').addEventListener('click', () => this.buyRelic(i, true));
       row.appendChild(slot);
     });
@@ -836,7 +905,7 @@ const ShopScene = {
     if(cpSlot.used){ cpEl.innerHTML='<div class="slot-title">SOLD OUT</div>'; }
     else{
       const price = GameState.shopPriceOf(GameData.SHOP_PRICES.cardPack);
-      cpEl.innerHTML=`${PackFX.packHtml('card_pack',{size:'mini'})}<div class="slot-title">${GIcon('pack_card')}？カードパック</div><div class="slot-desc">2枚から1枚選択</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入（${GCoinAmt(price)}）</button>`;
+      cpEl.innerHTML=`${this.priceBadge(price)}${PackFX.packHtml('card_pack',{size:'mini'})}<div class="slot-title">${GIcon('pack_card')}？カードパック</div><div class="slot-desc">2枚から1枚選択</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入</button>`;
       cpEl.querySelector('.buy-btn').addEventListener('click', () => this.buyCardPack(cpSlot));
     }
     row.appendChild(cpEl);
@@ -851,7 +920,7 @@ const ShopScene = {
     else{
       const price = GameState.shopPriceOf(GameData.SHOP_PRICES.pickupUpgrade);
       const eff = puSlot._single;
-      puEl.innerHTML=`<div class="slot-title">${GIcon('shop_pickup_upgrade')}ピックアップ<br>${eff.name}</div><div class="slot-desc">${eff.desc}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入（${GCoinAmt(price)}）</button>`;
+      puEl.innerHTML=`${this.priceBadge(price)}<div class="slot-title">${GIcon('shop_pickup_upgrade')}ピックアップ<br>${eff.name}</div><div class="slot-desc">${eff.desc}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入</button>`;
       puEl.querySelector('.buy-btn').addEventListener('click', () => {
         if(GameState.gold < price){ _seShop('error',{suppressTap:true}); return; }
         GameState.gold -= price; puSlot.used = true; _seShop('buy',{suppressTap:true}); _seShop('coin');
@@ -898,7 +967,7 @@ const ShopScene = {
         const ren=r.relicEnhance?GameData.RELIC_ENHANCE_POOL.find(x=>x.id===r.relicEnhance):null;
         const price=this.relicPrice(r);
         el.className+=' pickup-slot '+GameMainScene.relicGradeClass(r);
-        el.innerHTML=`<div class="slot-title"><div class="relic-shop-badge">レリック</div><span class="relic-ico">${GameIcons.relic(r)}</span>${r.name}<span class="relic-size">${GameState.relicSizeDots(r)}</span>${ren?`<span class="relic-enhance-tag"> ${ren.name}</span>`:''}</div><div class="slot-desc">${r.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||!this.canAcquireRelic(r)?'disabled':''}>購入（${GCoinAmt(price)}）</button>`;
+        el.innerHTML=`${this.priceBadge(price)}<div class="slot-title"><div class="relic-shop-badge">レリック</div><span class="relic-ico">${GameIcons.relic(r)}</span>${r.name}<span class="relic-size">${GameState.relicSizeDots(r)}</span>${ren?`<span class="relic-enhance-tag"> ${ren.name}</span>`:''}</div><div class="slot-desc">${r.desc}${ren?`<br><span style="color:var(--gold)">【${ren.name}】${ren.desc}</span>`:''}</div><button class="buy-btn" ${GameState.gold<price||!this.canAcquireRelic(r)?'disabled':''}>購入</button>`;
         el.querySelector('.buy-btn').addEventListener('click', () => this.buyPickupRelic(slot));
         row.appendChild(el); return;
       }
@@ -913,10 +982,10 @@ const ShopScene = {
         if(c.enhance) lines.push(`<span class="desc-enhance">【${c.enhance}】${GameData.ENHANCE_DESC[c.enhance]||''}</span>`);
         if(c.trait)   lines.push(`<span class="desc-trait">【${c.trait}】${GameData.TRAIT_DESC[c.trait]||''}</span>`);
         el.className+=' pickup-slot pickup-card-slot'+(c.pickupSpecial?' dream-slot':'');
-        el.innerHTML=`<div class="slot-title">${GIcon('pack_card')}ピックアップカード</div>`
+        el.innerHTML=`${this.priceBadge(cPrice)}<div class="slot-title">${GIcon('pack_card')}ピックアップカード</div>`
           +`<div class="pickup-card-face"><div class="card${c.trait?' trait-'+c.trait.replace(/[()]/g,''):''}">${this.cardTagsHtml(c)}${this.cardSymbolHtml(c)}${this.cardScoreHtml(c,GameState.gold)}</div></div>`
           +`<div class="slot-desc">基礎点${c.baseScore}${lines.length?'<br>'+lines.join('<br>'):''}</div>`
-          +`<button class="buy-btn" ${GameState.gold<cPrice?'disabled':''}>購入（${GCoinAmt(cPrice)}）</button>`;
+          +`<button class="buy-btn" ${GameState.gold<cPrice?'disabled':''}>購入</button>`;
         el.querySelector('.buy-btn').addEventListener('click', () => this.buyPickupCard(slot));
         row.appendChild(el); return;
       }
@@ -929,7 +998,7 @@ const ShopScene = {
         }
         const eff=slot._single;
         el.className+=' pickup-slot';
-        el.innerHTML=`<div class="slot-title">${GIcon('shop_pickup_upgrade')}ピックアップ<br>${eff.name}</div><div class="slot-desc">${eff.desc}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入（${GCoinAmt(price)}）</button>`;
+        el.innerHTML=`${this.priceBadge(price)}<div class="slot-title">${GIcon('shop_pickup_upgrade')}ピックアップ<br>${eff.name}</div><div class="slot-desc">${eff.desc}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入</button>`;
         el.querySelector('.buy-btn').addEventListener('click', () => {
           if(GameState.gold<price){ _seShop('error',{suppressTap:true}); return; }
           GameState.gold-=price; slot.used=true; _seShop('buy',{suppressTap:true}); _seShop('coin');
@@ -944,7 +1013,7 @@ const ShopScene = {
       }
 
       const packGfx=(typeof PackFX!=='undefined'&&PackFX.EMOJI[slot.type])?PackFX.packHtml(slot.type,{size:'mini'}):'';
-      el.innerHTML=`${packGfx}<div class="slot-title">${typeName.icon?GIcon(typeName.icon):''}${typeName.name}</div><div class="slot-desc">${this.slotDesc(slot.type)}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入（${GCoinAmt(price)}）</button>`;
+      el.innerHTML=`${this.priceBadge(price)}${packGfx}<div class="slot-title">${typeName.icon?GIcon(typeName.icon):''}${typeName.name}</div><div class="slot-desc">${this.slotDesc(slot.type)}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入</button>`;
       el.querySelector('.buy-btn').addEventListener('click', () => this.handleRandomSlot(slot));
       row.appendChild(el);
     });
@@ -962,11 +1031,11 @@ const ShopScene = {
   },
 
   renderSection(title, price, slots){
-    const sec=document.createElement('div'); sec.className='shop-section'; sec.innerHTML=`<h3>${title}（${GCoinAmt(price)}）</h3>`;
+    const sec=document.createElement('div'); sec.className='shop-section'; sec.innerHTML=`<h3>${title}</h3>`;
     const row=document.createElement('div'); row.className='shop-row';
     slots.forEach(slot=>{
       const el=document.createElement('div'); el.className='shop-slot'+(slot.content?'':' sold');
-      if(slot.content){ el.innerHTML=`${slot.content}<button class="buy-btn">購入</button>`; const btn=el.querySelector('.buy-btn'); btn.disabled=GameState.gold<price; btn.addEventListener('click',slot.onBuy); }
+      if(slot.content){ el.innerHTML=`${this.priceBadge(price)}${slot.content}<button class="buy-btn">購入</button>`; const btn=el.querySelector('.buy-btn'); btn.disabled=GameState.gold<price; btn.addEventListener('click',slot.onBuy); }
       else el.innerHTML='<div class="slot-title">SOLD OUT</div>';
       row.appendChild(el);
     });
@@ -1250,7 +1319,8 @@ const ShopScene = {
 
     // #2 ビンゴ倍率の変化
     if(effectId === 'mult'){
-      box.innerHTML = GameData.multChangeHtml(p.multBefore||{});
+      box.innerHTML = GameData.multChangeHtml(p.multBefore||{}, p.multAfter);
+      if(p._multDrawn) box.classList.add('mc-static'); p._multDrawn=true; // 回転演出は最初の描画だけ（再描画で数字が裏返って見えないように）
       overlay.appendChild(box); return overlay;
     }
     // #5 換金：カードがGに変わる演出（横回転してG面を見せる）

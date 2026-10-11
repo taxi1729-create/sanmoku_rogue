@@ -27,6 +27,7 @@ const GameState = {
   //   { floor, stageKey, stageName, score, target, ratio, num, gold, livesLeft, offers }
   retreat:null,
   // v1.13 裏世界（第3・8階層）：floorEvents[floor]={lineup:[type×3],eliteEffect,committed,active,done,result,altarPaid,altarInfo}（旧セーブの type は lineup に移行）
+  skipBonusRolls:{}, // スキップ報酬パックの事前抽選結果 {'階層_ステージkey': type}
   floorEvents:{}, specialGiftPending:0, // specialGiftPending：ショップで先に開く無料の特別アップグレード数
   // 裏世界：derbyDebtFloor＝ダービーの元手20Gを前借りした階層（その階層のハイレベルのG報酬が0になる）
   //         merchantShopFloor＝不思議な商人クリア後、次のショップを特殊ショップにする階層
@@ -48,13 +49,10 @@ const GameState = {
     if(noRelic) return {relic:0, relicEnhance:0};
     return { relic:3*this.relicCountOf('gold_boost'), relicEnhance:this.relics.filter(r=>r.relicEnhance==='ren_gold').length };
   },
-  // #8 スキップ報酬：(基本G4)×num＋レリック効果＋レリック強化効果（num=1、階層6以上で+1）
+  // スキップ報酬G：固定（GameData.SKIP_REWARD_BASE_G＝5G）。パック1つは MapSelectScene.getSkipBonus で別途抽選
   calcSkipReward(){
     const base=GameData.SKIP_REWARD_BASE_G;
-    const num=1+(this.currentFloor>=6?1:0);
-    const rg=this.rewardRelicGold(false);
-    const total=base*num+rg.relic+rg.relicEnhance; // #9 (基本G8)×num＋レリック効果＋レリック強化効果（num=1、階層6以上で+1）
-    return {base,num,relicBonus:rg.relic,relicEnhanceBonus:rg.relicEnhance,total};
+    return {base,num:1,relicBonus:0,relicEnhanceBonus:0,total:base};
   },
   // 一時撤退G＝floor(10×num×ratio)（num=1、階層6以上で+1。ratio=現在の点数/目標点数。クランプせず実数のまま。負・非数は0）
   calcRetreatReward(score, target){
@@ -148,6 +146,7 @@ const GameState = {
     this.passiveSuspended=null;
     this.lives=this.MAX_LIVES; this.retreat=null; // 残機・一時撤退
     this.floorEvents={}; this.specialGiftPending=0; // v1.10 イベントコモン
+    this.skipBonusRolls={};
     this.derbyDebtFloor=null; this.merchantShopFloor=null;
     this.bingoCountThisStage=0;
     this.totalBingoCount=0; this.sevenPendingMultBoost=false;
@@ -196,7 +195,7 @@ const GameState = {
       gameMode:this.gameMode,
       initialPassiveGranted:this.initialPassiveGranted,
       lives:this.lives, retreat:this.retreat,
-      floorEvents:this.floorEvents, specialGiftPending:this.specialGiftPending||0,
+      floorEvents:this.floorEvents, specialGiftPending:this.specialGiftPending||0, skipBonusRolls:this.skipBonusRolls||{},
       derbyDebtFloor:this.derbyDebtFloor, merchantShopFloor:this.merchantShopFloor,
       multBase:{...GameData.BINGO_MULTIPLIER_BASE},
       corrBase:GameData.CORRECTION_BASE_SCORE,
@@ -237,6 +236,7 @@ const GameState = {
     this.lives=(typeof d.lives==='number'&&Number.isFinite(d.lives))?Math.max(0,d.lives):this.MAX_LIVES;
     this.retreat=(d.retreat&&typeof d.retreat==='object')?d.retreat:null;
     this.floorEvents=(d.floorEvents&&typeof d.floorEvents==='object')?d.floorEvents:{};
+    this.skipBonusRolls=(d.skipBonusRolls&&typeof d.skipBonusRolls==='object')?d.skipBonusRolls:{};
     this.specialGiftPending=(d.specialGiftPending===true)?1:Math.max(0,d.specialGiftPending|0); // 旧形式 true → 1
     this.derbyDebtFloor=(typeof d.derbyDebtFloor==='number')?d.derbyDebtFloor:null;
     this.merchantShopFloor=(typeof d.merchantShopFloor==='number')?d.merchantShopFloor:null;
