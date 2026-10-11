@@ -23,14 +23,14 @@
  *     レイズ：NPCがコール/フォールドを選ぶ（勝ち・引き分けが視えればコール、負けが視えればフォールド。
  *       不調の回は50%。NPCの札が0なら常にフォールド）。
  *       コール→公開、プレイヤーレイズでさらに×2。フォールド→即終了、プレイヤーがレイズ倍化なしの得点を獲得。
- *   最大5回戦。プレイヤーが3点取った時点で勝利。5回戦終了時にプレイヤーが3点未満なら敗北（千里眼の点数は勝敗に無関係）。使ったカードは消費。
+ *   最大5回戦。プレイヤーが3点取った時点で勝利。千里眼が6点取った時点、または5回戦終了時にプレイヤーが3点未満なら敗北。使ったカードは消費。
  */
 const HighLowGame = (function(){
   'use strict';
   const _se=(n,o)=>{ try{ if(typeof SFX!=='undefined') SFX.play(n,o); }catch(e){} };
 
   const NPC_CARDS = [0, 10, 20, 40, 100];
-  const MAX_ROUNDS = 5, WIN_POINTS = 3, HAND_SIZE = 8;
+  const MAX_ROUNDS = 5, WIN_POINTS = 3, NPC_WIN_POINTS = 6, HAND_SIZE = 8;
   const FALTER_JAMMINGS = ['混乱', 'スタン', 'ブレイク', 'ビンゴ阻害'];   // 出した次の回戦で千里眼が不調になる
   const ENHANCE_MULT = { '横拡張':2, '縦拡張':2, '拡大':4 };   // この勝負のみ基礎点に掛ける倍率
 
@@ -207,7 +207,7 @@ const HighLowGame = (function(){
         </div>
         <div class="hl-score">
           <div class="hl-score-side hl-score-player"><span class="hl-score-lbl">あなた</span><span class="hl-score-num" data-k="p">0</span></div>
-          <div class="hl-score-mid"><b>3点</b>取れば勝利</div>
+          <div class="hl-score-mid"><b>3点</b>で勝利<br><small>相手<b>6点</b>で敗北</small></div>
           <div class="hl-score-side hl-score-npc"><span class="hl-score-num" data-k="n">0</span><span class="hl-score-lbl">千里眼</span></div>
         </div>
         <div class="hl-msg"></div>
@@ -296,7 +296,7 @@ const HighLowGame = (function(){
         <li>相手がチェック→あなたは<b>チェック</b>（公開、高い方に<b>1点</b>）か<b>レイズ</b>。</li>
         <li>相手がレイズ→<b>コール</b>（<b>2点</b>）／<b>フォールド</b>（相手に<b>1点</b>）／<b>レイズ</b>。同値は0点。</li>
         <li>あなたのレイズ：相手は勝ち・同値ならコール（得点<b>×2</b>、最大<b>4点</b>）、負けならフォールド（あなたに×2なしの得点）。<b>0の札</b>は必ずフォールド。</li>
-        <li>最大<b>5回戦</b>で<b>3点</b>先取なら勝利、届かなければ負け。</li>
+        <li>最大<b>5回戦</b>で<b>3点</b>取れば勝利。千里眼が<b>6点</b>取るか、届かなければ負け。</li>
         <li><b>混乱・スタン・ブレイク・ビンゴ阻害</b>付きの札を出すと<span class="hl-falter-txt">次の回戦は千里眼不調</span>（判断がランダム）。</li>
         <li>強化（この勝負のみ）：横拡張・縦拡張<b>×2</b>、拡大<b>×4</b>。ギャンブルは倍率後に加算値を足す。</li>
       </ul>
@@ -500,8 +500,8 @@ const HighLowGame = (function(){
   }
 
   function afterRound(){
-    // v1.15 プレイヤーが3点取れば勝利。千里眼が3点以上取っても終了せず、5回戦終了時にプレイヤーが3点未満なら敗北
-    if(st.score.p >= WIN_POINTS || st.round >= MAX_ROUNDS){
+    // v1.30 プレイヤーが3点取れば勝利。千里眼が6点取った時点で敗北。5回戦終了時にプレイヤーが3点未満なら敗北
+    if(st.score.p >= WIN_POINTS || st.score.n >= NPC_WIN_POINTS || st.round >= MAX_ROUNDS){
       st.phase = 'end';
       showResult();
     } else {

@@ -275,6 +275,10 @@ const GameIcons = (function(){
         `<path d="M3 6.2l5.5-2.2 7 2.5L21 4.3v13.5l-5.5 2.2-7-2.5L3 19.7z" fill="currentColor" fill-opacity=".2"/>`
       + `<path d="M8.5 4v13.5M15.5 6.5V20" stroke-width="1.5" stroke-opacity=".7"/>`
       + `<path d="M5.5 15.5c2-3 4-1 6-4s3.5-1 5-3" stroke-width="1.6" stroke-dasharray="1.6 2.2"/>` },
+    btn_shop:{ label:'ショップ', tint:'current', body:
+        `<path d="M3.5 9.5L5 4h14l1.5 5.5" fill="currentColor" fill-opacity=".2"/>`
+      + `<path d="M3.5 9.5a2.8 2.8 0 0 0 5.67 0a2.8 2.8 0 0 0 5.66 0a2.8 2.8 0 0 0 5.67 0"/>`
+      + `<path d="M5 12.2V20h14v-7.8"/><path d="M10 20v-4.5h4V20" fill="currentColor" fill-opacity=".3"/>` },
     btn_fast_forward:{ label:'早送り', tint:'current', body:
         `<path d="M2.5 5.5L11.5 12l-9 6.5zM12.5 5.5l9 6.5-9 6.5z" fill="currentColor" fill-opacity=".3"/>` },
     btn_pack_breakdown:{ label:'パック内訳', tint:'current', body:

@@ -126,7 +126,7 @@ const App = {
     return true;
   },
   showMapSelect(){ if(this._floor5Revelation(()=>this.showMapSelect())) return; this.container.innerHTML=''; MapSelectScene.render(this.container); },
-  showGameMain(stage){ this.container.innerHTML=''; GameMainScene.render(this.container,stage); },
+  showGameMain(stage){ GameState.lastShop=null; /* v1.30 ステージ開始で直近ショップへの復帰は不可 */ this.container.innerHTML=''; GameMainScene.render(this.container,stage); },
   showShop(){ if(this._floor5Revelation(()=>this.showShop())) return; this.container.innerHTML=''; ShopScene.render(this.container); },
   // #2 階層10クリア時のエンディング（ゲームクリア画面＋スタッフロール）
   showEnding(){ try{ if(typeof GameMeta!=='undefined') GameMeta.setCleared10(); }catch(e){} this.container.innerHTML=''; EndingScene.render(this.container); }, // #8 10階層クリア特典（タイトルに裏世界）

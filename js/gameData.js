@@ -356,7 +356,18 @@ const GameData = {
   ],
 
   // #8 レリックをタップした時に、現在の効果量を具体的な数値で表示する（例：リロール強化→補正基礎点:50）
+  // v1.30 レリック本体の効果量とレリック強化効果の効果量を両方表示する（以前は本体側がある時に強化側が表示されなかった）
   getRelicLiveInfo(relic){
+    if(!relic||typeof GameState==='undefined') return null;
+    let a=null, b=null;
+    try{ a=this._relicLiveRaw(Object.assign({},relic,{relicEnhance:null})); }catch(e){}
+    try{ if(relic.relicEnhance) b=this._relicLiveRaw({id:'__ren__',relicEnhance:relic.relicEnhance}); }catch(e){}
+    const out=[];
+    if(a) out.push(a);
+    if(b){ const ren=this.RELIC_ENHANCE_POOL.find(x=>x.id===relic.relicEnhance); out.push(`${ren?ren.name:'レリック強化'}→${b}`); }
+    return out.length?out.join('<br>'):null;
+  },
+  _relicLiveRaw(relic){
     if(typeof GameState==='undefined') return null;
     const gm=(typeof GameMainScene!=='undefined')?GameMainScene:null;
     switch(relic.id){
@@ -387,7 +398,7 @@ const GameData = {
       case 'ren_triangle': return `補正基礎点:+${GameState.currentDeck.filter(c=>c.symbol==='Triangle').length}`;
       case 'ren_square': return `補正基礎点:+${GameState.currentDeck.filter(c=>c.symbol==='Square').length}`;
       case 'ren_disc_pile': return `補正基礎点:+${GameState.discardPile.length}`;
-      case 'ren_grade': { const n=GameState.currentDeck.reduce((s,c)=>{let x=0;if(c.enhance)x++;if(c.jamming)x++;if(c.trait)x++;return s+x;},0); return `補正倍率:+${n}`; }
+      case 'ren_grade': { const n=GameState.currentDeck.reduce((s,c)=>{let x=0;if(c.enhance)x++;if(c.jamming)x++;if(c.trait)x++;return s+x;},0); return `補正倍率:+${n}（n=${n}）`; }
       case 'ren_only_one': return GameState.relicCount()===1?'補正倍率:+20（発動中）':'補正倍率:+20（レリック1個所持時のみ）';
       case 'ren_general': return '最終乗算補正:×1.1';
       case 'ren_pair': return GameState.relics.filter(x=>x.id===relic.id).length>=2?'カード基礎点:+40（発動中）':'カード基礎点:+40（同じレリックを2つ以上所持時のみ）';

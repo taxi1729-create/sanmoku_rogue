@@ -634,7 +634,7 @@ const ShopScene = {
     return `<div class="slot-price${GameState.gold<price?' ng':''}" aria-label="価格${price}G">${GCoinAmt(price)}</div>`;
   },
 
-  leaveShop(){ if(typeof PackFX!=='undefined'&&PackFX.isPlaying()) PackFX.skip&&PackFX.skip(); this._fxPack=null; this.packQueue=[]; this.pendingRelicPacks=0; this.pickingRelicPack=null; this.packBreakdownOpen=false; this.packBreakdownSelected=null; if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup(); this.offers=null; this.fixedFinalShop=false; this.pickingPack=null; this.pickingCardPack=null; this.cardRevealPopup=null; this.message=null; this.activeRelicId=null; this.relicListOpen=false; this.packActiveRelicId=null; this.packRelicListOpen=false; GameState.lastReward=null;
+  leaveShop(){ if(!this.miniShop&&this.offers&&!this._rewardLayer) GameState.lastShop={ floor:GameState.currentFloor, offers:this.offers, merchant:!!this.merchantShop, fixedFinal:!!this.fixedFinalShop }; this._shopSaveSig=null; if(typeof PackFX!=='undefined'&&PackFX.isPlaying()) PackFX.skip&&PackFX.skip(); this._fxPack=null; this.packQueue=[]; this.pendingRelicPacks=0; this.pickingRelicPack=null; this.packBreakdownOpen=false; this.packBreakdownSelected=null; if(this.cardRevealPopup&&this.cardRevealPopup._cleanup) this.cardRevealPopup._cleanup(); this.offers=null; this.fixedFinalShop=false; this.pickingPack=null; this.pickingCardPack=null; this.cardRevealPopup=null; this.message=null; this.activeRelicId=null; this.relicListOpen=false; this.packActiveRelicId=null; this.packRelicListOpen=false; GameState.lastReward=null;
     // ミニショップを出たら一時撤退を終了し、マップ（失敗したステージは未クリアのまま）へ戻る。リロードで再びミニショップに入らないよう保存
     if(this.miniShop){ this.miniShop=false; this._miniSaveSig=null; GameState.retreat=null; }
     if(this.merchantShop||GameState.merchantShopFloor!=null){ this.merchantShop=false; GameState.merchantShopFloor=null; } // 不思議な商人の特殊ショップは1回限り
@@ -676,6 +676,24 @@ const ShopScene = {
     this._miniSaveSig=sig;
     GameState.retreat.offers=this.offers;
     App.saveGame();
+  },
+  // v1.30 通常ショップ：購入・売却・パック選択確定のたびにセーブ（直近ショップとして品揃え・購入状態も保存し、マップから戻れる）
+  shopAutoSave(){
+    if(this.miniShop||this._rewardLayer||!this.offers||typeof App==='undefined') return;
+    if(this.pickingPack||this.pickingCardPack||this.pickingRelicPack||this._fxPack||(this.packQueue&&this.packQueue.length)||this.pendingRelicPacks||this.cardRevealPopup) return;
+    if(typeof GameMainScene!=='undefined'&&GameMainScene.pendingJokerPick) return;
+    let sig; try{ sig=JSON.stringify([GameState.gold,GameState.currentDeck,GameState.relics,this.offers,GameState.symbolPassiveTier]); }catch(e){ return; }
+    if(sig===this._shopSaveSig&&GameState.lastShop) return;
+    this._shopSaveSig=sig;
+    GameState.lastShop={ floor:GameState.currentFloor, offers:this.offers, merchant:!!this.merchantShop, fixedFinal:!!this.fixedFinalShop };
+    App.saveGame();
+  },
+  // v1.30 マップから直近のショップへ戻る（品揃え・購入済み状態はそのまま）
+  returnToLastShop(){
+    const ls=GameState.lastShop; if(!ls||!ls.offers) return;
+    this.offers=ls.offers; this.merchantShop=!!ls.merchant; this.fixedFinalShop=!!ls.fixedFinal; this.miniShop=false;
+    this._shopSaveSig=null; this.message=null;
+    App.showShop();
   },
   // ===== クリア報酬のパック（趣味レリック集め→爆発通常アップグレード→大爆発）をゲームメイン画面の上で開く =====
   //   リザルト（ボスはパッシブ報酬）を受け取った直後、ショップへ移る前に盤面を背景にして選択させる。全て選び終えたら onDone（ショップへ）
@@ -722,6 +740,7 @@ const ShopScene = {
     if(this._rewardLayer){ this.renderRewardLayer(); return; }
     try{ GameData.enforceCrossAll(); }catch(e){} // v1.00 #9 バツパッシブLv3
     try{ this.miniShopAutoSave(); }catch(e){}
+    try{ this.shopAutoSave(); }catch(e){}
     // #4 タップのたびに画面が一番上に戻る不具合を防ぐ：スクロール位置を保持
     const scrollY = window.scrollY;
     // #1 カード変化アニメーション終了時などの再描画で、パック選択モーダル内のスクロール位置も保持する
@@ -804,7 +823,7 @@ const ShopScene = {
       // #6 最終ショップ（階層10）は品揃え更新不可
       // #4 サンカクパッシブ1を取得するまでロック
       const rerollLocked=GameState.symbolPassiveTier.Hoshi<1;
-      const rerollBtn = document.createElement('button'); rerollBtn.innerHTML=rerollLocked?'品揃え更新'+GIcon('btn_lock',{cls:'gi-gap-l',title:'ロック中'}):`品揃え更新（${GCoinAmt(GameData.SHOP_PRICES.reroll) /* v1.08 品替え更新はブラックカード対象外 */}）`; rerollBtn.disabled=rerollLocked||GameState.gold<GameData.SHOP_PRICES.reroll /* v1.08 品替え更新はブラックカード対象外 */; rerollBtn.addEventListener('click',()=>this.rerollOffers()); actions.appendChild(rerollBtn);
+      const rerollBtn = document.createElement('button'); rerollBtn.className='shop-reroll-btn'; rerollBtn.innerHTML=rerollLocked?'品揃え更新'+GIcon('btn_lock',{cls:'gi-gap-l',title:'ロック中'}):'品揃え更新'+this.priceBadge(GameData.SHOP_PRICES.reroll) /* v1.30 商品と同じく右上に価格バッジ（ブラックカード対象外） */; rerollBtn.disabled=rerollLocked||GameState.gold<GameData.SHOP_PRICES.reroll /* v1.08 品替え更新はブラックカード対象外 */; rerollBtn.addEventListener('click',()=>this.rerollOffers()); actions.appendChild(rerollBtn);
     }
     const backBtn = document.createElement('button'); backBtn.textContent=this.miniShop?'マップに戻って再挑戦':'マップに戻る'; backBtn.addEventListener('click',()=>this.leaveShop()); actions.appendChild(backBtn);
     el.appendChild(actions);

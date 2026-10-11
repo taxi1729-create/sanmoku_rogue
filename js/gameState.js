@@ -32,6 +32,8 @@ const GameState = {
   // 裏世界：derbyDebtFloor＝ダービーの元手20Gを前借りした階層（その階層のハイレベルのG報酬が0になる）
   //         merchantShopFloor＝不思議な商人クリア後、次のショップを特殊ショップにする階層
   derbyDebtFloor:null, merchantShopFloor:null,
+  // v1.30 直近のショップ（ステージ開始まで保持）：{ floor, offers, merchant, fixedFinal }。マップから戻れる
+  lastShop:null,
 
   // #13 シカクパッシブ1の手札上限+1は廃止（パック選択枚数+1に変更）
   effectiveHandSize(){ return GameData.HAND_SIZE + this.handSizeBonus; },
@@ -133,6 +135,7 @@ const GameState = {
     this.currentDeck=GameData.buildDeckForMode(this.gameMode);
     this.gold=0; this.relics=GameData.buildRelicsForMode?GameData.buildRelicsForMode(this.gameMode):[]; this.clearedStages=[];
     this.finalShopDone=false; // #6 階層10特殊構成の初回フラグをリセット
+    this.lastShop=null;
     this.floor5RevelationDone=false; this.floor5GiftPending=false; // v1.08 啓示の特別アップグレード（未受取） // 第5階層踏破の啓示（Revelation）を再生済みか（1ランに1回）
     this.rerollCount=GameData.INITIAL_REROLL;
     this.handSizeBonus=0; this.roundsBonus=0; this.turnsBonus=0;
@@ -197,6 +200,7 @@ const GameState = {
       lives:this.lives, retreat:this.retreat,
       floorEvents:this.floorEvents, specialGiftPending:this.specialGiftPending||0, skipBonusRolls:this.skipBonusRolls||{},
       derbyDebtFloor:this.derbyDebtFloor, merchantShopFloor:this.merchantShopFloor,
+      lastShop:this.lastShop||null,
       multBase:{...GameData.BINGO_MULTIPLIER_BASE},
       corrBase:GameData.CORRECTION_BASE_SCORE,
       savedFloorStage: (this.currentStage?this.currentStage.key:''),
@@ -240,6 +244,7 @@ const GameState = {
     this.specialGiftPending=(d.specialGiftPending===true)?1:Math.max(0,d.specialGiftPending|0); // 旧形式 true → 1
     this.derbyDebtFloor=(typeof d.derbyDebtFloor==='number')?d.derbyDebtFloor:null;
     this.merchantShopFloor=(typeof d.merchantShopFloor==='number')?d.merchantShopFloor:null;
+    this.lastShop=(d.lastShop&&typeof d.lastShop==='object'&&d.lastShop.offers)?d.lastShop:null;
     this.migrateCards();
     if(d.multBase) Object.assign(GameData.BINGO_MULTIPLIER_BASE,d.multBase);
     if(d.corrBase!=null) GameData.CORRECTION_BASE_SCORE=d.corrBase;

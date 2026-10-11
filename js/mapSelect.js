@@ -62,6 +62,14 @@ const MapSelectScene = {
     deckBtn.innerHTML=`${GIcon('btn_deck',{cls:'shop-icon-ico'})}<span class="shop-icon-cap">デッキ</span><span class="shop-icon-badge">${GameState.currentDeck.length}</span>`;
     deckBtn.addEventListener('click',()=>{ _seMap('open',{suppressTap:true}); GameMainScene.showDeckModal('deck'); });
     header.appendChild(deckBtn);
+    // v1.30 直近のショップに戻る（ステージ開始前のみ）
+    if(GameState.lastShop&&GameState.lastShop.offers&&!GameState.retreat&&typeof ShopScene!=='undefined'){
+      const shopBtn=document.createElement('button'); shopBtn.type='button'; shopBtn.className='shop-icon-btn map-shop-btn';
+      shopBtn.setAttribute('aria-label','直近のショップに戻る'); shopBtn.title='直近のショップに戻る';
+      shopBtn.innerHTML=`${GIcon('btn_shop',{cls:'shop-icon-ico'})}<span class="shop-icon-cap">ショップ</span>`;
+      shopBtn.addEventListener('click',()=>{ _seMap('confirm',{suppressTap:true}); ShopScene.returnToLastShop(); });
+      header.appendChild(shopBtn);
+    }
     if(typeof Settings!=='undefined') header.appendChild(Settings.button('map')); // 設定（js/settings.js）
     el.appendChild(header);
     // #11 マップ画面でも所持レリックを確認・並び替えできるようにする

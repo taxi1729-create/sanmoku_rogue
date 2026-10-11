@@ -92,3 +92,7 @@
   .ecr-shine{display:none;}
   .sev-opt.sev-opt-rare{animation:none;}
 }
+
+/* v1.30 品揃え更新ボタンも右上に価格バッジ */
+.shop-reroll-btn{position:relative;overflow:visible;}
+.shop-reroll-btn .slot-price{top:-9px;right:-6px;}

@@ -1359,7 +1359,9 @@ const GameMainScene = {
     const startScore=GameState.currentScore;
     try{
       const runs=[];
-      for(let i=0;i<bingos.length;i++){
+      // v1.30 6つ以上の同時ビンゴは各計算の吹き出し演出を省略し、軽量演出（盤面ハイライト＋まとめてカウントアップ）にする
+      if(bingos.length>=6) runs.push(this.playScoreSequenceLite(bingos,ctx));
+      else for(let i=0;i<bingos.length;i++){
         // 同時ビンゴの開始間隔は 0.3/(n-1) 秒（n=このシーケンスのビンゴ数）。早送りの有無に関わらずこの間隔
         if(i>0){ const gap=300/(bingos.length-1); await this.sleep(Math.round(gap)); }
         this.sfx('bingo',{pitch:Math.min(7,i*2),minGap:0});
@@ -1382,6 +1384,28 @@ const GameMainScene = {
       this.scoringAnims=[]; this.scoringAnim=null; this._scorePops={};
       this.scoringRelicIds=[]; this.scoringRelicValues={}; this.scoringPassiveIds=[]; this.scoringPassiveValues={};
       this.renderAll();
+    }
+  },
+  async playScoreSequenceLite(bingos,ctx){
+    const prevCommit=ctx.commit; let release; ctx.commit=new Promise(r=>{ release=r; });
+    const before=GameState.currentScore;
+    let after=before;
+    bingos.forEach(b=>{ if(b.debugMsg) console.log(b.debugMsg); after=Math.max(0,after+(b.score||0)); });
+    const anim={phase:0,cells:[...new Set(bingos.flatMap(b=>b.cells||[]))],symbol:bingos[0].symbol,liveScore:before,before,score:after-before,reached:false,popCell:null};
+    this.scoringAnims=[anim]; this.scoringAnim=anim; this.scoreBoxes=null;
+    let done=false;
+    try{
+      this.renderAll();
+      for(let i=0;i<Math.min(bingos.length,4);i++){ this.sfx('bingo',{pitch:Math.min(7,i*2),minGap:0}); await this.sleep(this.scoreFastForward?20:90); }
+      await this.sleep(this.scoreFastForward?40:260);
+      await prevCommit;
+      bingos.forEach(b=>{ const ll=b.isPenta?'5列':(b.isQuad?'4列':'3列'); this.addLog(`${GIconSym(b.symbol)}${ll}ビンゴ！ ${GlobalFunctions.formatSigned(b.score)}`); });
+      await this.animateScoreCountUp(before,after);
+      GameState.currentScore=after; done=true;
+      anim.liveScore=after; anim.reached=after>=GameState.targetScore; anim.phase=8;
+    } finally{
+      if(!done) GameState.currentScore=after;
+      release();
     }
   },
   // 並行する各計算ステップのポップ対象（レリック・パッシブ）を和集合にまとめて反映する
@@ -2767,10 +2791,32 @@ const GameMainScene = {
       }
       l.push(`<div class="info-desc desc-enhance">【${card.enhance}】${GameData.ENHANCE_DESC[card.enhance]||''}${extra}</div>`);
     }
-    if(card.trait)   l.push(`<div class="info-desc desc-trait">【${card.trait}】${GameData.TRAIT_DESC[card.trait]||''}</div>`);
+    if(card.trait)   l.push(`<div class="info-desc desc-trait">【${card.trait}】${GameData.TRAIT_DESC[card.trait]||''}${this.traitLiveText(card)}</div>`);
     return l.length>0?l.join(''):'<div class="info-desc">効果なし</div>';
   },
 
+  // v1.30 性質変化「レリック特攻」「ミニマム」「マキシマム」の現在の効果量（盤面はゲーム中のみ参照）
+  traitLiveText(card){
+    try{
+      const t=card&&card.trait; if(!t) return '';
+      const wrap=(x)=>`<br><span class="trait-live-value" style="color:var(--gold)">${x}</span>`;
+      if(t==='レリック特攻'){ const n=GameState.relicCount(); return wrap(`現在：基礎点+${10*n}（n=${n}）`); }
+      if(t!=='ミニマム'&&t!=='マキシマム') return '';
+      const inGame=!!(this.board&&this.container&&this.container.isConnected&&this.container.querySelector('.game-screen'));
+      if(!inGame) return wrap('現在：盤面に応じて変動（ゲーム中に確認できます）');
+      const counts={}; GameData.SYMBOLS.forEach(sy=>{counts[sy]=this.board.filter(c=>c&&c.symbol===sy).length;});
+      const lbl=(sy)=>GameData.SYMBOL_LABEL[sy]||sy;
+      if(t==='ミニマム'){
+        const ent=Object.entries(counts).filter(([,v])=>v>0);
+        if(!ent.length) return wrap('現在：補正倍率+0（盤面に記号なし）');
+        const minv=Math.min(...ent.map(e=>e[1])); const syms=ent.filter(e=>e[1]===minv).map(e=>lbl(e[0])).join('');
+        return wrap(`現在：補正倍率+${minv*20}（最少記号${syms} n=${minv}）`);
+      }
+      const maxS=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+      if(!maxS||maxS[1]===0) return wrap('現在：補正倍率+0（盤面に記号なし）');
+      return wrap(`現在：${lbl(maxS[0])}ビンゴ時に補正倍率+${maxS[1]*10}（最多記号${lbl(maxS[0])} n=${maxS[1]}）`);
+    }catch(e){ return ''; }
+  },
   effectDotClasses(card){ if(!card) return []; const d=[]; if(card.jamming) d.push('dot-jamming'); if(card.enhance) d.push('dot-enhance'); if(card.trait) d.push('dot-trait'); return d; },
 
   // バツパッシブLv2（ミラー：全記号の最大倍率）・Lv3（×4）適用後のバツ基礎倍率。どちらも無効なら null
