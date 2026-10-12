@@ -146,7 +146,7 @@ const GameData = {
     'ブルジョワ':   '①カード基礎点+4×現在G',
     'ドロー':       '①盤面配置時にカードを1枚ドロー',
     // #4 新規強化効果5種
-    'エクステンド': '①このカードを置いたターンはビンゴしていてもラウンドが終了せず、ビンゴ計算も行われない。次の自分のターンでカードを配置した時に効果が解除される②カード基礎点+5',
+    'エクステンド': '①このカードを置いたターンはビンゴしていてもラウンドが終了せず、ビンゴ計算も行われない。次に自分がカードを置くか、次の自分の手番をスキップした時に効果が解除される②カード基礎点+5',
     '加重':         '①カード基礎点+n（n=デッキ内のこのカードと同じ記号のカードの数）',
     'ギャンブル':   '①手札に来るたび、カード基礎点に-50〜+50のランダムな値を加算。捨て札に行く、またはゲーム終了時にリセットされる',
     'トップスピード':'①カード基礎点+5。②ゲーム開始時、このカードをデッキの一番上に配置する',
@@ -268,7 +268,6 @@ const GameData = {
         live(){
           let crossEff=GameData.BINGO_MULTIPLIER_BASE.Cross;
           if(GameState.symbolPassiveTier.Cross>=2) crossEff=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s]));
-          if(GameState.symbolPassiveTier.Cross>=3) crossEff*=4;
           const sum=GameData.BINGO_MULTIPLIER_BASE.Triangle+GameData.BINGO_MULTIPLIER_BASE.Square+crossEff;
           return `サンカク+シカク+バツ(実効)＝${Math.round(sum*100)/100} → クリア時マル倍率+${sum>0?Math.round(sum):0}`;
         } },
@@ -307,8 +306,8 @@ const GameData = {
         live(){ const n=GameState.currentDeck.length; return `デッキ枚数:${n}枚 → NPCのバツ基礎点=${n*3*GameState.star()}`; } },
       2: { name:'バツ・ミラー', desc:'①一番高いビンゴ倍率を常にバツ倍率に反映し続ける',
         live(){ const max=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s])); return `バツ倍率 ${Math.round(GameData.BINGO_MULTIPLIER_BASE.Cross*100)/100} → ${Math.round(max*100)/100}（現在の最大倍率を反映）`; } },
-      3: { name:'バツ・クアドラプル', desc:'①点数計算時、現在のバツビンゴ倍率をさらに4倍して補正する。②全てのカードが常にバツカードになる',
-        live(){ const max=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s])); return `バツ倍率(${Math.round(max*100)/100}) × 4 = ${Math.round(max*4*100)/100}`; } },
+      3: { name:'バツ・クアドラプル', desc:'①手札にバツカードが来た時、そのカードのカード基礎点+20×STAR。②全てのカードが常にバツカードになる',
+        live(){ return `手札にバツカードが来るたび、そのカードの基礎点+${20*GameState.star()}（永続）`; } },
     },
     // #3 ホシパッシブ（実際のカード記号ではなく専用の特殊効果枠）
     Hoshi: {
@@ -323,10 +322,10 @@ const GameData = {
     Seven: {
       1: { name:'セブン・ラッキー', desc:'①ビンゴ時、7の倍数の基礎点を持つカード1枚につき、補正倍率+77',
         live(){ return 'そのビンゴ列に含まれる7の倍数の基礎点カード1枚につき補正倍率+77'; } },
-      2: { name:'セブン・アクセル', desc:'①累計で7回ビンゴするごとに、全記号のビンゴ倍率+7し、次のビンゴ時に限り最終乗算補正×7する',
-        live(){ const n=GameState.totalBingoCount||0; const rest=(7-(n%7))%7; return `累計ビンゴ回数：${n}回（次の節目まであと${rest}回）${GameState.sevenPendingMultBoost?' ／ 次のビンゴで最終乗算補正×7が発動！':''}`; } },
-      3: { name:'セブン・ハーモニー', desc:'①デッキの枚数が7の倍数の時、最終加算補正+目標点数の7%',
-        live(){ const n=GameState.currentDeck.length; return n%7===0?`デッキ${n}枚（7の倍数）→ 最終加算補正+${Math.round(GameState.targetScore*0.07)}`:`デッキ${n}枚（7の倍数ではないため現在は無効）`; } },
+      2: { name:'セブン・アクセル', desc:'①累計で7回ビンゴするごとに、デッキの枚数が7の倍数の時、全記号のビンゴ倍率+7し、次のビンゴ時に限り最終乗算補正×7する',
+        live(){ const n=GameState.totalBingoCount||0; const rest=(7-(n%7))%7; const d=GameState.currentDeck.length; return `累計ビンゴ回数：${n}回（次の節目まであと${rest}回）／デッキ${d}枚${d%7===0?'（7の倍数）':'（7の倍数ではない）'}${GameState.sevenPendingMultBoost?' ／ 次のビンゴで最終乗算補正×7が発動！':''}`; } },
+      3: { name:'セブン・ハーモニー', desc:'①ビンゴ時、最終加算補正+目標点数の7%',
+        live(){ return `最終加算補正+${Math.round(GameState.targetScore*0.07)}`; } },
     },
   },
 
@@ -858,9 +857,23 @@ const GameData = {
   CLEAR_REWARD_BASE_G: 5,
   SKIP_REWARD_BASE_G: 5, // スキップ報酬G（固定）
 
+  // v1.31 レリック強化効果の抽選：所持状況により一部の効果は限りなく出にくくする
+  //   ブラックカード：2個以上所持／NPC強化・ネガティブ：1個以上所持
+  pickRelicEnhanceId(){
+    const owned=(id)=>(typeof GameState!=='undefined'&&GameState.relics)?GameState.relics.filter(r=>r.relicEnhance===id).length:0;
+    const w=(id)=>{
+      if(id==='ren_black'&&owned(id)>=2) return 0.001;
+      if((id==='ren_npc'||id==='ren_negative')&&owned(id)>=1) return 0.001;
+      return 1;
+    };
+    const pool=this.RELIC_ENHANCE_POOL; const tot=pool.reduce((t,e)=>t+w(e.id),0);
+    let r=Math.random()*tot;
+    for(const e of pool){ r-=w(e.id); if(r<0) return e.id; }
+    return pool[pool.length-1].id;
+  },
   // #12 多階層
   buildFloorStages(floor){
-    const baseCommon=[250,1000,5000,20000,100000,250000,1000000,3000000,10000000,25000000];
+    const baseCommon=[250,1000,5000,20000,200000,500000,2000000,6000000,20000000,25000000]; // v1.31 第5〜9階層は2倍
     const c=baseCommon[Math.min(floor-1,9)]||250;
     const bossMulti=floor>=10?4:3;
     // #6 階層10はボス効果2つに下方修正（特有ボス効果は別枠で付与）

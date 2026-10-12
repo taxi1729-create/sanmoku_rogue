@@ -1109,3 +1109,21 @@ button.gallery-item:active{ transform:scale(.97); }
 .card-reveal-toast .mult-change-table tr:nth-child(4) td{ animation-delay:432ms; }
 .card-reveal-toast .mult-change-table tr:nth-child(n+5) td{ animation-delay:576ms; }
 @media (prefers-reduced-motion: reduce){ .card-reveal-toast .flip-card-inner{ animation:none; } }
+
+/* v1.31 6つ以上の同時ビンゴ：軽量な点数演出パネル */
+.score-lite-panel{position:fixed;left:50%;top:14%;transform:translateX(-50%);z-index:900;width:min(300px,86vw);pointer-events:none;
+  background:rgba(15,18,32,.88);border:1px solid rgba(253,230,138,.55);border-radius:12px;padding:8px 12px 10px;box-shadow:0 6px 20px rgba(0,0,0,.45);
+  animation:slpIn .18s ease-out;}
+.score-lite-panel.slp-out{opacity:0;transition:opacity .25s;}
+.slp-title{text-align:center;font-weight:800;font-size:18px;color:#fde68a;letter-spacing:.05em;margin-bottom:4px;}
+.slp-rows{max-height:38vh;overflow:hidden;display:flex;flex-direction:column;gap:2px;}
+.slp-row{display:flex;align-items:center;gap:6px;font-size:13px;color:#e5e7eb;animation:slpRow .16s ease-out;}
+.slp-row .slp-sym .gi{width:15px;height:15px;}
+.slp-row .slp-kind{flex:1;opacity:.85;}
+.slp-row .slp-score{font-weight:700;color:#86efac;font-variant-numeric:tabular-nums;}
+.slp-row.neg .slp-score{color:#fca5a5;}
+.slp-total{margin-top:6px;border-top:1px solid rgba(255,255,255,.18);padding-top:4px;text-align:right;font-weight:800;font-size:15px;color:#fde68a;font-variant-numeric:tabular-nums;}
+.slp-total.slp-total-on{animation:slpPop .3s ease-out;}
+@keyframes slpIn{from{opacity:0;transform:translateX(-50%) scale(.92);}to{opacity:1;transform:translateX(-50%) scale(1);}}
+@keyframes slpRow{from{opacity:0;transform:translateX(-8px);}to{opacity:1;transform:none;}}
+@keyframes slpPop{0%{transform:scale(1);}50%{transform:scale(1.15);}100%{transform:scale(1);}}

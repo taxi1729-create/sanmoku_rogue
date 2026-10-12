@@ -149,7 +149,7 @@ const ShopScene = {
   pickRelic(){
     const base = GameData.pickRelicBaseByGrade(); // #5 グレード別の排出確率
     // #1 魔力ステージE：ピックアップレリックには必ずレリック強化効果が付与される
-    const relicEnhance = (GameState.hasMana('E') || Math.random() < GameData.RELIC_ENHANCE_RATE) ? GlobalFunctions.randChoice(GameData.RELIC_ENHANCE_POOL).id : null;
+    const relicEnhance = (GameState.hasMana('E') || Math.random() < GameData.RELIC_ENHANCE_RATE) ? GameData.pickRelicEnhanceId() : null;
     return { ...base, relicEnhance };
   },
 
@@ -523,7 +523,7 @@ const ShopScene = {
     this.renderAll();
   },
   genRelicPackCandidates(){
-    const gen = () => { const base = GameData.pickRelicBaseByGrade(); const relicEnhance = (GameState.hasMana('E') || Math.random() < GameData.RELIC_ENHANCE_RATE) ? GlobalFunctions.randChoice(GameData.RELIC_ENHANCE_POOL).id : null; return { ...base, relicEnhance }; };
+    const gen = () => { const base = GameData.pickRelicBaseByGrade(); const relicEnhance = (GameState.hasMana('E') || Math.random() < GameData.RELIC_ENHANCE_RATE) ? GameData.pickRelicEnhanceId() : null; return { ...base, relicEnhance }; };
     return [gen(),gen(),gen()];
   },
   // #9 レリック「趣味レリック集め」：クリア報酬の爆発アップグレードより前に、無料のレリックパックを順番に開く
