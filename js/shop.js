@@ -447,7 +447,7 @@ const ShopScene = {
       case 'base_up5':       targetIndexes.forEach(i=>{ if(deck[i]) deck[i].baseScore+=10; }); this.message = '基礎点+10'; return targetIndexes.map(i=>deck[i]).filter(Boolean);
       // #9 特別セレクト全引き後の確定選択肢に追加
       case 'base_up30':      targetIndexes.forEach(i=>{ if(deck[i]) deck[i].baseScore+=30; }); this.message = '基礎点+30'; return targetIndexes.map(i=>deck[i]).filter(Boolean);
-      case 'symbol_change':  targetIndexes.forEach(i=>{ const c=deck[i]; if(!c) return; c.symbol=GlobalFunctions.randChoice(['Circle','Triangle','Square'].filter(s=>s!==c.symbol)); }); this.message = '記号変化'; return targetIndexes.map(i=>deck[i]).filter(Boolean);
+      case 'symbol_change':  targetIndexes.forEach(i=>{ const c=deck[i]; if(!c) return; c.symbol=(GameState.symbolPassiveTier.Cross||0)>=3?'Cross' /* v1.34 バツパッシブLv3④ */ :GlobalFunctions.randChoice(['Circle','Triangle','Square'].filter(s=>s!==c.symbol)); }); this.message = '記号変化'; return targetIndexes.map(i=>deck[i]).filter(Boolean);
       case 'cash_in': { const i=targetIndexes[0]; const c=deck[i]; if(!c) return []; const g=this.calcCashGain(c); GameState.currentDeck=deck.filter((_,idx)=>idx!==i); GameState.gold+=g; this._lastCashGain=g; this.message=`換金G+${g}`; return []; }
       case 'duplicate': { const i=targetIndexes[0]; const src=deck[i]; if(!src) return []; const clone={...src,id:'dup_'+Date.now()+'_'+Math.floor(Math.random()*100000)}; GameState.currentDeck.push(clone); this.message='複製した'; return [clone]; }
       // #21 付与効果は対象カードに現在付与されているもの以外から抽選する

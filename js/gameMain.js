@@ -158,7 +158,7 @@ const GameMainScene = {
     this.windows=this.buildWindows(GameData.BOARD_SIZE);
     this.logs=[]; this.resultState=null; this._rewardPacksOpen=false; this.boardInfoCell=null; this.scoringAnim=null; this.scoringAnims=[];
     this.rerollMode=false; this.rerollSelected=new Set();
-    this.prevRoundBingoSymbol=null; this.prevRoundScore=0; this.chargeActive=false; this.chargeN=0; this._chargeUpdatedThisRound=false; this.roundCorrMultBonus=0; this.roundBoostAdd=0; // #3 チャージn・ジャミング増強の今ラウンド補正
+    this.prevRoundBingoSymbol=null; this.prevRoundScore=0; this.chargeActive=false; this.chargeN=0; this._chargeUpdatedThisRound=false; this.roundCorrMultBonus=0; this.crossJamBonus=0; /* v1.34 バツパッシブLv3③（ゲーム中累積） */ this.roundBoostAdd=0; // #3 チャージn・ジャミング増強の今ラウンド補正
     this.bossEffect=null; this.bossEffects=null; this.blockedCells=new Set(); this.bossBlackedOut=false;
     this.lastNpcCell=null; this.lastPlacedCell=null; this.activeRelicId=null; this.relicListOpen=false; this.scoringRelicIds=[];
     this.scoringRelicValues={}; this.scoringPassiveIds=[]; this.scoringPassiveValues={};
@@ -392,6 +392,8 @@ const GameMainScene = {
     this.bingoSymbolCountThisRound={}; this.checkExtendReleased=false;
     this.effectsBubbleOpen=false;
     this.roundCorrMultBonus=0; // #3 ジャミング増強の補正倍率はラウンドごと
+    // v1.34 バツパッシブLv3①：ラウンド開始時、全てのバツカードのカード基礎点+50×STAR（永続）
+    if((GameState.symbolPassiveTier.Cross||0)>=3){ const add=50*GameState.star(); let n=0; (GameState.currentDeck||[]).forEach(c=>{ if(c&&c.symbol==='Cross'){ c.baseScore+=add; n++; } }); if(n) this.addLog(`バツパッシブLv3：バツカード${n}枚の基礎点+${add}`); }
     // #4 保留：盤面の保留カードは手札に戻さない（reserveは旧データ互換のため残っていれば手札へ）
     if(GameState.reserve.length>0){ GameState.reserve.forEach(c=>{c._reserveCarry=true;}); GameState.hand.push(...GameState.reserve); GameState.reserve=[]; }
     this.drawToHandSize();
@@ -819,8 +821,6 @@ const GameMainScene = {
     }
     GameState.hand.push(card);
     this.sfxDraw();
-    // v1.31 バツパッシブLv3①：手札にバツカードが来た時、そのカードの基礎点+20×STAR（永続）
-    if(card.symbol==='Cross'&&(GameState.symbolPassiveTier.Cross||0)>=3){ card.baseScore+=20*GameState.star(); }
     // #4 ギャンブル：手札に来るたび-50〜+50のランダムな値を基礎点に加算（前回分はリセットしてから再抽選）
     // #12 レリック「ギャンブル依存症」：効果量が常に+50か-50のどちらかのみになる
     if(card.enhance==='ギャンブル'){
@@ -864,6 +864,12 @@ const GameMainScene = {
       GameState.currentScore=Math.max(0,GameState.currentScore+bonus);
       this.effects.stunNextNpc=true;
       this.addLog(`ジャミング増強：ビンゴ阻害のカードが配置され、スタンを追加付与し+${bonus}点（目標点数×0.05）`);
+    }
+    // v1.34 バツパッシブLv3②：混乱はブレイクに置き換わる ／ ③ジャミング発動のたび補正倍率+20×STAR（ゲーム中累積）
+    if((GameState.symbolPassiveTier.Cross||0)>=3){
+      if(jamming==='混乱'){ jamming='ブレイク'; this.addLog('バツパッシブLv3：混乱はブレイクに置き換わった'); }
+      const v=20*GameState.star(); this.crossJamBonus=(this.crossJamBonus||0)+v;
+      this.addLog(`バツパッシブLv3：ジャミング発動により補正倍率+${v}（累計+${this.crossJamBonus}）`);
     }
     this.sfx({'スタン':'stun','混乱':'glitch','引き直し':'swipe'}[jamming]||'jam',{delay:0.08});
     switch(jamming){
@@ -1161,8 +1167,12 @@ const GameMainScene = {
       const totalBase=cardBaseSum+correctionBase+relicBonus;
 
       let finalMult=baseMult+GameData.CORRECTION_MULTIPLIER;
+      // v1.34 バツパッシブLv3③：ゲーム中のジャミング発動回数×20×STAR
+      const crossJamV=((GameState.symbolPassiveTier.Cross||0)>=3&&this.crossJamBonus)?this.crossJamBonus:0;
+      finalMult+=crossJamV;
       // #1 演出用：補正倍率に効く、普段は非表示のレリック強化効果・パッシブ・性質変化・手札効果の内訳を記録しておく
       const correctionMultParts=[];
+      if(crossJamV){ correctionMultParts.push({label:'バツパッシブLv3（ジャミング）',op:'+',val:crossJamV,sym:'Cross'}); markPassive('Cross',crossJamV); }
       // #新規 セブンパッシブ1：ビンゴ時、7の倍数の基礎点を持つカード1枚につき補正倍率+77
       if(GameState.symbolPassiveTier.Seven>=1){
         const n7=r.cells.filter(c=>c&&c.baseScore%7===0).length;
@@ -1995,6 +2005,7 @@ const GameMainScene = {
   _simJamming(jam,cellIdx,B,ef){
     const bs=GameData.BOARD_SIZE, free=i=>B[i]===null&&!this.blockedCells.has(i);
     if(jam==='ビンゴ阻害'&&GameState.relics.some(r=>r.id==='jamming_boost')&&this.relicActive()) ef.stunNextNpc=true;
+    if(jam==='混乱'&&(GameState.symbolPassiveTier.Cross||0)>=3) jam='ブレイク'; // v1.34 バツパッシブLv3②
     switch(jam){
       case 'スタン': ef.stunNextNpc=true; break;
       case '混乱': ef.confuseNextNpc=true; break;
@@ -2236,6 +2247,7 @@ const GameMainScene = {
           // #予測修正 倍率：実際のmakeResult()と同じく (ビンゴ倍率+補正倍率) に対して同じ順序で加算・乗算する
           //   （以前は×系の効果＝廃棄強化×1.5・ターン強化・背水の陣・将軍などを補正倍率部分のみに掛けており、実際より低く見えていた）
           let mult=baseMult+GameData.CORRECTION_MULTIPLIER;
+          if((GameState.symbolPassiveTier.Cross||0)>=3&&this.crossJamBonus) mult+=this.crossJamBonus; // v1.34
           if(GameState.symbolPassiveTier.Seven>=1){ const n7=cells.filter(c=>c&&c.baseScore%7===0).length; if(n7>0) mult+=n7*77; }
           if(!noRelic){
             const cTurn2=GameState.relicCountOf('turn_boost');
@@ -2890,6 +2902,7 @@ const GameMainScene = {
     const jamCells=(name)=>{ const r=[]; this.board.forEach((cd,i)=>{ if(cd&&cd.card&&cd.card.jamming===name) r.push(i); }); return r; };
     const round=[], next=[];
     // ---- 現在ラウンドで有効 ----
+    if((GameState.symbolPassiveTier.Cross||0)>=3&&this.crossJamBonus) round.push({icon:ic('sym_cross'),name:'バツパッシブLv3（ジャミング発動）',desc:`このゲームの補正倍率+${Math.round(this.crossJamBonus)}`});
     if(this.roundCorrMultBonus) round.push({icon:ic('relic_jamming_boost'),name:'ジャミング増強②（ブレイク）',desc:`このラウンドの補正倍率+${Math.round(this.roundCorrMultBonus)}`});
     const blk=jamCells('ビンゴ阻害');
     if(blk.length>0){ const n=blk.length; round.push({icon:ic('jam_bingo_block'),name:'ジャミング：ビンゴ阻害',count:n,desc:`NPCのバツビンゴ：${n>=3?'不可':(n===2?'縦横不可':'縦不可')}`,where:posList(blk)}); }

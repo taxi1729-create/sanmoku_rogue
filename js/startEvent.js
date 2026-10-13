@@ -432,7 +432,6 @@ const StartEvent = (function(){
   // v1.00 #13 施し用：基礎点15・バツ以外のランダム記号のカード
   function startCard(fields){
     const c={ id:'start_'+Date.now()+'_'+Math.floor(Math.random()*100000), symbol:GlobalFunctions.randChoice(['Circle','Triangle','Square']), number:15, baseScore:15, jamming:null, enhance:null, trait:null, ...fields };
-    if(G().symbolPassiveTier&&G().symbolPassiveTier.Cross>=3) c.symbol='Cross';
     GameData.applyGrantSideEffects(c, G().gold);
     return c;
   }

@@ -214,6 +214,7 @@ const GameData = {
   },
   // v1.00 #9 バツパッシブLv3：所持カードを全てバツ記号に変える（同記号マルチの即時加算も付け直す）
   enforceCrossAll(){
+    return; // v1.34 バツパッシブLv3の「全てのカードが常にバツ」は廃止
     if(typeof GameState==='undefined' || !(GameState.symbolPassiveTier?.Cross>=3)) return;
     const seen=new Set();
     [...(GameState.currentDeck||[]),...(GameState.hand||[]),...(GameState.drawPile||[]),...(GameState.discardPile||[]),...(GameState.discardedPile||[]),...(GameState.reserve||[])].forEach(c=>{
@@ -306,8 +307,8 @@ const GameData = {
         live(){ const n=GameState.currentDeck.length; return `デッキ枚数:${n}枚 → NPCのバツ基礎点=${n*3*GameState.star()}`; } },
       2: { name:'バツ・ミラー', desc:'①一番高いビンゴ倍率を常にバツ倍率に反映し続ける',
         live(){ const max=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s])); return `バツ倍率 ${Math.round(GameData.BINGO_MULTIPLIER_BASE.Cross*100)/100} → ${Math.round(max*100)/100}（現在の最大倍率を反映）`; } },
-      3: { name:'バツ・クアドラプル', desc:'①手札にバツカードが来た時、そのカードのカード基礎点+20×STAR。②全てのカードが常にバツカードになる',
-        live(){ return `手札にバツカードが来るたび、そのカードの基礎点+${20*GameState.star()}（永続）`; } },
+      3: { name:'バツ・クアドラプル', desc:'①ラウンド開始時、全てのバツカードのカード基礎点+50×STAR。②ジャミング効果「混乱」はブレイク効果に置き換わる。③ゲーム中にジャミング効果が発動するたび補正倍率+20×STAR（ラウンド終了時にリセットされず、ゲーム終了時にリセット）。④通常アップグレードの記号変化で変化する記号がバツのみになる',
+        live(){ const gm=(typeof GameMainScene!=='undefined')?GameMainScene:null; const n=GameState.currentDeck.filter(c=>c.symbol==='Cross').length; return `ラウンド開始時：バツカード${n}枚の基礎点+${50*GameState.star()} ／ ジャミング累計：補正倍率+${(gm&&gm.crossJamBonus)||0}`; } },
     },
     // #3 ホシパッシブ（実際のカード記号ではなく専用の特殊効果枠）
     Hoshi: {
@@ -673,8 +674,6 @@ const GameData = {
     let symbol;
     if(!crossUnlocked) symbol = r<0.334?'Circle':(r<0.667?'Triangle':'Square');
     else symbol = r<0.3?'Circle':(r<0.6?'Triangle':(r<0.9?'Square':'Cross'));
-    // v1.00 #9 バツパッシブLv3：排出されるカードはすべてバツ記号
-    if(typeof GameState!=='undefined' && GameState.symbolPassiveTier?.Cross>=3) symbol='Cross';
     // #3 ボス効果「バツ5000」はNPCのバツのみ対象のため、ショップ生成カードには影響させない
     const baseScore = GlobalFunctions.randInt(1, 50);
     let jamming = Math.random() < 0.5 ? GlobalFunctions.randChoice(Object.keys(this.JAMMING_DESC)) : null;
