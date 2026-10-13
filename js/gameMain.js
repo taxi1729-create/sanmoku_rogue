@@ -412,6 +412,13 @@ const GameMainScene = {
     this.resetClockUp();
     this.sfx('turnEnd',{pitch:-5}); // #シカクパッシブ3 タイマー片付け
     this.prevRoundScore=GameState.currentScore;
+    // v1.36 サンカクパッシブLv3②：ラウンド終了時、盤面のバツの数nに応じてサンカクビンゴ倍率+m（m=STAR×(5-n)、0未満にならない）
+    if((GameState.symbolPassiveTier.Triangle||0)>=3){
+      const n=this.board.filter(c=>c&&c.symbol==='Cross').length;
+      const m=Math.max(0,GameState.star()*(5-n));
+      if(m>0){ const mb=GameData.snapshotMult(); GameData.BINGO_MULTIPLIER_BASE.Triangle+=m; try{ this.showMultChangeToast(mb); }catch(e){} }
+      this.addLog(`サンカクパッシブ3：盤面のバツ${n}個 → サンカク倍率+${m}`);
+    }
     // #7 レリック「ラウンド強化」：ラウンド終了時、最終加算補正+1000×n(n=現在ラウンド)
     if(GameState.hasRelic('round_boost')&&this.relicActive()){
       const add=1000*GameState.round;

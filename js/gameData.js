@@ -289,8 +289,8 @@ const GameData = {
         live(){ const total=GameState.currentDeck.length||1; const n=GameState.currentDeck.filter(c=>c.symbol==='Triangle').length/total; return `サンカク比率n=${Math.round(n*100)/100} → サンカク基礎点×${Math.round((1+n)*GameState.star()*100)/100}`; } },
       2: { name:'サンカク・レゾナンス', desc:'①デッキ内のサンカクカードでジャミング効果を持つもの1枚につき、最終補正倍率+0.1する',
         live(){ const n=GameState.currentDeck.filter(c=>c.jamming&&c.symbol==='Triangle').length; return `サンカクのジャミング所持カード:${n}枚 → 最終補正倍率+${Math.round(n*0.1*100)/100}`; } },
-      3: { name:'サンカク・エコー', desc:'①サンカクカードのジャミング効果を使用した次のターンに、もう一度同じ効果をNPCに付与する',
-        live(){ return 'ジャミングカード使用の1ターン後に同じ効果を再付与'; } },
+      3: { name:'サンカク・エコー', desc:'①サンカクカードのジャミング効果を使用した次のターンに、もう一度同じ効果をNPCに付与する②ラウンド終了時、盤面のバツの数nに応じてサンカクビンゴ倍率+m（m=STAR×(5-n)、mは0未満にならない）',
+        live(){ const gm=(typeof GameMainScene!=='undefined')?GameMainScene:null; const n=(gm&&gm.board)?gm.board.filter(c=>c&&c.symbol==='Cross').length:0; const m=Math.max(0,GameState.star()*(5-n)); return `ジャミングカード使用の1ターン後に同じ効果を再付与 ／ 現在の盤面のバツ${n}個 → ラウンド終了時サンカク倍率+${m}`; } },
     },
     Square: {
       // #13 手札上限+1の代わりに、ショップでのパック購入時の選択可能カード枚数+1
