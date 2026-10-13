@@ -382,6 +382,7 @@ const GameData = {
       case 'square_boost': return '補正基礎点:+60（シカクビンゴ時）';
       case 'relic_boost': { const n=GameState.relicCount(); return `補正基礎点:+${5+8*n}`; }
       case 'empty_boost': { const ec=(gm&&gm.board)?gm.board.filter(c=>!c).length:0; return `補正倍率:+${6*ec+5}`; }
+      case 'pinnacle': { const n=(GameState.hand||[]).filter(c=>c&&c.trait).length; const d=(GameState.discardPile||[]).filter(c=>c&&c.trait).length; return `手札の性質変化${n}枚（ラウンド開始時 倍率+${n}）／捨て札の性質変化${d}枚（ラウンド終了時 基礎点+5）`; }
       case 'combo': return '最終乗算補正:+2.25（前ラウンドと異なる記号でビンゴ時）';
       case 'turn_boost': { const t=gm?(gm.turnInRound||1):1; return `最終乗算補正:×${Math.round(Math.pow(1.01,t)*100)/100}`; }
       case 'hand_boost': return `補正倍率:+${GameState.hand.length*3}`;
@@ -573,7 +574,7 @@ const GameData = {
     { id:'joker', name:'ジョーカー',            desc:'①このレリックを売却した時、デッキから好きなカードを1枚選び、基礎点+10した上で記号をマル・サンカク・シカク・バツの中から好きなものに変更する' },
     { id:'gambling_addict', name:'ギャンブル依存症', desc:'①カード強化効果「ギャンブル」の効果量が、常に+50か-50のどちらかのみになる' },
     { id:'big_explosion', name:'大爆発',         desc:'①ステージクリア時、所持Gがショップでの爆発アップグレードの価格（10G。レリック強化「ブラックカード」1枚につき-1G）以上ならその分を消費し、爆発通常アップグレードをもう1パック追加で獲得する' },
-    { id:'pinnacle', name:'極みの境地',          desc:'①このレリックはレリック所持数上限分の大きさを持つ。②補正基礎点+150③補正倍率+150' },
+    { id:'pinnacle', name:'極みの境地',          desc:'①このレリックは2個分の大きさを持つ。②ラウンド開始時、手札にある性質変化が付与されているカード枚数だけ全てのビンゴ倍率+1③ラウンド終了時、捨て札にある性質変化が付与されているカードのカード基礎点を永続で+5' },
     { id:'onko_chishin', name:'温故知新',        desc:'①補正基礎点+10m（m=レリック所持数）②補正倍率+10n（n=パッシブ所持数）' }, // v12 #2 レジェンド
   ],
 

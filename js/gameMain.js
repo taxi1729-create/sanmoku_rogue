@@ -397,6 +397,10 @@ const GameMainScene = {
     // #4 保留：盤面の保留カードは手札に戻さない（reserveは旧データ互換のため残っていれば手札へ）
     if(GameState.reserve.length>0){ GameState.reserve.forEach(c=>{c._reserveCarry=true;}); GameState.hand.push(...GameState.reserve); GameState.reserve=[]; }
     this.drawToHandSize();
+    // v1.35 レリック「極みの境地」②：ラウンド開始時、手札の性質変化カード枚数だけ全てのビンゴ倍率+1（所持数分）
+    { const cP=this.relicActive()?GameState.relicCountOf('pinnacle'):0;
+      const n=GameState.hand.filter(c=>c&&c.trait).length*cP;
+      if(n>0){ const mb=GameData.snapshotMult(); GameData.SYMBOLS.forEach(s=>{ GameData.BINGO_MULTIPLIER_BASE[s]+=n; }); try{ this.showMultChangeToast(mb); }catch(e){} this.addLog(`極みの境地：手札の性質変化カードにより全てのビンゴ倍率+${n}`); } }
     this.sfx('shuffle',{delay:0.05});
     this.addLog(`--- ラウンド ${GameState.round} 開始（先手：${this.currentSide==='player'?'プレイヤー':'NPC'}） ---`);
     this.renderAll();
@@ -433,6 +437,9 @@ const GameMainScene = {
       this.pushToDiscard(c);
     });
     GameState.hand=keptHand;
+    // v1.35 レリック「極みの境地」③：ラウンド終了時、捨て札の性質変化カードの基礎点+5（永続・所持数分）
+    { const cP=this.relicActive()?GameState.relicCountOf('pinnacle'):0;
+      if(cP>0){ const add=5*cP; let n=0; GameState.discardPile.forEach(c=>{ if(c&&c.trait){ c.baseScore+=add; n++; } }); if(n) this.addLog(`極みの境地：捨て札の性質変化カード${n}枚の基礎点+${add}`); } }
     // #5 ドロー関連の効果は重複可能：所持数分ドローする
     { const n=this.relicActive()?GameState.relics.filter(r=>r.relicEnhance==='ren_draw').length:0; for(let i=0;i<n;i++) this.drawOne(); }
     this.chargeActive=false;
@@ -1141,9 +1148,6 @@ const GameMainScene = {
         if(cTen>0){ const n10=cardScores.filter(sc=>sc%10===0).length; if(n10>0){const v=n10*30*cTen;relicBonus+=v;markBaseRelic('ten_stage',v);} }
         // #3 レリック「魔神のお墨付き」：補正基礎点+n（n=捧げたカードの基礎点）
         GameState.relics.forEach(rel=>{ if(rel.id==='majin_seal'){ const v=(rel.sealValue||0)+50; relicBonus+=v; markBaseRelic('majin_seal',v); } }); // #1 n+50
-        // #12 レリック「極みの境地」：補正基礎点+150
-        const cPinnacle=GameState.relicCountOf('pinnacle');
-        if(cPinnacle>0){const v=150*cPinnacle;relicBonus+=v;markBaseRelic('pinnacle',v);}
         // v12 #2 レリック「温故知新」①補正基礎点+10m（m=レリック所持数）
         const cOnko=GameState.relicCountOf('onko_chishin'); if(cOnko>0){const v=10*GameState.relicCount()*cOnko;if(v){relicBonus+=v;markBaseRelic('onko_chishin',v);}}
       }
@@ -1194,9 +1198,6 @@ const GameMainScene = {
         // #3 レリック「テンステージ」：ビンゴ時のターンが10の時、補正倍率+30（所持数分）
         const cTen2=GameState.relicCountOf('ten_stage');
         if(cTen2>0&&this.turnInRound===10){const v=30*cTen2;finalMult+=v;correctionMultParts.push({label:'テンステージ',op:'+',val:v,id:'ten_stage'});markRelic('ten_stage',v);}
-        // #12 レリック「極みの境地」：補正倍率+150
-        const cPinnacle2=GameState.relicCountOf('pinnacle');
-        if(cPinnacle2>0){const v=150*cPinnacle2;finalMult+=v;correctionMultParts.push({label:'極みの境地',op:'+',val:v,id:'pinnacle'});markRelic('pinnacle',v);}
         // v12 #2 レリック「温故知新」②補正倍率+10n（n=パッシブ所持数）
         const cOnko2=GameState.relicCountOf('onko_chishin'); if(cOnko2>0){const v=10*GameState.passiveCount()*cOnko2;if(v){finalMult+=v;correctionMultParts.push({label:'温故知新',op:'+',val:v,id:'onko_chishin'});markRelic('onko_chishin',v);}}
         GameState.relics.forEach(rel=>{
@@ -2226,7 +2227,6 @@ const GameMainScene = {
             const cTenP=GameState.relicCountOf('ten_stage');
             if(cTenP>0){ const n10=cardScores.filter(sc=>sc%10===0).length; relicBonus+=n10*30*cTenP; }
             GameState.relics.forEach(rel=>{ if(rel.id==='majin_seal') relicBonus+=(rel.sealValue||0)+50; });
-            relicBonus+=150*GameState.relicCountOf('pinnacle');
             relicBonus+=10*GameState.relicCount()*GameState.relicCountOf('onko_chishin');
           }
           // 性質変化（配置後の盤面で、実際の点数計算と同じ範囲＝当該ビンゴ列のみを見る）
@@ -2261,7 +2261,6 @@ const GameMainScene = {
             if(this.roundCorrMultBonus) mult+=this.roundCorrMultBonus;
             const cTen2P=GameState.relicCountOf('ten_stage');
             if(cTen2P>0&&turnNow===10) mult+=30*cTen2P;
-            mult+=150*GameState.relicCountOf('pinnacle');
             mult+=10*GameState.passiveCount()*GameState.relicCountOf('onko_chishin');
             GameState.relics.forEach(rel=>{
               if(rel.relicEnhance==='ren_general') mult*=1.1;

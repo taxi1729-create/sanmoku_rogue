@@ -104,7 +104,7 @@ const GameState = {
     if(ren==='ren_double') return 2;
     // #12 新規レリックの所持枠数（レリック強化効果を持つ場合は上のren判定が優先される）
     if(relic?.id==='hobby_collect') return 3;
-    if(relic?.id==='pinnacle') return this.effectiveMaxRelics();
+    if(relic?.id==='pinnacle') return 2; // v1.35 極みの境地：2個分
     return 1;
   },
   // v1.01 パッシブ変数STAR：初期値1、ホシパッシブLv3で2になる（各パッシブの効果量に乗算）
