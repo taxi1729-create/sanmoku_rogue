@@ -106,7 +106,10 @@ const ShopScene = {
   // ミニショップ：レリックパック・カードフォーカスパック（固定）＋ランダム商品2つ（通常ショップと同じ重み付き抽選）
   //   品揃え更新しても構成は同じ（固定2枠は未購入で復活し、ランダム2枠だけ再抽選）
   generateMiniOffers(){
-    const miniFixed = [{ type:'relic_pack', miniFixed:true }, { type:'card_focus', miniFixed:true }];
+    // v1.32 常設に「ピックアップアップグレード：記号変化」「パッシブレベルチェンジ」を追加
+    const symEff = GameData.NORMAL_SELECT_POOL.find(e=>e.id==='symbol_change');
+    const miniFixed = [{ type:'relic_pack', miniFixed:true }, { type:'card_focus', miniFixed:true },
+      { type:'pickup_upgrade', miniFixed:true, _single:symEff }, { type:'passive_change', miniFixed:true }];
     const randomSlots = [];
     for(let i = 0; i < 2; i++){
       const slot = this.makeRandomSlot();
@@ -485,6 +488,7 @@ const ShopScene = {
       case 'jamming_pack': this.buyJammingPack(slot); break;
       case 'relic_pack': this.buyRelicPack(slot); break;
       case 'normal_explosive_upgrade': this.buyExplosiveUpgrade(slot); break;
+      case 'passive_change': this.buyPassiveChange(slot); break;
       default: break;
     }
   },
@@ -492,7 +496,7 @@ const ShopScene = {
   slotPrice(type){
     // ピックアップレリックは実際のレリック価格（5G、レリック強化付きは+3G）で表示・判定する
     const map = { pickup_relic:GameData.SHOP_PRICES.relic, card_pack:GameData.SHOP_PRICES.cardPack, pickup_upgrade:GameData.SHOP_PRICES.pickupUpgrade, normal_upgrade:GameData.SHOP_PRICES.normalUpgrade, special_upgrade:GameData.SHOP_PRICES.specialUpgrade, card_focus:GameData.SHOP_PRICES.cardFocus, bingo_focus:GameData.SHOP_PRICES.bingoFocus, dream_card:GameData.SHOP_PRICES.dreamCard,
-      enhance_pack:GameData.SHOP_PRICES.enhancePack, jamming_pack:GameData.SHOP_PRICES.jammingPack, relic_pack:GameData.SHOP_PRICES.relicPack, normal_explosive_upgrade:GameData.SHOP_PRICES.normalExplosiveUpgrade };
+      enhance_pack:GameData.SHOP_PRICES.enhancePack, jamming_pack:GameData.SHOP_PRICES.jammingPack, relic_pack:GameData.SHOP_PRICES.relicPack, normal_explosive_upgrade:GameData.SHOP_PRICES.normalExplosiveUpgrade, passive_change:GameData.SHOP_PRICES.passiveChange };
     return map[type] || 3;
   },
 
@@ -670,17 +674,72 @@ const ShopScene = {
   // v10 #7 ミニショップでの購入・売却・パック選択確定のたびにセーブ（パック選択中は確定後にセーブ）
   miniShopAutoSave(){
     if(!this.miniShop||!GameState.retreat||!this.offers) return;
-    if(this.pickingPack||this.pickingCardPack||this.pickingRelicPack||this._fxPack||(this.packQueue&&this.packQueue.length)||this.pendingRelicPacks) return;
-    let sig; try{ sig=JSON.stringify([GameState.gold,GameState.currentDeck,GameState.relics,this.offers]); }catch(e){ return; }
+    if(this.pickingPack||this.pickingCardPack||this.pickingRelicPack||this._fxPack||(this.packQueue&&this.packQueue.length)||this.pendingRelicPacks||this.passiveChange) return;
+    let sig; try{ sig=JSON.stringify([GameState.gold,GameState.currentDeck,GameState.relics,this.offers,GameState.symbolPassiveTier]); }catch(e){ return; }
     if(sig===this._miniSaveSig) return;
     this._miniSaveSig=sig;
     GameState.retreat.offers=this.offers;
     App.saveGame();
   },
+  // ===== v1.32 パッシブレベルチェンジ（20G）：所持パッシブ1つのレベルを1下げ、その後ランダム3択からパッシブを1つ習得 =====
+  passiveChangeOwned(){ return [...GameData.PASSIVE_SYMBOLS,'Seven'].filter(s=>(GameState.symbolPassiveTier[s]||0)>=1); },
+  buyPassiveChange(slot){
+    const price=GameState.shopPriceOf(this.slotPrice('passive_change'));
+    if(GameState.gold<price||this.passiveChangeOwned().length===0||slot.used){ _seShop('error',{suppressTap:true}); this.message=GameState.gold<price?'Gが足りません':'レベルを下げられるパッシブがありません'; this.renderAll(); return; }
+    this.passiveChange={ slot, step:'lower' };
+    _seShop('open',{suppressTap:true});
+    this.renderAll();
+  },
+  renderPassiveChangeModal(){
+    const ov=document.createElement('div'); ov.className='pack-modal-overlay passive-change-overlay';
+    const box=document.createElement('div'); box.className='pack-modal passive-change-modal';
+    const price=GameState.shopPriceOf(this.slotPrice('passive_change'));
+    box.innerHTML=`<h3>${GIcon('shop_passive_change',{cls:'gi-gap'})}パッシブレベルチェンジ</h3><div class="pc-lead">レベルを1下げるパッシブを選択（${GCoinAmt(price)}）。その後、ランダムな3つから1つ習得します。</div>`;
+    const list=document.createElement('div'); list.className='pc-list';
+    this.passiveChangeOwned().forEach(s=>{
+      const t=GameState.symbolPassiveTier[s]; const p=(GameData.SYMBOL_PASSIVES[s]||{})[t]||{name:''};
+      const b=document.createElement('button'); b.type='button'; b.className='pc-item';
+      b.innerHTML=`<span class="pc-sym sym-${s}">${GameData.SYMBOL_LABEL[s]}</span><span class="pc-text"><b>${GameData.SYMBOL_PASSIVE_NAMES[s]}</b><span class="pc-lv">Lv${t} → Lv${t-1}</span><span class="pc-lose">失う効果：${p.name}</span></span>`;
+      b.addEventListener('click',()=>this.applyPassiveLower(s));
+      list.appendChild(b);
+    });
+    box.appendChild(list);
+    const cancel=document.createElement('button'); cancel.type='button'; cancel.className='pc-cancel'; cancel.textContent='やめる';
+    cancel.addEventListener('click',()=>{ _seShop('close',{suppressTap:true}); this.passiveChange=null; this.renderAll(); });
+    box.appendChild(cancel);
+    ov.appendChild(box);
+    return ov;
+  },
+  applyPassiveLower(s){
+    const pc=this.passiveChange; if(!pc||pc.step!=='lower') return;
+    const price=GameState.shopPriceOf(this.slotPrice('passive_change'));
+    const t=GameState.symbolPassiveTier[s]||0;
+    if(GameState.gold<price||t<1){ _seShop('error',{suppressTap:true}); return; }
+    GameState.gold-=price; pc.slot.used=true; _seShop('buy',{suppressTap:true}); _seShop('coin');
+    GameState.symbolPassiveTier[s]=t-1;
+    try{ GameData.refreshPassiveEnhance(); }catch(e){}
+    this.message=`${GameData.SYMBOL_PASSIVE_NAMES[s]}：Lv${t} → Lv${t-1}`;
+    const picks=(typeof GameMainScene!=='undefined')?GameMainScene.generatePassiveChoicePicks():null;
+    if(!picks||!picks.length||typeof StageFX==='undefined'){ this.passiveChange=null; this.renderAll(); return; }
+    pc.step='pick'; pc.picks=picks;
+    this.renderAll();
+    StageFX.showPassiveChoice({
+      picks, remaining:1, title:'パッシブレベルチェンジ', noSkip:true, outsideGame:true,
+      items:picks.map(cand=>{ const p=GameData.SYMBOL_PASSIVES[cand.symbol][cand.nextTier]; let live=''; try{ live=p.live(); }catch(e){} return {sym:cand.symbol,tier:cand.nextTier,symHtml:GameData.SYMBOL_LABEL[cand.symbol],name:p.name,desc:p.desc,live}; }),
+      onChoose:(idx)=>{
+        const c=picks[idx];
+        if(c){ GameState.symbolPassiveTier[c.symbol]=c.nextTier; try{ GameData.refreshPassiveEnhance(); GameData.enforceCrossAll(); }catch(e){}
+          this.message=`${this.message}／${GameData.SYMBOL_PASSIVE_NAMES[c.symbol]}Lv${c.nextTier}を習得`; }
+        try{ StageFX.hidePassive(); }catch(e){}
+        this.passiveChange=null;
+        if(this.container) this.renderAll();
+      },
+    });
+  },
   // v1.30 通常ショップ：購入・売却・パック選択確定のたびにセーブ（直近ショップとして品揃え・購入状態も保存し、マップから戻れる）
   shopAutoSave(){
     if(this.miniShop||this._rewardLayer||!this.offers||typeof App==='undefined') return;
-    if(this.pickingPack||this.pickingCardPack||this.pickingRelicPack||this._fxPack||(this.packQueue&&this.packQueue.length)||this.pendingRelicPacks||this.cardRevealPopup) return;
+    if(this.pickingPack||this.pickingCardPack||this.pickingRelicPack||this._fxPack||(this.packQueue&&this.packQueue.length)||this.pendingRelicPacks||this.cardRevealPopup||this.passiveChange) return;
     if(typeof GameMainScene!=='undefined'&&GameMainScene.pendingJokerPick) return;
     let sig; try{ sig=JSON.stringify([GameState.gold,GameState.currentDeck,GameState.relics,this.offers,GameState.symbolPassiveTier]); }catch(e){ return; }
     if(sig===this._shopSaveSig&&GameState.lastShop) return;
@@ -832,6 +891,7 @@ const ShopScene = {
     // #19 パック内訳モーダル
     const pip = GameMainScene.renderPassiveInfoPanel(()=>this.renderAll()); if(pip) this.container.appendChild(pip); // #16
     if(this.packBreakdownOpen) this.container.appendChild(this.renderPackBreakdownModal());
+    if(this.passiveChange&&this.passiveChange.step==='lower') this.container.appendChild(this.renderPassiveChangeModal());
     // パック開封演出：未開封のパックは、剥く演出が終わるまで選択モーダルを出さない
     const fxPack=this.pendingPackFx(); if(fxPack) this.startPackFx(fxPack);
     const opened=(pk)=>pk&&(!pk.packType||pk._opened);
@@ -1034,6 +1094,10 @@ const ShopScene = {
       const packGfx=(typeof PackFX!=='undefined'&&PackFX.EMOJI[slot.type])?PackFX.packHtml(slot.type,{size:'mini'}):'';
       el.innerHTML=`${this.priceBadge(price)}${packGfx}<div class="slot-title">${typeName.icon?GIcon(typeName.icon):''}${typeName.name}</div><div class="slot-desc">${this.slotDesc(slot.type)}</div><button class="buy-btn" ${GameState.gold<price?'disabled':''}>購入</button>`;
       el.querySelector('.buy-btn').addEventListener('click', () => this.handleRandomSlot(slot));
+      if(slot.type==='passive_change'){
+        el.classList.add('special-slot','passive-change-slot');
+        if(this.passiveChangeOwned().length===0){ const b=el.querySelector('.buy-btn'); b.disabled=true; b.textContent='パッシブ未所持'; }
+      }
       row.appendChild(el);
     });
     // ミニショップ：常設／ランダムの区別タグ
@@ -1045,7 +1109,8 @@ const ShopScene = {
     const nN=GameState.packCardCount(false), nE=GameState.packCardCount(true); // #11
     const descs = { pickup_relic:'ランダムなレリックを購入', pickup_card:'陳列されたカード1枚を購入',card_pack:'カード2枚から1枚選択', pickup_upgrade:`通常セレクトから3つ・対象カード${nN}枚`, normal_upgrade:`通常セレクトから3つ・対象カード${nN}枚`, special_upgrade:`特別セレクトから2つ・対象カード${nN}枚`, card_focus:'カード4枚から2枚ピックアップ', bingo_focus:'ビンゴ倍率強化を選択', dream_card:'カード2枚から1枚ピックアップ（全効果付き）',
       enhance_pack:'強化付きカード3枚から1枚選択', jamming_pack:'ジャミング付きカード3枚から1枚選択', relic_pack:'レリック3つから1つ選択・売却してストック確保も可能',
-      normal_explosive_upgrade:`通常セレクトから5つ・対象カード${nE}枚・5つの中から最大3つまで選択（補充なし）` };
+      normal_explosive_upgrade:`通常セレクトから5つ・対象カード${nE}枚・5つの中から最大3つまで選択（補充なし）`,
+      passive_change:'所持パッシブ1つのレベルを1下げ、ランダムな3つから1つ習得' };
     return descs[type] || '';
   },
 

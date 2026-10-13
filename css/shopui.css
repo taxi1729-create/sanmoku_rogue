@@ -96,3 +96,15 @@
 /* v1.30 品揃え更新ボタンも右上に価格バッジ */
 .shop-reroll-btn{position:relative;overflow:visible;}
 .shop-reroll-btn .slot-price{top:-9px;right:-6px;}
+
+/* v1.32 パッシブレベルチェンジ */
+.passive-change-modal .pc-lead{font-size:12px;opacity:.85;margin:4px 0 10px;line-height:1.5;}
+.passive-change-modal .pc-list{display:flex;flex-direction:column;gap:8px;}
+.passive-change-modal .pc-item{display:flex;align-items:center;gap:10px;text-align:left;padding:8px 10px;border-radius:10px;border:1px solid rgba(94,234,212,.45);background:rgba(15,23,42,.7);color:inherit;}
+.passive-change-modal .pc-item:active{transform:scale(.98);}
+.passive-change-modal .pc-sym{font-size:22px;flex:none;width:32px;text-align:center;}
+.passive-change-modal .pc-sym .gi{width:26px;height:26px;}
+.passive-change-modal .pc-text{display:flex;flex-direction:column;gap:2px;font-size:12px;}
+.passive-change-modal .pc-lv{color:#fca5a5;font-weight:700;}
+.passive-change-modal .pc-lose{opacity:.8;}
+.passive-change-modal .pc-cancel{margin-top:12px;width:100%;}

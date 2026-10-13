@@ -112,6 +112,7 @@ const StageFX = (function(){
     if(watchTimer) return;
     watchTimer=setInterval(()=>{
       if(document.querySelector('.game-screen')) return;
+      if(pvUI && pvUI.opts && pvUI.opts.outsideGame) return; // v1.32 ショップ（パッシブレベルチェンジ）から呼ぶ選択はゲーム画面外でも片付けない
       clearAll();
     }, 400);
   }
@@ -1230,13 +1231,13 @@ const StageFX = (function(){
       document.body.appendChild(ov);
     }
     const content=el('div','stfx-pv-content');
-    content.innerHTML=`<div class="stfx-pv-head"><div class="stfx-pv-title">記号パッシブを授かる</div><div class="stfx-pv-sub">1つ選んでください${(opts.remaining||1)>1?`<span class="stfx-pv-remain">魔力ステージD：あと${opts.remaining}回</span>`:''}</div></div>
+    content.innerHTML=`<div class="stfx-pv-head"><div class="stfx-pv-title">${esc(opts.title||'記号パッシブを授かる')}</div><div class="stfx-pv-sub">1つ選んでください${(opts.remaining||1)>1?`<span class="stfx-pv-remain">魔力ステージD：あと${opts.remaining}回</span>`:''}</div></div>
       <div class="stfx-pv-list">${opts.items.map((it,i)=>`
         <button type="button" class="stfx-pv-card" data-idx="${i}">
           <span class="stfx-pv-emblem sym-${esc(it.sym)}"><span class="stfx-pv-emblem-ring"></span><span class="stfx-pv-sym">${it.symHtml}</span><span class="stfx-pv-lv">Lv${esc(it.tier)}</span></span>
           <span class="stfx-pv-text"><b>${esc(it.name)}</b><span class="stfx-pv-desc">${(it.desc)}</span><span class="stfx-pv-live">${(it.live)}</span></span>
         </button>`).join('')}</div>
-      <button type="button" class="stfx-pv-skip">スキップ</button>
+      ${opts.noSkip?'':'<button type="button" class="stfx-pv-skip">スキップ</button>'}
       <div class="stfx-pv-hint">タップでスキップ</div>`;
     ov.appendChild(content);
     const ui=pvUI={ ov, picks:opts.picks, opts, busy:true, skip:false, sym:null };
@@ -1256,7 +1257,7 @@ const StageFX = (function(){
       if(ui.busy){ settle(); return; }
       choose(ui, parseInt(cd.dataset.idx,10));
     }));
-    skipBtn.addEventListener('click',(e)=>{
+    if(skipBtn) skipBtn.addEventListener('click',(e)=>{
       e.stopPropagation(); if(ui!==pvUI || ui.choosing) return;
       if(ui.busy){ settle(); return; }
       confirmSkip(()=>{

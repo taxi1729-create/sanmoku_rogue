@@ -625,12 +625,15 @@ const GameData = {
     { id:'normal_explosive_upgrade', name:'爆発通常アップグレード', weight:0, icon:'pack_explosive' },
     // ピックアップカード：重み付き抽選には含めず、各ランダム枠の抽選時に PICKUP_CARD_RATE の確率で別途陳列（rollRandomShopSlotType）
     { id:'pickup_card', name:'ピックアップカード', weight:0, icon:'pack_card' },
+    // v1.32 パッシブレベルチェンジ：重み付き抽選には含めず、各ランダム枠の抽選時に PASSIVE_CHANGE_RATE の確率で陳列
+    { id:'passive_change', name:'パッシブレベルチェンジ', weight:0, icon:'shop_passive_change' },
   ],
+  PASSIVE_CHANGE_RATE: 0.0005,     // ランダム商品1枠あたりの陳列確率（0.05%）
   PICKUP_CARD_RATE: 0.15,          // ランダム商品1枠あたりの陳列確率
   PICKUP_CARD_SPECIAL_RATE: 0.05,  // 全効果付き・基礎点100〜150になる確率
   // 価格：1G＋ジャミング2G＋強化4G＋性質変化6G（ブラックカード割引は呼び出し側で shopPriceOf を通す）
   pickupCardBasePrice(card){ return 1 + (card&&card.jamming?2:0) + (card&&card.enhance?4:0) + (card&&card.trait?6:0); },
-  rollRandomShopSlotType(){ return Math.random() < this.PICKUP_CARD_RATE ? 'pickup_card' : this.pickWeightedType(); },
+  rollRandomShopSlotType(){ if(Math.random() < this.PASSIVE_CHANGE_RATE) return 'passive_change'; return Math.random() < this.PICKUP_CARD_RATE ? 'pickup_card' : this.pickWeightedType(); },
 
   // スキップ報酬のパック抽選：爆発通常アップグレード50%・特別アップグレード20%・ドリームカードパック10%・レリックパック20%
   SKIP_BONUS_TYPES: [
@@ -699,7 +702,8 @@ const GameData = {
                  // #9 新商品価格（各4G）
                  enhancePack:4, jammingPack:4, relicPack:6, // v11 #10 レリックパック6G
                  // #6 爆発通常アップグレード
-                 normalExplosiveUpgrade:10 },
+                 normalExplosiveUpgrade:10,
+                 passiveChange:20 }, // v1.32 パッシブレベルチェンジ
 
   NORMAL_SELECT_POOL: [
     { id:'circle_mult', name:`${GIcon('rarity_normal')}マルビンゴ強化`,    desc:`${GIconSym('Circle')}のビンゴ倍率を+4する`,              targetMin:0, targetMax:0 },

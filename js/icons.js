@@ -232,6 +232,10 @@ const GameIcons = (function(){
         `<path d="M9 3h6M9.8 3v2.8C6.5 7.2 5 9.8 5 13c0 4.3 3 7.5 7 7.5s7-3.2 7-7.5c0-3.2-1.5-5.8-4.8-7.2V3"${s(C.gold)}${tf(C.gold,0.2)}/>`
       + `<path d="M6.2 11.5h11.6"${s(C.gold)} stroke-width="1.5" stroke-opacity=".7"/>`
       + `<circle cx="12" cy="15" r="2.3"${F(C.redD)}/>` },
+    shop_passive_change:{ label:'パッシブレベルチェンジ', tint:'fixed', body:
+        `<circle cx="12" cy="12" r="9.2"${s(C.teal)}${tf(C.teal,0.15)}/>`
+      + `<path d="M8 6.5v9M5.2 12.8L8 15.6l2.8-2.8"${s(C.white)} stroke-width="1.9"/>`
+      + `<path d="M16 17.5v-9M13.2 11.2L16 8.4l2.8 2.8"${s(C.teal)} stroke-width="1.9"/>` },
     shop_pickup_upgrade:{ label:'ピックアップアップグレード', tint:'fixed', body:
         `<circle cx="11" cy="13" r="8.5"${s(C.teal)}${tf(C.teal,0.15)}/>`
       + `<circle cx="11" cy="13" r="4.4"${s(C.teal)}/>`
