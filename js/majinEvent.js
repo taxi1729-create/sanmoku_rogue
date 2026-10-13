@@ -322,7 +322,7 @@ const MajinEvent = (function(){
         return lostHtml([top],'捧げたカード')+`<div class="mj-sub-label">レリックを獲得</div><div class="mj-card-row">${relicHtml(relic)}</div><div class="mj-note">${relic.desc}<br>n = <b>${relic.sealValue}</b></div>`;
       } },
     ability_3: { majin:'ability', title:'記号の奉納', cost:0, rx:'seal',
-      desc: () => `記号パッシブを1つ捧げ（Lv0に）、魔力ステージD（第${G().currentFloor}階層ボス報酬のパッシブが3択に）を得る。`,
+      desc: () => `記号パッシブを1つ捧げ（レベル-1）、魔力ステージD（第${G().currentFloor}階層ボス報酬のパッシブが3択に）を得る。`,
       check: () => ownedPassives().length===0 ? '捧げる記号パッシブを所持していない' : ((G().mana.D||[]).includes(G().currentFloor) ? 'この階層には既に魔力ステージDが宿っている' : null),
       async run(api){
         const key=await api.pickList(ownedPassives().map(s=>{
@@ -330,9 +330,9 @@ const MajinEvent = (function(){
           return { key:s, icon:GameData.SYMBOL_LABEL[s], iconCls:'sym-'+s, label:`${GameData.SYMBOL_PASSIVE_NAMES[s]} Lv${t}`, desc:GameData.SYMBOL_PASSIVES[s][t].name };
         }), {title:'捧げる記号パッシブを1つ選べ'});
         const oldT=G().symbolPassiveTier[key];
-        G().symbolPassiveTier[key]=0; GameData.refreshPassiveEnhance();
+        G().symbolPassiveTier[key]=Math.max(0,oldT-1); GameData.refreshPassiveEnhance(); // v1.33 Lv0ではなく1下げる
         G().grantMana('D', G().currentFloor);
-        return `<div class="mj-sub-label">捧げたパッシブ</div>${passiveHtml(key,0,`（Lv${oldT} → Lv0）を捧げた`)}${manaHtml('D')}`;
+        return `<div class="mj-sub-label">捧げたパッシブ</div>${passiveHtml(key,Math.max(0,oldT-1),`（Lv${oldT} → Lv${Math.max(0,oldT-1)}）を捧げた`)}${manaHtml('D')}`;
       } },
     ability_4: { majin:'ability', title:'半減の契約', cost:0, rx:'seal',
       desc: () => '全ビンゴ倍率を半分に（切り上げ）。代わりに記号パッシブ3つから1つを習得（次のLv）。',

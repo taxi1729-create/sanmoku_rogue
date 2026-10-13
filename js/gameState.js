@@ -73,7 +73,7 @@ const GameState = {
     return h;
   },
   effectiveMaxRounds(){ return GameData.MAX_ROUNDS + this.roundsBonus; },
-  effectiveTurnsPerRound(){ return GameData.TURNS_PER_ROUND + this.turnsBonus; },
+  effectiveTurnsPerRound(){ return GameData.TURNS_PER_ROUND + this.turnsBonus + 2*(this.relics||[]).filter(r=>r.id==='majin_seal').length; }, // v1.33 魔神のお墨付き②ターン+2
   effectiveMaxRelics(){ return GameData.MAX_RELICS + this.relicSlotBonus + (this.mana?.C||0); },
   // #1 魔力
   hasMana(st){ if(!this.mana) return false; if(st==='C') return (this.mana.C||0)>0; if(st==='D') return (this.mana.D||[]).length>0; return !!this.mana[st]; },

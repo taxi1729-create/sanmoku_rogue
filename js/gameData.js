@@ -90,7 +90,7 @@ const GameData = {
     E:{ name:'魔力ステージE', desc:'①カードがカード強化・ジャミング・性質変化の全てが付与された状態で排出される。②レリックには全てレリック強化効果が付与された状態で排出される' },
   },
   // #3 魔神イベント専用レリック（ショップ等のランダム抽選には含めない）
-  MAJIN_SEAL_RELIC: { id:'majin_seal', name:'魔神のお墨付き', desc:'ビンゴ時、補正基礎点+(n+50)（n=魔神に捧げたカードの基礎点）' },
+  MAJIN_SEAL_RELIC: { id:'majin_seal', name:'魔神のお墨付き', desc:'①ビンゴ時、補正基礎点+(n+50)（n=魔神に捧げたカードの基礎点）②ターン+2' },
 
   // #18 点数計算変数の初期値を明記
   CORRECTION_BASE_SCORE: 0,   // 補正基礎点
@@ -275,8 +275,8 @@ const GameData = {
     // #8 チェックパッシブ（旧マルパッシブ1の効果を継承）
     Check: {
       // #19 チェックパッシブ1：ビンゴした記号の種類が2種類以上の時、最終乗算補正+(種類数-1)
-      1: { name:'チェック・バラエティ', desc:'①ビンゴ時、このラウンドでビンゴした記号の種類（同時ビンゴを含む）が2種類以上の時、最終乗算補正+n×STAR（n=ビンゴした記号の種類の数-1）',
-        live(){ const n=(typeof GameMainScene!=='undefined'&&GameMainScene.bingoSymbolsThisRound)?GameMainScene.bingoSymbolsThisRound.size:0; return `このラウンドでビンゴした記号の種類：${n}種類 → 最終乗算補正+${Math.max(0,n-1)*GameState.star()}`; } },
+      1: { name:'チェック・バラエティ', desc:'①ビンゴ時、このラウンドでビンゴした記号の種類（同時ビンゴを含む）が2種類以上の時、最終乗算補正+1.5×n×STAR（n=ビンゴした記号の種類の数-1）',
+        live(){ const n=(typeof GameMainScene!=='undefined'&&GameMainScene.bingoSymbolsThisRound)?GameMainScene.bingoSymbolsThisRound.size:0; return `このラウンドでビンゴした記号の種類：${n}種類 → 最終乗算補正+${Math.round(Math.max(0,n-1)*1.5*GameState.star()*100)/100}`; } },
       2: { name:'チェック・コーナー', desc:'①ゲーム開始時、盤面の4隅にマル・シカク・サンカクのいずれかランダムな記号（基礎点100）と、ランダムなマルチ強化（マルマルチ/シカクマルチ/サンカクマルチ/オールマルチ）が付いたカードを配置する',
         live(){ return '盤面4隅に基礎点100・オールマルチのマルカードを配置'; } },
       // #20 チェックパッシブ3：同じ記号のビンゴが2回目になるまで、盤面がエクステンド状態（ビンゴしてもラウンドが終了しない）
@@ -331,24 +331,24 @@ const GameData = {
 
 
   RELIC_ENHANCE_POOL: [
-    { id:'ren_discard', name:'廃棄強化',     desc:'①捨て札は廃棄札へ。最終乗算補正×1.5' },
-    { id:'ren_circle', name:'マルオール',   desc:'①ビンゴ時補正基礎点+n（n=デッキのマルカード数）' },
-    { id:'ren_square', name:'シカクオール',  desc:'①ビンゴ時補正基礎点+n（n=デッキのシカクカード数）' },
-    { id:'ren_triangle', name:'サンカクオール',desc:'①ビンゴ時補正基礎点+n（n=デッキのサンカクカード数）' },
+    { id:'ren_discard', name:'廃棄強化',     desc:'①捨て札は廃棄札へ。最終乗算補正×2.25' },
+    { id:'ren_circle', name:'マルオール',   desc:'①ビンゴ時補正基礎点+2n（n=デッキのマルカード数）' },
+    { id:'ren_square', name:'シカクオール',  desc:'①ビンゴ時補正基礎点+2n（n=デッキのシカクカード数）' },
+    { id:'ren_triangle', name:'サンカクオール',desc:'①ビンゴ時補正基礎点+2n（n=デッキのサンカクカード数）' },
     { id:'ren_only_one', name:'オンリーワン',  desc:'①レリック所持数が1つの時、補正倍率+40②レリック所持数が1つの時、ステージクリア時に全てのビンゴ倍率+1' },
-    { id:'ren_pair', name:'ペアルック',    desc:'①同じレリックを持っている時、カード基礎点+40' },
+    { id:'ren_pair', name:'ペアルック',    desc:'①同じレリックを持っている時、カード基礎点+80' },
     { id:'ren_negative', name:'ネガティブ',    desc:'①このレリックは所持数に加算されない' },
     { id:'ren_discard_sell', name:'ディスカード', desc:'①売却時デッキ枚数/2（切捨て）Gを得る' },
     { id:'ren_general', name:'将軍',          desc:'①ビンゴ時、最終乗算補正×1.1' },
     { id:'ren_all_link', name:'オールリンク',  desc:'①プレイヤーが配置するカードに常にジャミング効果「リンク」が付与されている状態になる（他のジャミング効果と重複する）' },
     { id:'ren_gold', name:'G獲得',         desc:'①ステージクリア時追加で1G得る' },
     { id:'ren_draw', name:'ドロー強化',    desc:'①ラウンド終了時カードを1枚ドロー' },
-    { id:'ren_double', name:'倍化',          desc:'①2個分とカウント。最終乗算補正×1.5' },
-    { id:'ren_triple', name:'3倍化',         desc:'①3個分とカウント。最終乗算補正×2' },
+    { id:'ren_double', name:'倍化',          desc:'①2個分とカウント。最終乗算補正×2.25' },
+    { id:'ren_triple', name:'3倍化',         desc:'①3個分とカウント。最終乗算補正×3' },
     { id:'ren_cross', name:'バツ強化',      desc:'①バツビンゴ時、ビンゴ倍率を2倍にする' },
     { id:'ren_npc', name:'NPC強化',       desc:'①NPCが2回行動。補正基礎点×5' },
-    { id:'ren_draw_pile', name:'山札強化',      desc:'①ビンゴ時、山札数×100を最終加算補正に追加' },
-    { id:'ren_disc_pile', name:'捨て札強化',    desc:'①ビンゴ時補正基礎点+n（n=捨て札数）' },
+    { id:'ren_draw_pile', name:'山札強化',      desc:'①ビンゴ時、山札数×200を最終加算補正に追加' },
+    { id:'ren_disc_pile', name:'捨て札強化',    desc:'①ビンゴ時補正基礎点+2n（n=捨て札数）' },
     { id:'ren_black', name:'ブラックカード', desc:'①ショップの品替え更新以外の販売価格を1G減少。この効果は重複できる' },
     { id:'ren_first', name:'手番高速',      desc:'①全ラウンドで最初の手番がプレイヤーになる' },
     { id:'ren_grade', name:'グレードオール', desc:'①ビンゴ時補正倍率+n（n=デッキの強化/ジャミング/性質変化の総数）' },
@@ -373,7 +373,7 @@ const GameData = {
       case 'reroll_boost': return `補正基礎点:${GameState.rerollCount*10}`;
       case 'bingo': return '補正基礎点:+30';
       case 'onko_chishin': return `補正基礎点:+${10*GameState.relicCount()}（m=${GameState.relicCount()}）／補正倍率:+${10*GameState.passiveCount()}（n=${GameState.passiveCount()}）`;
-      case 'charge': return `補正倍率:+${gm?(gm.chargeN||0):0}（n=${gm?(gm.chargeN||0):0}、150超でn=-10）`;
+      case 'charge': return `補正倍率:+${gm?(gm.chargeN||0):0}（n=${gm?(gm.chargeN||0):0}、250超でn=-10）`;
       case 'odd_boost': return '補正基礎点:+15（奇数加算時）';
       case 'even_boost': return '補正基礎点:+15（偶数加算時）';
       case 'circle_boost': return '補正基礎点:+60（マルビンゴ時）';
@@ -381,7 +381,7 @@ const GameData = {
       case 'square_boost': return '補正基礎点:+60（シカクビンゴ時）';
       case 'relic_boost': { const n=GameState.relicCount(); return `補正基礎点:+${5+8*n}`; }
       case 'empty_boost': { const ec=(gm&&gm.board)?gm.board.filter(c=>!c).length:0; return `補正倍率:+${6*ec+5}`; }
-      case 'combo': return '最終乗算補正:+1.5（前ラウンドと異なる記号でビンゴ時）';
+      case 'combo': return '最終乗算補正:+2.25（前ラウンドと異なる記号でビンゴ時）';
       case 'turn_boost': { const t=gm?(gm.turnInRound||1):1; return `最終乗算補正:×${Math.round(Math.pow(1.01,t)*100)/100}`; }
       case 'hand_boost': return `補正倍率:+${GameState.hand.length*3}`;
       case 'last_stand': return GameState.round>=4?'最終乗算補正:×2（発動中）':'最終乗算補正:×2（4ラウンド以降で発動）';
@@ -390,22 +390,22 @@ const GameData = {
       case 'round_boost': return `最終加算補正:+${1000*GameState.round}（ラウンド終了時）`;
       case 'base_boost': return '最終加算補正:+2000（取得時に反映済み）';
       case 'jamming_boost': return `点数:+${Math.round(GameState.targetScore*0.05)}（ビンゴ阻害カード配置時）`;
-      case 'majin_seal': return `補正基礎点:+${(relic.sealValue||0)+50}`;
+      case 'majin_seal': return `補正基礎点:+${(relic.sealValue||0)+50}／ターン+2`;
     }
     switch(relic.relicEnhance){
-      case 'ren_circle': return `補正基礎点:+${GameState.currentDeck.filter(c=>c.symbol==='Circle').length}`;
-      case 'ren_triangle': return `補正基礎点:+${GameState.currentDeck.filter(c=>c.symbol==='Triangle').length}`;
-      case 'ren_square': return `補正基礎点:+${GameState.currentDeck.filter(c=>c.symbol==='Square').length}`;
-      case 'ren_disc_pile': return `補正基礎点:+${GameState.discardPile.length}`;
+      case 'ren_circle': return `補正基礎点:+${2*GameState.currentDeck.filter(c=>c.symbol==='Circle').length}`;
+      case 'ren_triangle': return `補正基礎点:+${2*GameState.currentDeck.filter(c=>c.symbol==='Triangle').length}`;
+      case 'ren_square': return `補正基礎点:+${2*GameState.currentDeck.filter(c=>c.symbol==='Square').length}`;
+      case 'ren_disc_pile': return `補正基礎点:+${2*GameState.discardPile.length}`;
       case 'ren_grade': { const n=GameState.currentDeck.reduce((s,c)=>{let x=0;if(c.enhance)x++;if(c.jamming)x++;if(c.trait)x++;return s+x;},0); return `補正倍率:+${n}（n=${n}）`; }
       case 'ren_only_one': return GameState.relicCount()===1?'補正倍率:+20（発動中）':'補正倍率:+20（レリック1個所持時のみ）';
       case 'ren_general': return '最終乗算補正:×1.1';
-      case 'ren_pair': return GameState.relics.filter(x=>x.id===relic.id).length>=2?'カード基礎点:+40（発動中）':'カード基礎点:+40（同じレリックを2つ以上所持時のみ）';
+      case 'ren_pair': return GameState.relics.filter(x=>x.id===relic.id).length>=2?'カード基礎点:+80（発動中）':'カード基礎点:+80（同じレリックを2つ以上所持時のみ）';
       case 'ren_npc': return '補正基礎点:×5（NPCは2回行動）';
-      case 'ren_double': return '最終乗算補正:×1.5';
-      case 'ren_triple': return '最終乗算補正:×2';
-      case 'ren_draw_pile': return `最終加算補正:+${GameState.drawPile.length*100}`;
-      case 'ren_discard': return '最終乗算補正:×1.5';
+      case 'ren_double': return '最終乗算補正:×2.25';
+      case 'ren_triple': return '最終乗算補正:×3';
+      case 'ren_draw_pile': return `最終加算補正:+${GameState.drawPile.length*200}`;
+      case 'ren_discard': return '最終乗算補正:×2.25';
       case 'ren_gold': return 'クリア報酬:G+1';
     }
     return null;
@@ -543,14 +543,14 @@ const GameData = {
   RELIC_ENHANCE_RATE: 0.3, // #4 レリック強化効果の付与確率30%
   RELIC_POOL: [
     { id:'bingo', name:'ビンゴ',           desc:'①ビンゴした時、補正基礎点+30' },
-    { id:'charge', name:'チャージ',         desc:'①補正倍率+n（ゲーム開始時n=0。全てのビンゴ計算が終わりラウンドが上がる時に、手札のカード基礎点の合計をnに加算。nが150を超えるとn=-10になる）' },
+    { id:'charge', name:'チャージ',         desc:'①補正倍率+n（ゲーム開始時n=0。全てのビンゴ計算が終わりラウンドが上がる時に、手札のカード基礎点の合計をnに加算。nが250を超えるとn=-10になる）' },
     { id:'double', name:'ダブル',           desc:'①同一ターンにビンゴが2つ以上ある時、最終乗算補正×1.5' },
     { id:'odd_boost', name:'奇数補正',         desc:'①ビンゴで加算される基礎点が奇数の度に補正基礎点+15' },
     { id:'even_boost', name:'偶数補正',         desc:'①ビンゴで加算される基礎点が偶数の度に補正基礎点+15' },
     { id:'circle_boost', name:'マル補正',         desc:'①マルでビンゴした時、補正基礎点+60' },
     { id:'triangle_boost', name:'サンカク補正',     desc:'①サンカクでビンゴした時、補正基礎点+60' },
     { id:'square_boost', name:'シカク補正',       desc:'①シカクでビンゴした時、補正基礎点+60' },
-    { id:'combo', name:'コンボ',           desc:'①前ラウンドと異なる記号でビンゴした時、最終乗算補正+1.5' },
+    { id:'combo', name:'コンボ',           desc:'①前ラウンドと異なる記号でビンゴした時、最終乗算補正+2.25' },
     { id:'relic_boost', name:'レリック強化',     desc:'①レリック所持数nに応じ、補正基礎点+5+8n' },
     { id:'paint', name:'ペイント',         desc:'①ゲーム開始時、ランダムな記号が選ばれその記号のカードに塗りつぶし(レリック)付与。②1ラウンドのターン-4' },
     { id:'turn_boost', name:'ターン強化',       desc:'①ビンゴ時、経過ターン数nに応じて最終乗算補正×1.01^n' },
