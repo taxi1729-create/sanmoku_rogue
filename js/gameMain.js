@@ -393,7 +393,8 @@ const GameMainScene = {
     this.effectsBubbleOpen=false;
     this.roundCorrMultBonus=0; // #3 ジャミング増強の補正倍率はラウンドごと
     // v1.34 バツパッシブLv3①：ラウンド開始時、全てのバツカードのカード基礎点+50×STAR（永続）
-    if((GameState.symbolPassiveTier.Cross||0)>=3){ const add=50*GameState.star(); let n=0; (GameState.currentDeck||[]).forEach(c=>{ if(c&&c.symbol==='Cross'){ c.baseScore+=add; n++; } }); if(n) this.addLog(`バツパッシブLv3：バツカード${n}枚の基礎点+${add}`); }
+    // v1.37 3Gを支払えた時のみ発動（所持Gが3未満なら発動しない）。加点量は30×STAR
+    if((GameState.symbolPassiveTier.Cross||0)>=3){ if(GameState.gold>=3){ GameState.gold-=3; const add=30*GameState.star(); let n=0; (GameState.currentDeck||[]).forEach(c=>{ if(c&&c.symbol==='Cross'){ c.baseScore+=add; n++; } }); this.addLog(`バツパッシブLv3：3Gを支払い、バツカード${n}枚の基礎点+${add}`); } else this.addLog('バツパッシブLv3：所持Gが3G未満のため①は発動しない'); }
     // #4 保留：盤面の保留カードは手札に戻さない（reserveは旧データ互換のため残っていれば手札へ）
     if(GameState.reserve.length>0){ GameState.reserve.forEach(c=>{c._reserveCarry=true;}); GameState.hand.push(...GameState.reserve); GameState.reserve=[]; }
     this.drawToHandSize();
@@ -1459,7 +1460,7 @@ const GameMainScene = {
   updateCharge(sum){
     if(!(GameState.hasRelic('charge')&&this.relicActive())) return;
     this.chargeN=(this.chargeN||0)+sum;
-    if(this.chargeN>250){ this.chargeN=-10; this.addLog('チャージ：nが250を超えたため n=-10 にリセット'); }
+    if(this.chargeN>500){ this.chargeN=-50; this.addLog('チャージ：nが500を超えたため n=-50 にリセット'); }
     else this.addLog(`チャージ：手札の基礎点合計${sum}を加算（n=${this.chargeN}）`);
     this.renderAll();
   },

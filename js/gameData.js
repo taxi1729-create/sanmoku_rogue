@@ -307,8 +307,8 @@ const GameData = {
         live(){ const n=GameState.currentDeck.length; return `デッキ枚数:${n}枚 → NPCのバツ基礎点=${n*3*GameState.star()}`; } },
       2: { name:'バツ・ミラー', desc:'①一番高いビンゴ倍率を常にバツ倍率に反映し続ける',
         live(){ const max=Math.max(...GameData.SYMBOLS.map(s=>GameData.BINGO_MULTIPLIER_BASE[s])); return `バツ倍率 ${Math.round(GameData.BINGO_MULTIPLIER_BASE.Cross*100)/100} → ${Math.round(max*100)/100}（現在の最大倍率を反映）`; } },
-      3: { name:'バツ・クアドラプル', desc:'①ラウンド開始時、全てのバツカードのカード基礎点+50×STAR。②ジャミング効果「混乱」はブレイク効果に置き換わる。③ゲーム中にジャミング効果が発動するたび補正倍率+20×STAR（ラウンド終了時にリセットされず、ゲーム終了時にリセット）。④通常アップグレードの記号変化で変化する記号がバツのみになる',
-        live(){ const gm=(typeof GameMainScene!=='undefined')?GameMainScene:null; const n=GameState.currentDeck.filter(c=>c.symbol==='Cross').length; return `ラウンド開始時：バツカード${n}枚の基礎点+${50*GameState.star()} ／ ジャミング累計：補正倍率+${(gm&&gm.crossJamBonus)||0}`; } },
+      3: { name:'バツ・クアドラプル', desc:'①ラウンド開始時、3Gを支払い全てのバツカードのカード基礎点+30×STAR（所持Gが3G未満なら発動しない）。②ジャミング効果「混乱」はブレイク効果に置き換わる。③ゲーム中にジャミング効果が発動するたび補正倍率+20×STAR（ラウンド終了時にリセットされず、ゲーム終了時にリセット）。④通常アップグレードの記号変化で変化する記号がバツのみになる',
+        live(){ const gm=(typeof GameMainScene!=='undefined')?GameMainScene:null; const n=GameState.currentDeck.filter(c=>c.symbol==='Cross').length; return `ラウンド開始時（3G支払い）：バツカード${n}枚の基礎点+${30*GameState.star()} ／ ジャミング累計：補正倍率+${(gm&&gm.crossJamBonus)||0}`; } },
     },
     // #3 ホシパッシブ（実際のカード記号ではなく専用の特殊効果枠）
     Hoshi: {
@@ -374,7 +374,7 @@ const GameData = {
       case 'reroll_boost': return `補正基礎点:${GameState.rerollCount*10}`;
       case 'bingo': return '補正基礎点:+30';
       case 'onko_chishin': return `補正基礎点:+${10*GameState.relicCount()}（m=${GameState.relicCount()}）／補正倍率:+${10*GameState.passiveCount()}（n=${GameState.passiveCount()}）`;
-      case 'charge': return `補正倍率:+${gm?(gm.chargeN||0):0}（n=${gm?(gm.chargeN||0):0}、250超でn=-10）`;
+      case 'charge': return `補正倍率:+${gm?(gm.chargeN||0):0}（n=${gm?(gm.chargeN||0):0}、500超でn=-50）`;
       case 'odd_boost': return '補正基礎点:+15（奇数加算時）';
       case 'even_boost': return '補正基礎点:+15（偶数加算時）';
       case 'circle_boost': return '補正基礎点:+60（マルビンゴ時）';
@@ -545,7 +545,7 @@ const GameData = {
   RELIC_ENHANCE_RATE: 0.3, // #4 レリック強化効果の付与確率30%
   RELIC_POOL: [
     { id:'bingo', name:'ビンゴ',           desc:'①ビンゴした時、補正基礎点+30' },
-    { id:'charge', name:'チャージ',         desc:'①補正倍率+n（ゲーム開始時n=0。全てのビンゴ計算が終わりラウンドが上がる時に、手札のカード基礎点の合計をnに加算。nが250を超えるとn=-10になる）' },
+    { id:'charge', name:'チャージ',         desc:'①補正倍率+n（ゲーム開始時n=0。全てのビンゴ計算が終わりラウンドが上がる時に、手札のカード基礎点の合計をnに加算。nが500を超えるとn=-50になる）' },
     { id:'double', name:'ダブル',           desc:'①同一ターンにビンゴが2つ以上ある時、最終乗算補正×1.5' },
     { id:'odd_boost', name:'奇数補正',         desc:'①ビンゴで加算される基礎点が奇数の度に補正基礎点+15' },
     { id:'even_boost', name:'偶数補正',         desc:'①ビンゴで加算される基礎点が偶数の度に補正基礎点+15' },
